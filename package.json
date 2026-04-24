@@ -10,10 +10,16 @@
   "type": "module",
   "scripts": {
     "ready": "vp fmt && vp lint && vp run -r test && vp run -r build",
-    "dev": "vp run website#dev",
+    "dev": "concurrently -n web,convex -c blue,magenta \"vp run web#dev -- --port 3676\" \"bunx convex dev\"",
+    "dev:web": "vp run web#dev -- --port 3676",
+    "dev:convex": "bunx convex dev",
     "prepare": "vp config"
   },
+  "dependencies": {
+    "convex": "^1.36.1"
+  },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "vite-plus": "catalog:"
   },
   "overrides": {

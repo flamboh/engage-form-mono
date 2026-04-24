@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Engage Form",
+  "version": "0.0.1",
+  "description": "Fill Engage purchase request forms from prepared purchases.",
+  "action": {
+    "default_popup": "index.html"
+  },
+  "permissions": ["activeTab"],
+  "content_scripts": [
+    {
+      "matches": ["https://uoregon.campuslabs.com/engage/submitter/form/*"],
+      "js": ["content.js"]
+    }
+  ]
+}

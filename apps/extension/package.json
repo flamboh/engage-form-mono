@@ -8,6 +8,10 @@
     "build": "tsc && vp build",
     "preview": "vp preview"
   },
+  "dependencies": {
+    "@engage-form/domain": "workspace:*",
+    "@engage-form/fill-engine": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "~6.0.2",
     "vite": "catalog:",

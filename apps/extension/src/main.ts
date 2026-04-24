@@ -1,60 +1,89 @@
 import "./style.css";
-import typescriptLogo from "./assets/typescript.svg";
-import viteLogo from "./assets/vite.svg";
-import heroImg from "./assets/hero.png";
-import { setupCounter } from "./counter.ts";
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${typescriptLogo}" class="framework" alt="TypeScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.ts</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+type ChromeRuntime = {
+  tabs: {
+    query(
+      queryInfo: { active: boolean; currentWindow: boolean },
+      callback: (tabs: { id?: number }[]) => void,
+    ): void;
+    sendMessage(
+      tabId: number,
+      message: ExtensionMessage,
+      callback?: (response: ExtensionResponse) => void,
+    ): void;
+  };
+  runtime: {
+    lastError?: { message: string };
+  };
+};
 
-<div class="ticks"></div>
+type ExtensionMessage = {
+  type: "ENGAGE_FILL_SAMPLE";
+};
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://www.typescriptlang.org" target="_blank">
-          <img class="button-icon" src="${typescriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+type ExtensionResponse = {
+  ok: boolean;
+  message: string;
+  step: string;
+  filled: number;
+};
 
-<div class="ticks"></div>
-<section id="spacer"></section>
+declare const chrome: ChromeRuntime;
+
+const app = document.querySelector<HTMLDivElement>("#app");
+
+if (app === null) {
+  throw new Error("App root missing.");
+}
+
+app.innerHTML = `
+  <main class="popup">
+    <section class="head">
+      <div>
+        <p>Engage Form</p>
+        <h1>Ready purchase</h1>
+      </div>
+      <strong class="ready">Ready</strong>
+    </section>
+
+    <section class="purchase">
+      <h2>Mort Garson music vinyl</h2>
+      <dl>
+        <div><dt>Org</dt><dd>Album Listening Club</dd></div>
+        <div><dt>Amount</dt><dd>$22.98</dd></div>
+        <div><dt>Event</dt><dd>04/21, 6:30pm</dd></div>
+        <div><dt>Recipient</dt><dd>Aidan O'Donnell</dd></div>
+      </dl>
+    </section>
+
+    <button id="fill-page" type="button">Fill current Engage page</button>
+    <p id="status">Open Engage form, then fill page by page.</p>
+  </main>
 `;
 
-setupCounter(document.querySelector<HTMLButtonElement>("#counter")!);
+const fillButton = document.querySelector<HTMLButtonElement>("#fill-page");
+const status = document.querySelector<HTMLParagraphElement>("#status");
+
+if (fillButton === null || status === null) {
+  throw new Error("Popup controls missing.");
+}
+
+fillButton.addEventListener("click", () => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const [tab] = tabs;
+
+    if (tab?.id === undefined) {
+      status.textContent = "No active tab.";
+      return;
+    }
+
+    chrome.tabs.sendMessage(tab.id, { type: "ENGAGE_FILL_SAMPLE" }, (response) => {
+      if (chrome.runtime.lastError !== undefined) {
+        status.textContent = "Open the Engage form first.";
+        return;
+      }
+
+      status.textContent = `${response.message} Step: ${response.step}. Filled: ${response.filled}.`;
+    });
+  });
+});

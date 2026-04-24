@@ -39,8 +39,14 @@ Long term maintainability is a core priority. If you add new functionality, firs
 - Keep designs simple, no over explaining, plain colors, no gradients, no decorative elements.
 - Assume dev servers for both Convex and `bun dev` are already running.
 
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
+
 ## References
 
+- Open Source TanStack Start + Convex + Clerk: ~/Code/oss/lawn
 - Convex code demos: ~/Code/oss/convex-demos
 - Clerk + Convex: https://clerk.com/docs/guides/development/integrations/databases/convex
 - Skills: use ~/.agents/skills/find-skills to locate relevant skills wherever possible
+- TanStack Start: https://tanstack.com/start/latest
