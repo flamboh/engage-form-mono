@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Doc } from '$convex/_generated/dataModel';
 	import { convexMutation, convexQuery } from '$lib/convex-http';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
 
 	const clerkContext = getClerkContext();
+	const authMode = $derived(page.url.searchParams.get('auth') === 'sign-up' ? 'sign-up' : 'sign-in');
 
 	let purchases = $state<Doc<'purchaseRequests'>[]>([]);
 	let purchasesLoading = $state(false);
@@ -51,7 +53,11 @@
 	<div class="flex min-h-screen items-center justify-center bg-stone-50">
 		<div
 			{@attach (el) => {
-				clerkContext.clerk.mountSignIn(el, {});
+				if (authMode === 'sign-up') {
+					clerkContext.clerk.mountSignUp(el, {});
+				} else {
+					clerkContext.clerk.mountSignIn(el, {});
+				}
 			}}
 		></div>
 	</div>

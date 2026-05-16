@@ -41,6 +41,10 @@ const TEMPLATE_ENV_KEYS = [
 ] as const;
 
 const copyLoadedEnv = (loadedEnv: Record<string, string>) => {
+  process.env.PUBLIC_CONVEX_URL ??= loadedEnv.PUBLIC_CONVEX_URL ?? loadedEnv.CONVEX_URL;
+  process.env.PUBLIC_CONVEX_SITE_URL ??=
+    loadedEnv.PUBLIC_CONVEX_SITE_URL ?? loadedEnv.CONVEX_SITE_URL;
+
   for (const key of TEMPLATE_ENV_KEYS) {
     const value = loadedEnv[key];
     if (value && !process.env[key]) process.env[key] = value;
@@ -84,7 +88,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      allowedHosts: ["olivermac.tail49a5f0.ts.net"],
+      allowedHosts: ["olivermac.tail49a5f0.ts.net", "oliverbox.tail49a5f0.ts.net"],
       fs: {
         allow: [workspaceRoot],
       },

@@ -21,6 +21,7 @@
       "dependencies": {
         "@engage-form/domain": "workspace:*",
         "@engage-form/fill-engine": "workspace:*",
+        "convex": "^1.39.1",
       },
       "devDependencies": {
         "typescript": "~6.0.2",

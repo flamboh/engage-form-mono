@@ -26,7 +26,7 @@
   <header class="border-b border-border/70">
     <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
       <span class="font-heading text-lg font-semibold tracking-tight">Engage Form</span>
-      <a class="text-sm text-muted-foreground transition-colors hover:text-foreground" href="/">
+      <a class="text-sm text-muted-foreground transition-colors hover:text-foreground" href="/app">
         Sign in
       </a>
     </div>
@@ -43,7 +43,7 @@
       <div class="flex flex-wrap items-center justify-center gap-4">
         <a
           class="inline-flex h-11 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          href="/"
+          href="/app?auth=sign-up"
         >
           Get started
         </a>
