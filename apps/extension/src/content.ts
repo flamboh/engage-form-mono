@@ -1,5 +1,11 @@
 import type { Purchase } from "@engage-form/domain";
-import { createFillPlan, detectStep, type FillAction } from "@engage-form/fill-engine";
+import { detectStep, type FillAction } from "@engage-form/fill-engine";
+import {
+  createContentRunner,
+  type ExtensionMessage,
+  type ExtensionResponse,
+  type FillRunState,
+} from "./content-runner.ts";
 import {
   clickNextStep,
   type FileUploadResult,
@@ -11,33 +17,10 @@ import {
   uploadMiss,
 } from "./form-controls.ts";
 
-type ExtensionMessage =
-  | {
-      type: "ENGAGE_FILL_READY_PURCHASE";
-      purchase: Purchase;
-    }
-  | {
-      type: "ENGAGE_COMPLETE_READY_PURCHASE";
-      purchase: Purchase;
-    };
-
-type ExtensionResponse = {
-  ok: boolean;
-  message: string;
-  step: string;
-  filled: number;
-  missed: string[];
-};
-
-type FillRunState = {
-  purchase: Purchase;
-  filled: number;
-  pageCount: number;
-};
-
 type ChromeApi = {
   runtime: {
     getURL(path: string): string;
+    sendMessage(message: { type: "ENGAGE_REVIEW_REACHED"; purchaseId: string }): void;
     onMessage: {
       addListener(
         callback: (
@@ -48,24 +31,43 @@ type ChromeApi = {
       ): void;
     };
   };
+  storage: {
+    local: {
+      get(
+        keys: string[],
+        callback: (items: Partial<Record<typeof READY_PURCHASE_KEY, Purchase>>) => void,
+      ): void;
+    };
+  };
 };
 
 declare const chrome: ChromeApi;
 
 const FILL_RUN_KEY = "engageFormFillRun";
-const MAX_RUN_PAGES = 16;
+const READY_PURCHASE_KEY = "readyPurchase";
 const windowState = window as Window & { __engageFormContentLoaded?: boolean };
+const runner = createContentRunner({
+  pageHeading,
+  applyFillPlan,
+  clickNextStep,
+  sendReviewReached(purchaseId) {
+    chrome.runtime.sendMessage({
+      type: "ENGAGE_REVIEW_REACHED",
+      purchaseId,
+    });
+  },
+  loadFillRun,
+  saveFillRun,
+  clearFillRun,
+  loadPurchase,
+});
 
 if (windowState.__engageFormContentLoaded !== true) {
   windowState.__engageFormContentLoaded = true;
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    const task =
-      message.type === "ENGAGE_COMPLETE_READY_PURCHASE"
-        ? startFillRun(message.purchase)
-        : fillCurrentPage(message.purchase);
-
-    void task
+    void runner
+      .handleMessage(message)
       .then((result) => {
         showToast(result.message);
         sendResponse(result);
@@ -90,106 +92,10 @@ if (windowState.__engageFormContentLoaded !== true) {
   }, 500);
 }
 
-async function fillCurrentPage(purchase: Purchase): Promise<ExtensionResponse> {
-  const step = detectStep(pageHeading());
-  const plan = createFillPlan(step, purchase);
-  const result = await applyFillPlan(plan.actions);
-
-  return {
-    ok: result.missed.length === 0,
-    message: result.message,
-    step,
-    filled: result.filled,
-    missed: result.missed,
-  };
-}
-
-async function startFillRun(purchase: Purchase): Promise<ExtensionResponse> {
-  saveFillRun({ purchase, filled: 0, pageCount: 0 });
-  return continueFillRun();
-}
-
 async function resumeFillRun() {
-  const state = loadFillRun();
-  if (state === null) return;
-
-  const result = await continueFillRun();
+  const result = await runner.resumeFillRun();
+  if (result === null) return;
   showToast(result.message);
-}
-
-async function continueFillRun(): Promise<ExtensionResponse> {
-  const state = loadFillRun();
-  const step = detectStep(pageHeading());
-  if (state === null) {
-    return {
-      ok: false,
-      message: "No active fill run.",
-      step,
-      filled: 0,
-      missed: [],
-    };
-  }
-
-  if (step === "review") {
-    clearFillRun();
-    return {
-      ok: true,
-      message: `Review reached. Filled ${state.filled} fields.`,
-      step,
-      filled: state.filled,
-      missed: [],
-    };
-  }
-
-  if (step === "unknown") {
-    clearFillRun();
-    return {
-      ok: false,
-      message: "Unknown Engage step. Stopped before advancing.",
-      step,
-      filled: state.filled,
-      missed: [],
-    };
-  }
-
-  if (state.pageCount >= MAX_RUN_PAGES) {
-    clearFillRun();
-    return {
-      ok: false,
-      message: "Stopped after too many Engage steps.",
-      step,
-      filled: state.filled,
-      missed: [],
-    };
-  }
-
-  const result = await fillCurrentPage(state.purchase);
-  const filled = state.filled + result.filled;
-
-  if (result.missed.length > 0) {
-    clearFillRun();
-    return { ...result, filled, ok: false };
-  }
-
-  if (!clickNextStep()) {
-    clearFillRun();
-    return {
-      ok: false,
-      message: "Current page filled, but no next button found.",
-      step,
-      filled,
-      missed: [],
-    };
-  }
-
-  saveFillRun({ ...state, filled, pageCount: state.pageCount + 1 });
-  return {
-    ok: true,
-    message: `Continuing to review. Filled ${filled} fields.`,
-    step,
-    filled,
-    missed: [],
-  };
 }
 
 async function applyFillPlan(actions: FillAction[]) {
@@ -257,6 +163,7 @@ async function uploadFiles(
     filename: string;
     contentType: string;
     storageKey: string;
+    dataUrl?: string;
   }[],
   dropSelector: string,
 ): Promise<FileUploadResult> {
@@ -275,13 +182,14 @@ async function assignFiles(
     filename: string;
     contentType: string;
     storageKey: string;
+    dataUrl?: string;
   }[],
   dropTarget: HTMLElement,
 ): Promise<FileUploadResult> {
   const transfer = new DataTransfer();
 
   for (const file of files) {
-    const response = await fetch(chrome.runtime.getURL(file.storageKey));
+    const response = await fetch(file.dataUrl ?? chrome.runtime.getURL(file.storageKey));
     if (!response.ok) return uploadMiss(`Upload asset missing: ${file.filename}.`);
 
     transfer.items.add(
@@ -319,7 +227,9 @@ function loadFillRun() {
   if (json === null) return null;
 
   try {
-    return JSON.parse(json) as FillRunState;
+    const state = parseFillRunState(JSON.parse(json));
+    if (state === null) clearFillRun();
+    return state;
   } catch {
     clearFillRun();
     return null;
@@ -332,6 +242,38 @@ function saveFillRun(state: FillRunState) {
 
 function clearFillRun() {
   window.sessionStorage.removeItem(FILL_RUN_KEY);
+}
+
+function loadPurchase(purchaseId: string) {
+  return new Promise<Purchase | null>((resolve) => {
+    chrome.storage.local.get([READY_PURCHASE_KEY], (items) => {
+      const purchase = items[READY_PURCHASE_KEY] ?? null;
+      resolve(purchase?.id === purchaseId ? purchase : null);
+    });
+  });
+}
+
+function parseFillRunState(value: unknown): FillRunState | null {
+  if (!isRecord(value)) return null;
+  const purchaseId =
+    typeof value.purchaseId === "string" ? value.purchaseId : legacyPurchaseId(value);
+  if (purchaseId === null) return null;
+
+  return {
+    purchaseId,
+    filled: typeof value.filled === "number" ? value.filled : 0,
+    pageCount: typeof value.pageCount === "number" ? value.pageCount : 0,
+  };
+}
+
+function legacyPurchaseId(value: Record<string, unknown>) {
+  return isRecord(value.purchase) && typeof value.purchase.id === "string"
+    ? value.purchase.id
+    : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function showToast(message: string) {

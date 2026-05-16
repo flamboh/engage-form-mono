@@ -1,15 +1,22 @@
 import "./style.css";
+import { ConvexHttpClient } from "convex/browser";
 import type { Purchase } from "@engage-form/domain";
-import {
-  parseReadyPurchaseJson,
-  READY_PURCHASE_KEY,
-  readyPurchaseSummary,
-  type ReadyPurchaseStore,
-} from "./storage.ts";
+import { api } from "../../../convex/_generated/api.js";
+import type { Id } from "../../../convex/_generated/dataModel.js";
+import { EXTENSION_TOKEN_KEY, READY_PURCHASE_KEY, readyPurchaseSummary } from "./storage.ts";
+
+type RecentPurchase = {
+  id: string;
+  status: "draft" | "ready" | "filled";
+  organization: string;
+  purchaser: string;
+  itemDescription: string;
+  totalAmount: number;
+};
 
 type ChromeRuntime = {
   scripting: {
-    executeScript(injection: ScriptInjection, callback?: (results?: ScriptResult[]) => void): void;
+    executeScript(injection: ScriptInjection, callback?: () => void): void;
   };
   tabs: {
     query(
@@ -25,24 +32,32 @@ type ChromeRuntime = {
   runtime: {
     lastError?: { message: string };
   };
-  storage: ReadyPurchaseStore;
+  storage: {
+    local: {
+      get(
+        keys: string[],
+        callback: (
+          items: Partial<
+            Record<typeof READY_PURCHASE_KEY, Purchase> & Record<typeof EXTENSION_TOKEN_KEY, string>
+          >,
+        ) => void,
+      ): void;
+      set(
+        items: Partial<
+          Record<typeof READY_PURCHASE_KEY, Purchase> & Record<typeof EXTENSION_TOKEN_KEY, string>
+        >,
+        callback?: () => void,
+      ): void;
+    };
+  };
 };
 
-type ScriptInjection =
-  | { target: { tabId: number }; files: string[] }
-  | { target: { tabId: number }; func: () => string | null };
+type ScriptInjection = { target: { tabId: number }; files: string[] };
 
-type ScriptResult = { result?: string | null };
-
-type ExtensionMessage =
-  | {
-      type: "ENGAGE_FILL_READY_PURCHASE";
-      purchase: Purchase;
-    }
-  | {
-      type: "ENGAGE_COMPLETE_READY_PURCHASE";
-      purchase: Purchase;
-    };
+type ExtensionMessage = {
+  type: "ENGAGE_COMPLETE_READY_PURCHASE";
+  purchase: Purchase;
+};
 
 type ExtensionResponse = {
   ok: boolean;
@@ -54,234 +69,190 @@ type ExtensionResponse = {
 
 declare const chrome: ChromeRuntime;
 
+const convex = new ConvexHttpClient(readConvexUrl());
 const app = document.querySelector<HTMLDivElement>("#app");
+let token = "";
+let recentPurchases: RecentPurchase[] = [];
 let readyPurchase: Purchase | null = null;
 
-if (app === null) {
-  throw new Error("App root missing.");
-}
+if (app === null) throw new Error("App root missing.");
 
-app.innerHTML = `
-  <main class="popup">
-    <section class="head">
-      <div>
-        <p>Engage Form</p>
-        <h1 id="purchase-title">No ready purchase</h1>
-      </div>
-      <strong id="purchase-state" class="draft">Draft</strong>
-    </section>
+load();
 
-    <section class="purchase">
-      <h2 id="purchase-item">Send from companion site</h2>
-      <dl>
-        <div><dt>Org</dt><dd id="purchase-org">-</dd></div>
-        <div><dt>Amount</dt><dd id="purchase-amount">-</dd></div>
-        <div><dt>Event</dt><dd id="purchase-event">-</dd></div>
-        <div><dt>Recipient</dt><dd id="purchase-recipient">-</dd></div>
-      </dl>
-    </section>
+function render(status = "") {
+  const summary = readyPurchase === null ? null : readyPurchaseSummary(readyPurchase);
+  app!.innerHTML = `
+    <main class="popup">
+      <section class="head">
+        <div>
+          <p>Engage Form</p>
+          <h1>${token ? "Recent purchases" : "Link extension"}</h1>
+        </div>
+        <strong class="${summary ? "ready" : "draft"}">${summary ? "Selected" : "Sync"}</strong>
+      </section>
 
-    <button id="primary-action" type="button">Import purchase</button>
-    <p id="status">Open the companion purchase, then import.</p>
-  </main>
-`;
-
-const primaryButton = document.querySelector<HTMLButtonElement>("#primary-action");
-const status = document.querySelector<HTMLParagraphElement>("#status");
-
-if (primaryButton === null || status === null) {
-  throw new Error("Popup controls missing.");
-}
-
-const primaryActionButton = primaryButton;
-const statusEl = status;
-
-loadReadyPurchase();
-
-primaryActionButton.addEventListener("click", () => {
-  runPrimaryAction();
-});
-
-function loadReadyPurchase() {
-  chrome.storage.local.get([READY_PURCHASE_KEY], (items) => {
-    readyPurchase = items[READY_PURCHASE_KEY] ?? null;
-    renderReadyPurchase();
-    if (readyPurchase === null) importFromActiveTab();
-  });
-}
-
-function renderReadyPurchase() {
-  const title = document.querySelector<HTMLElement>("#purchase-title");
-  const state = document.querySelector<HTMLElement>("#purchase-state");
-  const item = document.querySelector<HTMLElement>("#purchase-item");
-  const org = document.querySelector<HTMLElement>("#purchase-org");
-  const amount = document.querySelector<HTMLElement>("#purchase-amount");
-  const event = document.querySelector<HTMLElement>("#purchase-event");
-  const recipient = document.querySelector<HTMLElement>("#purchase-recipient");
-
-  if (
-    title === null ||
-    state === null ||
-    item === null ||
-    org === null ||
-    amount === null ||
-    event === null ||
-    recipient === null
-  ) {
-    throw new Error("Popup purchase fields missing.");
-  }
-
-  if (readyPurchase === null) {
-    title.textContent = "No ready purchase";
-    state.textContent = "Draft";
-    state.className = "draft";
-    item.textContent = "Send from companion site";
-    org.textContent = "-";
-    amount.textContent = "-";
-    event.textContent = "-";
-    recipient.textContent = "-";
-    primaryActionButton.textContent = "Import purchase";
-    primaryActionButton.disabled = false;
-    return;
-  }
-
-  const summary = readyPurchaseSummary(readyPurchase);
-  title.textContent = "Ready purchase";
-  state.textContent = "Ready";
-  state.className = "ready";
-  item.textContent = summary.title;
-  org.textContent = summary.org;
-  amount.textContent = summary.amount;
-  event.textContent = summary.event;
-  recipient.textContent = summary.recipient;
-  statusEl.textContent = "Open Engage, then complete.";
-  primaryActionButton.textContent = "Complete form";
-  primaryActionButton.disabled = false;
-}
-
-function runPrimaryAction() {
-  setBusy("Checking current tab...");
-
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const [tab] = tabs;
-
-    if (tab?.id === undefined) {
-      setReady("No active tab.");
-      return;
-    }
-
-    const tabId = tab.id;
-    importFromTab(tabId, (imported) => {
-      if (imported) return;
-
-      const purchase = readyPurchase;
-      if (purchase === null) {
-        setReady("Open the companion purchase first.");
-        return;
+      ${
+        token
+          ? `
+            <section class="purchase">
+              <h2>${summary?.title ?? "No purchase selected"}</h2>
+              <dl>
+                <div><dt>Org</dt><dd>${summary?.org ?? "-"}</dd></div>
+                <div><dt>Amount</dt><dd>${summary?.amount ?? "-"}</dd></div>
+                <div><dt>Event</dt><dd>${summary?.event ?? "-"}</dd></div>
+                <div><dt>Recipient</dt><dd>${summary?.recipient ?? "-"}</dd></div>
+              </dl>
+            </section>
+            <section class="purchase-list">
+              ${recentPurchases
+                .map(
+                  (purchase) => `
+                    <button class="purchase-row ${purchase.status}" data-purchase-id="${purchase.id}" type="button">
+                      <span>${purchase.organization}</span>
+                      <strong>${purchase.itemDescription || "Untitled"}</strong>
+                      <small>${purchase.purchaser} · ${money(purchase.totalAmount)} · ${purchase.status}</small>
+                    </button>
+                  `,
+                )
+                .join("")}
+            </section>
+            <button id="refresh" type="button">Refresh</button>
+          `
+          : `
+            <textarea id="token" placeholder="Paste device token"></textarea>
+            <button id="connect" type="button">Connect</button>
+          `
       }
+      <p id="status">${status}</p>
+    </main>
+  `;
 
-      fillActiveTab(tabId, { type: "ENGAGE_COMPLETE_READY_PURCHASE", purchase }, false);
-    });
+  document.querySelector("#connect")?.addEventListener("click", connect);
+  document.querySelector("#refresh")?.addEventListener("click", () => void refresh());
+  document.querySelectorAll<HTMLButtonElement>("[data-purchase-id]").forEach((button) => {
+    button.addEventListener("click", () => void selectAndFill(button.dataset.purchaseId ?? ""));
   });
 }
 
-function importFromActiveTab() {
-  setBusy("Importing current tab...");
-
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const [tab] = tabs;
-
-    if (tab?.id === undefined) {
-      setReady("No active tab.");
-      return;
-    }
-
-    importFromTab(tab.id, (imported) => {
-      if (!imported) setReady("No ready purchase found on this tab.");
-    });
+function load() {
+  chrome.storage.local.get([READY_PURCHASE_KEY, EXTENSION_TOKEN_KEY], (items) => {
+    token = items[EXTENSION_TOKEN_KEY] ?? "";
+    readyPurchase = items[READY_PURCHASE_KEY] ?? null;
+    render(token ? "Syncing..." : "Create a token in the web app.");
+    if (token) void refresh();
   });
 }
 
-function importFromTab(tabId: number, callback: (imported: boolean) => void) {
-  chrome.scripting.executeScript({ target: { tabId }, func: readReadyPurchaseJson }, (results) => {
-    if (chrome.runtime.lastError !== undefined) {
-      callback(false);
-      return;
-    }
-
-    const json = results?.[0]?.result;
-    if (typeof json !== "string") {
-      callback(false);
-      return;
-    }
-
-    saveReadyPurchase(json, callback);
-  });
-}
-
-function saveReadyPurchase(json: string, callback?: (imported: boolean) => void) {
-  const purchase = parseReadyPurchaseJson(json);
-  if (purchase === null) {
-    setReady("Ready purchase data is invalid.");
-    callback?.(false);
+function connect() {
+  const input = document.querySelector<HTMLTextAreaElement>("#token");
+  token = input?.value.trim() ?? "";
+  if (!token) {
+    render("Paste a token first.");
     return;
   }
+  chrome.storage.local.set({ [EXTENSION_TOKEN_KEY]: token }, () => {
+    void refresh();
+  });
+}
 
-  chrome.storage.local.set({ [READY_PURCHASE_KEY]: purchase }, () => {
-    if (chrome.runtime.lastError !== undefined) {
-      setReady(chrome.runtime.lastError.message);
-      callback?.(false);
+async function refresh() {
+  recentPurchases = (await convex.query(api.extension.listRecentPurchases, {
+    token,
+  })) as RecentPurchase[];
+  render(recentPurchases.length === 0 ? "No ready purchases yet." : "Select a purchase to fill.");
+}
+
+async function selectAndFill(purchaseId: string) {
+  render("Fetching purchase...");
+  const purchase = (await convex.query(api.extension.getPurchaseForFill, {
+    token,
+    id: purchaseId as Id<"purchaseRequests">,
+  })) as unknown as Purchase;
+  readyPurchase = await prepareFiles(purchase);
+  chrome.storage.local.set({ [READY_PURCHASE_KEY]: readyPurchase }, () => {
+    fillSelectedPurchase();
+  });
+}
+
+async function prepareFiles(purchase: Purchase): Promise<Purchase> {
+  return {
+    ...purchase,
+    files: await Promise.all(
+      purchase.files.map(async (file) => {
+        if (!file.url) return file;
+        const response = await fetch(file.url);
+        const blob = await response.blob();
+        return { ...file, dataUrl: await blobToDataUrl(blob) };
+      }),
+    ),
+  };
+}
+
+function fillSelectedPurchase() {
+  if (readyPurchase === null) return;
+  render("Checking current tab...");
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tabId = tabs[0]?.id;
+    if (tabId === undefined || readyPurchase === null) {
+      render("No active tab.");
       return;
     }
-
-    readyPurchase = purchase;
-    renderReadyPurchase();
-    statusEl.textContent = "Ready purchase imported.";
-    callback?.(true);
+    fillActiveTab(
+      tabId,
+      { type: "ENGAGE_COMPLETE_READY_PURCHASE", purchase: readyPurchase },
+      false,
+    );
   });
 }
 
 function fillActiveTab(tabId: number, message: ExtensionMessage, injected: boolean) {
-  setBusy("Completing to review...");
-
   chrome.tabs.sendMessage(tabId, message, (response) => {
     if (chrome.runtime.lastError !== undefined) {
       if (injected) {
-        setReady("Open the Engage form first.");
+        render("Open the Engage form first.");
         return;
       }
-
       injectContentScript(tabId, message);
       return;
     }
-
     const missed = response.missed.length > 0 ? ` Missed: ${response.missed.join(", ")}.` : "";
-    setReady(`${response.message} Step: ${response.step}. Filled: ${response.filled}.${missed}`);
+    render(`${response.message} Step: ${response.step}. Filled: ${response.filled}.${missed}`);
   });
 }
 
 function injectContentScript(tabId: number, message: ExtensionMessage) {
   chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] }, () => {
     if (chrome.runtime.lastError !== undefined) {
-      setReady("Open the Engage form first.");
+      render("Open the Engage form first.");
       return;
     }
-
     fillActiveTab(tabId, message, true);
   });
 }
 
-function readReadyPurchaseJson() {
-  const element = document.querySelector<HTMLTextAreaElement>("#engage-form-ready-purchase");
-  return element?.value ?? null;
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("File could not be encoded."));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
-function setBusy(message: string) {
-  primaryActionButton.disabled = true;
-  statusEl.textContent = message;
+function money(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-function setReady(message: string) {
-  primaryActionButton.disabled = false;
-  statusEl.textContent = message;
+function readConvexUrl() {
+  const env = import.meta.env.PUBLIC_CONVEX_URL ?? import.meta.env.VITE_CONVEX_URL;
+  if (typeof env !== "string" || env.trim() === "") {
+    throw new Error("Missing PUBLIC_CONVEX_URL for extension.");
+  }
+  return env;
 }

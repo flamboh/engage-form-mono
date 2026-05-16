@@ -1,14 +1,24 @@
 import type { Purchase } from "@engage-form/domain";
 
 export const READY_PURCHASE_KEY = "readyPurchase";
+export const EXTENSION_TOKEN_KEY = "extensionToken";
 
 export type ReadyPurchaseStore = {
   local: {
     get(
       keys: string[],
-      callback: (items: Partial<Record<typeof READY_PURCHASE_KEY, Purchase>>) => void,
+      callback: (
+        items: Partial<
+          Record<typeof READY_PURCHASE_KEY, Purchase> & Record<typeof EXTENSION_TOKEN_KEY, string>
+        >,
+      ) => void,
     ): void;
-    set(items: Record<typeof READY_PURCHASE_KEY, Purchase>, callback?: () => void): void;
+    set(
+      items: Partial<
+        Record<typeof READY_PURCHASE_KEY, Purchase> & Record<typeof EXTENSION_TOKEN_KEY, string>
+      >,
+      callback?: () => void,
+    ): void;
   };
 };
 

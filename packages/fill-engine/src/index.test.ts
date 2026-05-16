@@ -48,6 +48,38 @@ test("creates about-page fill plan", () => {
     labelIncludes: "Name of Student Organization",
     value: "Album Listening Club",
   });
+  expect(plan.actions).toContainEqual({
+    type: "text",
+    labelIncludes: "Requestor's first and last name",
+    value: samplePurchase.requester.name,
+  });
+});
+
+test("uses purchaser data for reimbursement fields", () => {
+  const purchase = {
+    ...samplePurchase,
+    requesterIsPurchaser: false,
+    purchaser: {
+      ...samplePurchase.purchaser,
+      id: "person_buyer",
+      name: "Different Buyer",
+      uo95: "950000001",
+      permanentAddress: "123 Buyer St, Eugene, OR",
+    },
+  };
+
+  const plan = createFillPlan("reimbursement", purchase);
+
+  expect(plan.actions).toContainEqual({
+    type: "text",
+    labelIncludes: "name and UO 95 ID",
+    value: "Different Buyer, 950000001",
+  });
+  expect(plan.actions).toContainEqual({
+    type: "text",
+    labelIncludes: "permanent address",
+    value: "123 Buyer St, Eugene, OR",
+  });
 });
 
 test("creates upload fill plans", () => {
@@ -76,7 +108,7 @@ test("creates upload fill plans", () => {
     {
       type: "file",
       labelIncludes: "upload",
-      files: [samplePurchase.files.find((file) => file.id === samplePurchase.approvalFileId)],
+      files: [samplePurchase.files.find((file) => file.id === samplePurchase.secondApprovalFileId)],
     },
   ]);
 
@@ -89,6 +121,21 @@ test("creates upload fill plans", () => {
           (file) => file.id === samplePurchase.eventPreset.publicityProofFileId,
         ),
       ],
+    },
+  ]);
+});
+
+test("skips self approval upload when requester is not purchaser", () => {
+  expect(
+    createFillPlan("selfApproval", {
+      ...samplePurchase,
+      requesterIsPurchaser: false,
+      secondApprovalFileId: null,
+    }).actions,
+  ).toEqual([
+    {
+      type: "stop",
+      message: "No upload required for this purchase.",
     },
   ]);
 });

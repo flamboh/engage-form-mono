@@ -33,9 +33,12 @@ export const myQueryFunction = query({
 });
 ```
 
-Using this query function in a React component looks like:
+Using this query function in a Svelte component looks like:
 
 ```ts
+import { useQuery } from "convex-svelte";
+import { api } from "../convex/_generated/api";
+
 const data = useQuery(api.myFunctions.myQueryFunction, {
   first: 10,
   second: "hello",
@@ -70,16 +73,27 @@ export const myMutationFunction = mutation({
 });
 ```
 
-Using this mutation function in a React component looks like:
+Using this mutation function in a Svelte component looks like:
 
 ```ts
-const mutation = useMutation(api.myFunctions.myMutationFunction);
-function handleButtonPress() {
+import { useConvexClient } from "convex-svelte";
+import { api } from "../convex/_generated/api";
+
+const client = useConvexClient();
+
+async function handleButtonPress() {
   // fire and forget, the most common way to use mutations
-  mutation({ first: "Hello!", second: "me" });
+  void client.mutation(api.myFunctions.myMutationFunction, {
+    first: "Hello!",
+    second: "me",
+  });
   // OR
   // use the result once the mutation has completed
-  mutation({ first: "Hello!", second: "me" }).then((result) => console.log(result));
+  const result = await client.mutation(api.myFunctions.myMutationFunction, {
+    first: "Hello!",
+    second: "me",
+  });
+  console.log(result);
 }
 ```
 

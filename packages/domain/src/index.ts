@@ -4,7 +4,7 @@ export type FileKind =
   | "receipt"
   | "id_front"
   | "id_back"
-  | "approval"
+  | "second_approval"
   | "publicity"
   | "brand_approval"
   | "recipient_list";
@@ -19,15 +19,15 @@ export type Organization = {
   defaultBudgetLineItem: string;
 };
 
-export type PurchaserProfile = {
+export type PersonProfile = {
   id: string;
   name: string;
-  email: string;
-  phone: string;
   uo95: string;
   permanentAddress: string;
   idCardFrontFileId: string;
   idCardBackFileId: string;
+  email?: string;
+  phone?: string;
 };
 
 export type EventPreset = {
@@ -47,6 +47,8 @@ export type PurchaseFile = {
   contentType: string;
   size: number;
   storageKey: string;
+  url?: string | null;
+  dataUrl?: string;
 };
 
 export type Recipient = {
@@ -61,7 +63,8 @@ export type Purchase = {
   id: string;
   status: PurchaseStatus;
   organization: Organization;
-  purchaser: PurchaserProfile;
+  requester: PersonProfile;
+  purchaser: PersonProfile;
   eventPreset: EventPreset;
   eventDate: string;
   vendor: string;
@@ -69,9 +72,10 @@ export type Purchase = {
   totalAmount: number;
   budgetLineItem: string;
   reimbursementReason: string;
-  requesterIsReimbursee: boolean;
+  businessPurposeText: string;
+  requesterIsPurchaser: boolean;
   receiptFileIds: string[];
-  approvalFileId: string;
+  secondApprovalFileId: string | null;
   recipients: Recipient[];
   files: PurchaseFile[];
 };
@@ -91,8 +95,18 @@ export const samplePurchase: Purchase = {
     fundLetter: "I",
     defaultBudgetLineItem: "Event Expenses",
   },
+  requester: {
+    id: "person_oliver",
+    name: "Oliver Boorstein",
+    email: "obo@uoregon.edu",
+    phone: "9073104429",
+    uo95: "952043159",
+    permanentAddress: "11337 Our Rd, Anchorage, AK 99516",
+    idCardFrontFileId: "file_id_front",
+    idCardBackFileId: "file_id_back",
+  },
   purchaser: {
-    id: "profile_oliver",
+    id: "person_oliver",
     name: "Oliver Boorstein",
     email: "obo@uoregon.edu",
     phone: "9073104429",
@@ -116,9 +130,11 @@ export const samplePurchase: Purchase = {
   totalAmount: 22.98,
   budgetLineItem: "Event Expenses",
   reimbursementReason: "Other processes are too slow.",
-  requesterIsReimbursee: true,
+  businessPurposeText:
+    "Album Listening Club wishes to reimburse Oliver Boorstein because they purchased a Mort Garson music vinyl from Amazon for $22.98. This Mort Garson music vinyl was given as a gift to Aidan O'Donnell (951951840) for winning the Kahoot! Trivia during Album Listening Club weekly event which took place on 04/21 at 6:30pm in McKenzie 240A with about 50 students in attendance.",
+  requesterIsPurchaser: true,
   receiptFileIds: ["file_receipt"],
-  approvalFileId: "file_approval",
+  secondApprovalFileId: "file_approval",
   recipients: [
     {
       name: "Aidan O'Donnell",
@@ -132,7 +148,7 @@ export const samplePurchase: Purchase = {
     file("file_id_front", "id_front", "Oliver_ID_1.jpg", "image/jpeg"),
     file("file_id_back", "id_back", "Oliver_ID_2.jpg", "image/jpeg"),
     file("file_receipt", "receipt", "mort_garson_receipt.jpg", "image/jpeg"),
-    file("file_approval", "approval", "approval_email.pdf", "application/pdf"),
+    file("file_approval", "second_approval", "approval_email.pdf", "application/pdf"),
     file("file_publicity", "publicity", "weekly_event_engage.pdf", "application/pdf"),
   ],
 };
@@ -153,13 +169,15 @@ export function reimbursementRecipientText(purchase: Purchase) {
 }
 
 export function recipientValueText(purchase: Purchase) {
-  return purchase.recipients
+  return reportableRecipients(purchase)
     .map((recipient) => `${recipient.name}, ${formatMoney(recipient.value)}`)
     .join("\n");
 }
 
 export function recipientIdText(purchase: Purchase) {
-  return purchase.recipients.map((recipient) => `${recipient.name}, ${recipient.uo95}`).join("\n");
+  return reportableRecipients(purchase)
+    .map((recipient) => `${recipient.name}, ${recipient.uo95}`)
+    .join("\n");
 }
 
 export function purchaseFileById(purchase: Purchase, fileId: string) {
@@ -171,8 +189,7 @@ export function purchaseFileById(purchase: Purchase, fileId: string) {
 }
 
 export function generateBusinessPurpose(purchase: Purchase) {
-  const recipient = firstRecipient(purchase);
-  return `${purchase.organization.name} wishes to reimburse ${purchase.purchaser.name} because they purchased a ${purchase.itemDescription} from ${purchase.vendor} for ${formatMoney(purchase.totalAmount)}. This ${purchase.itemDescription} was given as a gift to ${recipient.name} (${recipient.uo95}) for ${recipient.reason} during ${purchase.eventPreset.name} which took place on ${purchase.eventDate} at ${purchase.eventPreset.time} in ${purchase.eventPreset.location} with about ${purchase.eventPreset.estimatedAttendance} students in attendance.`;
+  return purchase.businessPurposeText;
 }
 
 export function validatePurchaseReadiness(purchase: Purchase) {
@@ -190,8 +207,27 @@ export function validatePurchaseReadiness(purchase: Purchase) {
     purchase.organization.indexNumber,
     "Index missing.",
   );
+  requireText(issues, "requester.name", purchase.requester.name, "Requester name missing.");
+  requireText(
+    issues,
+    "requester.email",
+    purchase.requester.email ?? "",
+    "Requester email missing.",
+  );
+  requireText(
+    issues,
+    "requester.phone",
+    purchase.requester.phone ?? "",
+    "Requester phone missing.",
+  );
   requireText(issues, "purchaser.name", purchase.purchaser.name, "Purchaser name missing.");
-  requireText(issues, "purchaser.email", purchase.purchaser.email, "Purchaser email missing.");
+  requireText(issues, "purchaser.uo95", purchase.purchaser.uo95, "Purchaser UO 95 missing.");
+  requireText(
+    issues,
+    "purchaser.permanentAddress",
+    purchase.purchaser.permanentAddress,
+    "Purchaser address missing.",
+  );
   requireText(issues, "eventDate", purchase.eventDate, "Event date missing.");
   requireText(issues, "vendor", purchase.vendor, "Vendor missing.");
   requireText(issues, "itemDescription", purchase.itemDescription, "Item description missing.");
@@ -201,6 +237,19 @@ export function validatePurchaseReadiness(purchase: Purchase) {
     purchase.reimbursementReason,
     "Reimbursement reason missing.",
   );
+  requireText(issues, "budgetLineItem", purchase.budgetLineItem, "Budget line item missing.");
+  requireText(
+    issues,
+    "businessPurposeText",
+    purchase.businessPurposeText,
+    "Business purpose missing.",
+  );
+  if (unresolvedToken(purchase.businessPurposeText)) {
+    issues.push({
+      field: "businessPurposeText",
+      message: "Business purpose has unresolved variables.",
+    });
+  }
 
   if (purchase.totalAmount <= 0) {
     issues.push({ field: "totalAmount", message: "Total amount must be greater than zero." });
@@ -229,37 +278,45 @@ export function validatePurchaseReadiness(purchase: Purchase) {
     "Publicity proof missing.",
   );
 
-  if (purchase.requesterIsReimbursee) {
-    requireText(issues, "approvalFileId", purchase.approvalFileId, "Second approval missing.");
+  if (purchase.requesterIsPurchaser) {
+    requireText(
+      issues,
+      "secondApprovalFileId",
+      purchase.secondApprovalFileId ?? "",
+      "Second approval missing.",
+    );
   }
 
-  if (purchase.recipients.length === 0) {
+  const enteredRecipients = purchase.recipients.filter((recipient) => recipient.value > 0);
+  if (enteredRecipients.length === 0) {
     issues.push({ field: "recipients", message: "Recipient missing." });
   }
 
-  for (const recipient of purchase.recipients) {
-    requireText(issues, "recipient.name", recipient.name, "Recipient name missing.");
-    requireText(issues, "recipient.uo95", recipient.uo95, "Recipient UO 95 missing.");
+  for (const recipient of enteredRecipients) {
     if (recipient.value >= 50) {
       issues.push({ field: "recipient.value", message: "Gift value must be under $50." });
     }
+    if (recipient.value < 10) continue;
+    requireText(issues, "recipient.name", recipient.name, "Recipient name missing.");
+    requireText(issues, "recipient.uo95", recipient.uo95, "Recipient UO 95 missing.");
+    requireText(issues, "recipient.reason", recipient.reason, "Recipient reason missing.");
   }
 
   return issues;
 }
 
-function firstRecipient(purchase: Purchase) {
-  const [recipient] = purchase.recipients;
-  if (recipient === undefined) {
-    throw new Error("Purchase requires a recipient.");
-  }
-  return recipient;
+function reportableRecipients(purchase: Purchase) {
+  return purchase.recipients.filter((recipient) => recipient.value >= 10);
 }
 
 function requireText(issues: ReadinessIssue[], field: string, value: string, message: string) {
   if (value.trim() === "") {
     issues.push({ field, message });
   }
+}
+
+function unresolvedToken(value: string) {
+  return /\{[A-Za-z][A-Za-z0-9]*\}/.test(value);
 }
 
 function file(id: string, kind: FileKind, filename: string, contentType: string): PurchaseFile {

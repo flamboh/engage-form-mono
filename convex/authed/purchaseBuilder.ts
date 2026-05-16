@@ -1,0 +1,310 @@
+import { Debouncer } from "@ikhrustalev/convex-debouncer";
+import type { DebouncerComponentApi } from "@ikhrustalev/convex-debouncer";
+import { v } from "convex/values";
+import { makeFunctionReference, type FunctionReference } from "convex/server";
+import { components } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import { authedMutation, authedQuery } from "./helpers";
+import {
+  applyDraftPatch,
+  assertReady,
+  ownerFromIdentity,
+  requireOwnedDoc,
+  requireText,
+  setRequester,
+  type DraftPatch,
+} from "../purchaseModel";
+import { draftPatch, fileKind, fundLetter } from "../purchaseValidators";
+
+const saveDraftPatchRef = makeFunctionReference(
+  "internal/purchaseAutosave:saveDraftPatch",
+) as unknown as FunctionReference<
+  "mutation",
+  "internal",
+  { id: Id<"purchaseRequests">; owner: string; patch: DraftPatch }
+>;
+
+const debouncer = new Debouncer(components.debouncer as unknown as DebouncerComponentApi, {
+  delay: 1000,
+  mode: "sliding",
+});
+
+export const listSaved = authedQuery({
+  args: { includeArchived: v.boolean() },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    const organizations = args.includeArchived
+      ? await ctx.db
+          .query("organizations")
+          .withIndex("by_owner", (q) => q.eq("owner", owner))
+          .take(100)
+      : await ctx.db
+          .query("organizations")
+          .withIndex("by_owner_and_archived", (q) => q.eq("owner", owner).eq("archived", false))
+          .take(100);
+    const people = await ctx.db
+      .query("people")
+      .withIndex("by_owner", (q) => q.eq("owner", owner))
+      .take(200);
+    const eventPresets = await ctx.db
+      .query("eventPresets")
+      .withIndex("by_owner", (q) => q.eq("owner", owner))
+      .take(200);
+
+    return {
+      organizations,
+      people: args.includeArchived ? people : people.filter((person) => !person.archived),
+      eventPresets: args.includeArchived
+        ? eventPresets
+        : eventPresets.filter((eventPreset) => !eventPreset.archived),
+    };
+  },
+});
+
+export const listPurchases = authedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    return await ctx.db
+      .query("purchaseRequests")
+      .withIndex("by_owner", (q) => q.eq("owner", owner))
+      .order("desc")
+      .take(50);
+  },
+});
+
+export const getDraft = authedQuery({
+  args: { id: v.id("purchaseRequests") },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    const request = await requireOwnedDoc(ctx, "purchaseRequests", args.id, owner);
+    if (request.status !== "draft") throw new Error("Only draft requests can be edited.");
+    return request;
+  },
+});
+
+export const generateUploadUrl = authedMutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const saveFile = authedMutation({
+  args: {
+    kind: fileKind,
+    storageId: v.id("_storage"),
+    filename: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    requireText(args.filename, "Filename missing.");
+    return await ctx.db.insert("files", { ...args, owner, createdAt: Date.now() });
+  },
+});
+
+export const upsertOrganization = authedMutation({
+  args: {
+    id: v.union(v.id("organizations"), v.null()),
+    name: v.string(),
+    indexNumber: v.string(),
+    fundLetter,
+    defaultBudgetLineItem: v.string(),
+    businessPurposeTemplate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    requireText(args.name, "Organization name missing.");
+    requireText(args.indexNumber, "Index number missing.");
+    requireText(args.defaultBudgetLineItem, "Budget line item missing.");
+    requireText(args.businessPurposeTemplate, "Business purpose template missing.");
+    const fields = {
+      owner,
+      name: args.name,
+      indexNumber: args.indexNumber,
+      fundLetter: args.fundLetter,
+      defaultBudgetLineItem: args.defaultBudgetLineItem,
+      businessPurposeTemplate: args.businessPurposeTemplate,
+      archived: false,
+      updatedAt: Date.now(),
+    };
+    if (args.id === null) return await ctx.db.insert("organizations", fields);
+    await requireOwnedDoc(ctx, "organizations", args.id, owner);
+    await ctx.db.patch(args.id, fields);
+    return args.id;
+  },
+});
+
+export const upsertPerson = authedMutation({
+  args: {
+    id: v.union(v.id("people"), v.null()),
+    organizationId: v.id("organizations"),
+    name: v.string(),
+    uo95: v.string(),
+    permanentAddress: v.string(),
+    idCardFrontFileId: v.id("files"),
+    idCardBackFileId: v.id("files"),
+    email: v.union(v.string(), v.null()),
+    phone: v.union(v.string(), v.null()),
+    isRequester: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    await requireOwnedDoc(ctx, "organizations", args.organizationId, owner);
+    await requireOwnedDoc(ctx, "files", args.idCardFrontFileId, owner);
+    await requireOwnedDoc(ctx, "files", args.idCardBackFileId, owner);
+    requireText(args.name, "Person name missing.");
+    requireText(args.uo95, "UO 95 missing.");
+    requireText(args.permanentAddress, "Permanent address missing.");
+    if (args.isRequester) {
+      requireText(args.email ?? "", "Requester email missing.");
+      requireText(args.phone ?? "", "Requester phone missing.");
+    }
+    const fields = {
+      owner,
+      organizationId: args.organizationId,
+      name: args.name,
+      uo95: args.uo95,
+      permanentAddress: args.permanentAddress,
+      idCardFrontFileId: args.idCardFrontFileId,
+      idCardBackFileId: args.idCardBackFileId,
+      email: args.email,
+      phone: args.phone,
+      isRequester: args.isRequester,
+      archived: false,
+      updatedAt: Date.now(),
+    };
+    const personId = args.id === null ? await ctx.db.insert("people", fields) : args.id;
+    if (args.id !== null) {
+      await requireOwnedDoc(ctx, "people", args.id, owner);
+      await ctx.db.patch(args.id, fields);
+    }
+    if (args.isRequester) await setRequester(ctx, owner, args.organizationId, personId);
+    return personId;
+  },
+});
+
+export const upsertEventPreset = authedMutation({
+  args: {
+    id: v.union(v.id("eventPresets"), v.null()),
+    organizationId: v.id("organizations"),
+    name: v.string(),
+    time: v.string(),
+    location: v.string(),
+    estimatedAttendance: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    await requireOwnedDoc(ctx, "organizations", args.organizationId, owner);
+    requireText(args.name, "Event name missing.");
+    requireText(args.time, "Event time missing.");
+    requireText(args.location, "Event location missing.");
+    if (args.estimatedAttendance <= 0) throw new Error("Estimated attendance missing.");
+    const fields = {
+      owner,
+      organizationId: args.organizationId,
+      name: args.name,
+      time: args.time,
+      location: args.location,
+      estimatedAttendance: args.estimatedAttendance,
+      archived: false,
+      updatedAt: Date.now(),
+    };
+    if (args.id === null) return await ctx.db.insert("eventPresets", fields);
+    await requireOwnedDoc(ctx, "eventPresets", args.id, owner);
+    await ctx.db.patch(args.id, fields);
+    return args.id;
+  },
+});
+
+export const setArchived = authedMutation({
+  args: {
+    table: v.union(v.literal("organizations"), v.literal("people"), v.literal("eventPresets")),
+    id: v.union(v.id("organizations"), v.id("people"), v.id("eventPresets")),
+    archived: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    await requireOwnedDoc(ctx, args.table, args.id as Id<typeof args.table>, owner);
+    await ctx.db.patch(args.id, { archived: args.archived, updatedAt: Date.now() });
+  },
+});
+
+export const createDraft = authedMutation({
+  args: {},
+  handler: async (ctx) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    const now = Date.now();
+    return await ctx.db.insert("purchaseRequests", {
+      owner,
+      status: "draft",
+      organizationId: null,
+      purchaserPersonId: null,
+      eventPresetId: null,
+      eventDate: "",
+      vendor: "",
+      itemDescription: "",
+      totalAmount: 0,
+      budgetLineItem: "",
+      reimbursementReason: "",
+      businessPurposeText: "",
+      businessPurposeTouched: false,
+      receiptFileIds: [],
+      secondApprovalFileId: null,
+      publicityFileId: null,
+      recipients: [],
+      createdAt: now,
+      updatedAt: now,
+      lastFilledAt: null,
+    });
+  },
+});
+
+export const scheduleDraftAutosave = authedMutation({
+  args: { id: v.id("purchaseRequests"), patch: draftPatch },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    await requireOwnedDoc(ctx, "purchaseRequests", args.id, owner);
+    return await debouncer.schedule(ctx, "purchase-draft-autosave", args.id, saveDraftPatchRef, {
+      id: args.id,
+      owner,
+      patch: args.patch,
+    });
+  },
+});
+
+export const markReady = authedMutation({
+  args: { id: v.id("purchaseRequests"), patch: v.optional(draftPatch) },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    const request = await requireOwnedDoc(ctx, "purchaseRequests", args.id, owner);
+    if (args.patch !== undefined) {
+      await ctx.db.patch(args.id, applyDraftPatch(request, args.patch as DraftPatch));
+    }
+    const updated = await requireOwnedDoc(ctx, "purchaseRequests", args.id, owner);
+    await assertReady(ctx, updated);
+    await ctx.db.patch(args.id, { status: "ready", updatedAt: Date.now() });
+  },
+});
+
+export const discardDraft = authedMutation({
+  args: { id: v.id("purchaseRequests") },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    const request = await requireOwnedDoc(ctx, "purchaseRequests", args.id, owner);
+    if (request.status !== "draft") throw new Error("Only drafts can be discarded.");
+    const fileIds = [
+      ...request.receiptFileIds,
+      request.secondApprovalFileId,
+      request.publicityFileId,
+    ].filter((id): id is Id<"files"> => id !== null);
+    for (const fileId of fileIds) {
+      const file = await requireOwnedDoc(ctx, "files", fileId, owner);
+      await ctx.storage.delete(file.storageId);
+      await ctx.db.delete(fileId);
+    }
+    await ctx.db.delete(args.id);
+  },
+});

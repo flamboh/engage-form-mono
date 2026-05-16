@@ -30,13 +30,13 @@ Long term maintainability is a core priority. If you add new functionality, firs
 
 ## Package Roles
 
-- `apps/web`: TanStack Start + React Web App
+- `apps/web`: SvelteKit Web App
 - `apps/extension`: Manifest V3 Chrome extension
 - `convex/`: Convex backend
 
 ## Expectations
 
-- Use shadcn for base components `vpx shadcn@latest add {component}`
+- Use SvelteKit/Svelte components for `apps/web`; prefer simple local components unless a shared UI primitive is clearly needed.
 - Keep designs simple, no over explaining, plain colors, no gradients, no decorative elements.
 - Assume dev servers for both Convex and `bun dev` are already running.
 
@@ -46,8 +46,21 @@ When working on Convex code, **always read `convex/_generated/ai/guidelines.md` 
 
 ## References
 
-- Open Source TanStack Start + Convex + Clerk: ~/Code/oss/lawn
+- SvelteKit + Convex + Clerk template: ~/Code/oss/my-sveltekit-template
 - Convex code demos: ~/Code/oss/convex-demos
 - Clerk + Convex: https://clerk.com/docs/guides/development/integrations/databases/convex
 - Skills: use ~/.agents/skills/find-skills to locate relevant skills wherever possible
-- TanStack Start: https://tanstack.com/start/latest
+
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->

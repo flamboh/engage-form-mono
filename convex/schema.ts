@@ -1,0 +1,127 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+const fundLetter = v.union(
+  v.literal("I"),
+  v.literal("E"),
+  v.literal("G"),
+  v.literal("N"),
+  v.literal("U"),
+  v.literal("D"),
+  v.literal("T"),
+);
+
+const fileKind = v.union(
+  v.literal("receipt"),
+  v.literal("id_front"),
+  v.literal("id_back"),
+  v.literal("second_approval"),
+  v.literal("publicity"),
+  v.literal("brand_approval"),
+  v.literal("recipient_list"),
+);
+
+const recipient = v.object({
+  name: v.string(),
+  uo95: v.string(),
+  reason: v.string(),
+  value: v.number(),
+});
+
+export default defineSchema({
+  conferences: defineTable({
+    name: v.string(),
+    location: v.string(),
+    startDate: v.number(),
+    endDate: v.number(),
+    description: v.optional(v.string()),
+  }),
+  organizations: defineTable({
+    owner: v.string(),
+    name: v.string(),
+    indexNumber: v.string(),
+    fundLetter,
+    defaultBudgetLineItem: v.string(),
+    businessPurposeTemplate: v.string(),
+    archived: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner_and_archived", ["owner", "archived"])
+    .index("by_owner", ["owner"]),
+  files: defineTable({
+    owner: v.string(),
+    kind: fileKind,
+    storageId: v.id("_storage"),
+    filename: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+    createdAt: v.number(),
+  }).index("by_owner", ["owner"]),
+  people: defineTable({
+    owner: v.string(),
+    organizationId: v.id("organizations"),
+    name: v.string(),
+    uo95: v.string(),
+    permanentAddress: v.string(),
+    idCardFrontFileId: v.id("files"),
+    idCardBackFileId: v.id("files"),
+    email: v.union(v.string(), v.null()),
+    phone: v.union(v.string(), v.null()),
+    isRequester: v.boolean(),
+    archived: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner_and_organizationId_and_archived", ["owner", "organizationId", "archived"])
+    .index("by_owner_and_organizationId_and_isRequester", [
+      "owner",
+      "organizationId",
+      "isRequester",
+    ])
+    .index("by_owner", ["owner"]),
+  eventPresets: defineTable({
+    owner: v.string(),
+    organizationId: v.id("organizations"),
+    name: v.string(),
+    time: v.string(),
+    location: v.string(),
+    estimatedAttendance: v.number(),
+    archived: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner_and_organizationId_and_archived", ["owner", "organizationId", "archived"])
+    .index("by_owner", ["owner"]),
+  purchaseRequests: defineTable({
+    owner: v.string(),
+    status: v.union(v.literal("draft"), v.literal("ready"), v.literal("filled")),
+    organizationId: v.union(v.id("organizations"), v.null()),
+    purchaserPersonId: v.union(v.id("people"), v.null()),
+    eventPresetId: v.union(v.id("eventPresets"), v.null()),
+    eventDate: v.string(),
+    vendor: v.string(),
+    itemDescription: v.string(),
+    totalAmount: v.number(),
+    budgetLineItem: v.string(),
+    reimbursementReason: v.string(),
+    businessPurposeText: v.string(),
+    businessPurposeTouched: v.boolean(),
+    receiptFileIds: v.array(v.id("files")),
+    secondApprovalFileId: v.union(v.id("files"), v.null()),
+    publicityFileId: v.union(v.id("files"), v.null()),
+    recipients: v.array(recipient),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastFilledAt: v.union(v.number(), v.null()),
+  })
+    .index("by_owner_and_status", ["owner", "status"])
+    .index("by_owner", ["owner"]),
+  extensionSessions: defineTable({
+    owner: v.string(),
+    tokenHash: v.string(),
+    name: v.string(),
+    createdAt: v.number(),
+    lastUsedAt: v.union(v.number(), v.null()),
+    revokedAt: v.union(v.number(), v.null()),
+  })
+    .index("by_tokenHash", ["tokenHash"])
+    .index("by_owner", ["owner"]),
+});

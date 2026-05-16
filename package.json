@@ -16,9 +16,12 @@
     "prepare": "vp config"
   },
   "dependencies": {
-    "convex": "^1.36.1"
+    "@ikhrustalev/convex-debouncer": "^0.1.2",
+    "convex": "^1.36.1",
+    "convex-helpers": "^0.1.118"
   },
   "devDependencies": {
+    "@types/node": "^25.8.0",
     "concurrently": "^9.2.1",
     "vite-plus": "catalog:"
   },

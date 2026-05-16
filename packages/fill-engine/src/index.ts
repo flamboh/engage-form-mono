@@ -56,7 +56,7 @@ type RtpField =
       labelIncludes: string;
     }
   | {
-      type: "file";
+      type: "file" | "conditionalFile";
       labelIncludes: string;
       resolve: (purchase: Purchase) => PurchaseFile[];
     }
@@ -89,9 +89,9 @@ export const rtpSchema: RtpStepSchema[] = [
     step: "about",
     headingIncludes: ["about you, your org, and business purpose"],
     fields: [
-      textField("Requestor's first and last name", (purchase) => purchase.purchaser.name),
-      textField("Requestor's email address", (purchase) => purchase.purchaser.email),
-      textField("Requestor's phone number", (purchase) => purchase.purchaser.phone),
+      textField("Requestor's first and last name", (purchase) => purchase.requester.name),
+      textField("Requestor's email address", (purchase) => purchase.requester.email ?? ""),
+      textField("Requestor's phone number", (purchase) => purchase.requester.phone ?? ""),
       textField("Name of Student Organization", (purchase) => purchase.organization.name),
       textField("Student Organization Index", (purchase) => purchase.organization.indexNumber),
       checkboxField((purchase) => purchase.organization.fundLetter, true),
@@ -140,7 +140,11 @@ export const rtpSchema: RtpStepSchema[] = [
     step: "selfApproval",
     headingIncludes: ["seeking self reimbursement"],
     fields: [
-      fileField("upload", (purchase) => [purchaseFileById(purchase, purchase.approvalFileId)]),
+      conditionalFileField("upload", (purchase) =>
+        purchase.requesterIsPurchaser && purchase.secondApprovalFileId !== null
+          ? [purchaseFileById(purchase, purchase.secondApprovalFileId)]
+          : [],
+      ),
     ],
   },
   {
@@ -274,6 +278,13 @@ function resolveField(field: RtpField, purchase: Purchase): FillAction | FillAct
     return { type: "file", labelIncludes: field.labelIncludes, files: field.resolve(purchase) };
   }
 
+  if (field.type === "conditionalFile") {
+    const files = field.resolve(purchase);
+    return files.length > 0
+      ? { type: "file", labelIncludes: field.labelIncludes, files }
+      : stop("No upload required for this purchase.");
+  }
+
   if (field.type === "receiptFiles") {
     return receiptFileActions(purchase);
   }
@@ -313,6 +324,13 @@ function fileField(
   resolve: (purchase: Purchase) => PurchaseFile[],
 ): RtpField {
   return { type: "file", labelIncludes, resolve };
+}
+
+function conditionalFileField(
+  labelIncludes: string,
+  resolve: (purchase: Purchase) => PurchaseFile[],
+): RtpField {
+  return { type: "conditionalFile", labelIncludes, resolve };
 }
 
 function receiptFilesField(): RtpField {
