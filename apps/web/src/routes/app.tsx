@@ -184,10 +184,16 @@ function PurchaseBuilderPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <textarea
+            id="engage-form-ready-purchase"
+            readOnly
+            hidden
+            value={JSON.stringify(purchase)}
+          />
           <ul className="flex flex-col gap-3">
             {issues.length === 0 ? (
               <li className="text-sm text-muted-foreground">
-                Ready purchase available for the extension.
+                Ready purchase available for the extension popup.
               </li>
             ) : (
               issues.map((issue) => (

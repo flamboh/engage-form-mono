@@ -6,11 +6,17 @@
   "action": {
     "default_popup": "index.html"
   },
-  "permissions": ["activeTab"],
+  "permissions": ["activeTab", "scripting", "storage"],
   "content_scripts": [
     {
       "matches": ["https://uoregon.campuslabs.com/engage/submitter/form/*"],
       "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["sample/*"],
+      "matches": ["https://uoregon.campuslabs.com/*"]
     }
   ]
 }

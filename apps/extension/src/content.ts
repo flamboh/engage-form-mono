@@ -1,48 +1,200 @@
-import { samplePurchase } from "@engage-form/domain";
+import type { Purchase } from "@engage-form/domain";
 import { createFillPlan, detectStep, type FillAction } from "@engage-form/fill-engine";
+import {
+  clickNextStep,
+  type FileUploadResult,
+  setChoice,
+  setComboBox,
+  setField,
+  setFiles,
+  setSelect,
+  uploadMiss,
+} from "./form-controls.ts";
 
-type ExtensionMessage = {
-  type: "ENGAGE_FILL_SAMPLE";
-};
+type ExtensionMessage =
+  | {
+      type: "ENGAGE_FILL_READY_PURCHASE";
+      purchase: Purchase;
+    }
+  | {
+      type: "ENGAGE_COMPLETE_READY_PURCHASE";
+      purchase: Purchase;
+    };
 
 type ExtensionResponse = {
   ok: boolean;
   message: string;
   step: string;
   filled: number;
+  missed: string[];
 };
 
-type ChromeRuntime = {
+type FillRunState = {
+  purchase: Purchase;
+  filled: number;
+  pageCount: number;
+};
+
+type ChromeApi = {
   runtime: {
+    getURL(path: string): string;
     onMessage: {
       addListener(
         callback: (
           message: ExtensionMessage,
           sender: unknown,
           sendResponse: (response: ExtensionResponse) => void,
-        ) => void,
+        ) => boolean | void,
       ): void;
     };
   };
 };
 
-declare const chrome: ChromeRuntime;
+declare const chrome: ChromeApi;
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type !== "ENGAGE_FILL_SAMPLE") {
-    return;
+const FILL_RUN_KEY = "engageFormFillRun";
+const MAX_RUN_PAGES = 16;
+const windowState = window as Window & { __engageFormContentLoaded?: boolean };
+
+if (windowState.__engageFormContentLoaded !== true) {
+  windowState.__engageFormContentLoaded = true;
+
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    const task =
+      message.type === "ENGAGE_COMPLETE_READY_PURCHASE"
+        ? startFillRun(message.purchase)
+        : fillCurrentPage(message.purchase);
+
+    void task
+      .then((result) => {
+        showToast(result.message);
+        sendResponse(result);
+      })
+      .catch((error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : "Unknown fill error.";
+        clearFillRun();
+        showToast(errorMessage);
+        sendResponse({
+          ok: false,
+          message: errorMessage,
+          step: detectStep(pageHeading()),
+          filled: 0,
+          missed: [],
+        });
+      });
+    return true;
+  });
+
+  window.setTimeout(() => {
+    void resumeFillRun();
+  }, 500);
+}
+
+async function fillCurrentPage(purchase: Purchase): Promise<ExtensionResponse> {
+  const step = detectStep(pageHeading());
+  const plan = createFillPlan(step, purchase);
+  const result = await applyFillPlan(plan.actions);
+
+  return {
+    ok: result.missed.length === 0,
+    message: result.message,
+    step,
+    filled: result.filled,
+    missed: result.missed,
+  };
+}
+
+async function startFillRun(purchase: Purchase): Promise<ExtensionResponse> {
+  saveFillRun({ purchase, filled: 0, pageCount: 0 });
+  return continueFillRun();
+}
+
+async function resumeFillRun() {
+  const state = loadFillRun();
+  if (state === null) return;
+
+  const result = await continueFillRun();
+  showToast(result.message);
+}
+
+async function continueFillRun(): Promise<ExtensionResponse> {
+  const state = loadFillRun();
+  const step = detectStep(pageHeading());
+  if (state === null) {
+    return {
+      ok: false,
+      message: "No active fill run.",
+      step,
+      filled: 0,
+      missed: [],
+    };
   }
 
-  const heading = pageHeading();
-  const step = detectStep(heading);
-  const plan = createFillPlan(step, samplePurchase);
-  const result = applyFillPlan(plan.actions);
-  showToast(result.message);
-  sendResponse({ ok: true, message: result.message, step, filled: result.filled });
-});
+  if (step === "review") {
+    clearFillRun();
+    return {
+      ok: true,
+      message: `Review reached. Filled ${state.filled} fields.`,
+      step,
+      filled: state.filled,
+      missed: [],
+    };
+  }
 
-function applyFillPlan(actions: FillAction[]) {
+  if (step === "unknown") {
+    clearFillRun();
+    return {
+      ok: false,
+      message: "Unknown Engage step. Stopped before advancing.",
+      step,
+      filled: state.filled,
+      missed: [],
+    };
+  }
+
+  if (state.pageCount >= MAX_RUN_PAGES) {
+    clearFillRun();
+    return {
+      ok: false,
+      message: "Stopped after too many Engage steps.",
+      step,
+      filled: state.filled,
+      missed: [],
+    };
+  }
+
+  const result = await fillCurrentPage(state.purchase);
+  const filled = state.filled + result.filled;
+
+  if (result.missed.length > 0) {
+    clearFillRun();
+    return { ...result, filled, ok: false };
+  }
+
+  if (!clickNextStep()) {
+    clearFillRun();
+    return {
+      ok: false,
+      message: "Current page filled, but no next button found.",
+      step,
+      filled,
+      missed: [],
+    };
+  }
+
+  saveFillRun({ ...state, filled, pageCount: state.pageCount + 1 });
+  return {
+    ok: true,
+    message: `Continuing to review. Filled ${filled} fields.`,
+    step,
+    filled,
+    missed: [],
+  };
+}
+
+async function applyFillPlan(actions: FillAction[]) {
   let filled = 0;
+  const missed: string[] = [];
   const stopMessages: string[] = [];
 
   for (const action of actions) {
@@ -51,19 +203,27 @@ function applyFillPlan(actions: FillAction[]) {
       continue;
     }
 
-    if (applyAction(action)) {
+    const result = await applyAction(action);
+    if (result === true || (typeof result === "object" && result.ok)) {
       filled += 1;
+    } else {
+      missed.push(typeof result === "object" ? result.message : actionLabel(action));
+      if (action.type === "file") break;
     }
   }
 
   if (stopMessages.length > 0) {
-    return { filled, message: stopMessages.join(" ") };
+    return { filled, missed, message: stopMessages.join(" ") };
   }
 
-  return { filled, message: "Filled current page." };
+  if (missed.length > 0) {
+    return { filled, missed, message: `Filled ${filled}; missed ${missed.join(", ")}.` };
+  }
+
+  return { filled, missed, message: "Filled current page." };
 }
 
-function applyAction(action: Exclude<FillAction, { type: "stop" }>) {
+async function applyAction(action: Exclude<FillAction, { type: "stop" }>) {
   if (action.type === "text") {
     return setField(action.labelIncludes, action.value, "input");
   }
@@ -80,117 +240,60 @@ function applyAction(action: Exclude<FillAction, { type: "stop" }>) {
     return setChoice(action.labelIncludes, "radio", true);
   }
 
+  if (action.type === "combobox") {
+    return setComboBox(action.labelIncludes, action.valueIncludes);
+  }
+
+  if (action.type === "file") {
+    return setFiles(action.labelIncludes, action.files, uploadFiles);
+  }
+
   return setSelect(action.labelIncludes, action.valueIncludes);
 }
 
-function setField(labelIncludes: string, value: string, selector: "input" | "textarea") {
-  const control = findControl(labelIncludes, selector);
-  if (control === null) {
-    return false;
+async function uploadFiles(
+  selector: string,
+  files: {
+    filename: string;
+    contentType: string;
+    storageKey: string;
+  }[],
+  dropSelector: string,
+): Promise<FileUploadResult> {
+  const input = document.querySelector(selector);
+  if (!(input instanceof HTMLInputElement)) return uploadMiss("Tagged file input disappeared.");
+
+  const dropTarget = document.querySelector(dropSelector);
+  if (!(dropTarget instanceof HTMLElement)) return uploadMiss("Tagged upload target disappeared.");
+
+  return assignFiles(input, files, dropTarget);
+}
+
+async function assignFiles(
+  input: HTMLInputElement,
+  files: {
+    filename: string;
+    contentType: string;
+    storageKey: string;
+  }[],
+  dropTarget: HTMLElement,
+): Promise<FileUploadResult> {
+  const transfer = new DataTransfer();
+
+  for (const file of files) {
+    const response = await fetch(chrome.runtime.getURL(file.storageKey));
+    if (!response.ok) return uploadMiss(`Upload asset missing: ${file.filename}.`);
+
+    transfer.items.add(
+      new File([await response.blob()], file.filename, { type: file.contentType }),
+    );
   }
 
-  control.value = value;
-  dispatchInput(control);
-  return true;
-}
-
-function setChoice(labelIncludes: string, type: "checkbox" | "radio", checked: boolean) {
-  const input = findChoice(labelIncludes, type);
-  if (input === null) {
-    return false;
-  }
-
-  if (input.checked !== checked) {
-    input.click();
-  }
-
-  return true;
-}
-
-function setSelect(labelIncludes: string, valueIncludes: string) {
-  const select = findControl(labelIncludes, "select");
-  if (select === null) {
-    return false;
-  }
-
-  const option = Array.from(select.options).find((item) =>
-    includes(item.textContent, valueIncludes),
-  );
-  if (option === undefined) {
-    return false;
-  }
-
-  select.value = option.value;
-  dispatchInput(select);
-  return true;
-}
-
-function findControl<T extends "input" | "textarea" | "select">(
-  labelIncludes: string,
-  selector: T,
-) {
-  const direct = Array.from(
-    document.querySelectorAll<
-      T extends "input"
-        ? HTMLInputElement
-        : T extends "textarea"
-          ? HTMLTextAreaElement
-          : HTMLSelectElement
-    >(selector),
-  ).find((control) => includes(accessibleText(control), labelIncludes));
-
-  if (direct !== undefined) {
-    return direct;
-  }
-
-  const labelNode = findTextContainer(labelIncludes);
-  if (labelNode === null) {
-    return null;
-  }
-
-  return nextControl(labelNode, selector);
-}
-
-function findChoice(labelIncludes: string, type: "checkbox" | "radio") {
-  const choices = Array.from(document.querySelectorAll<HTMLInputElement>(`input[type="${type}"]`));
-  return choices.find((choice) => includes(choiceText(choice), labelIncludes)) ?? null;
-}
-
-function choiceText(choice: HTMLInputElement) {
-  const container = choice.closest("label, div, li, p");
-  return `${accessibleText(choice)} ${container?.textContent ?? ""}`;
-}
-
-function accessibleText(element: Element) {
-  return [
-    element.getAttribute("aria-label"),
-    element.getAttribute("title"),
-    element.getAttribute("placeholder"),
-    element.getAttribute("name"),
-    element.getAttribute("id"),
-    element.getAttribute("description"),
-  ]
-    .filter((value) => value !== null)
-    .join(" ");
-}
-
-function findTextContainer(labelIncludes: string) {
-  const nodes = Array.from(document.querySelectorAll<HTMLElement>("label, div, p, span, strong"));
-  return nodes.find((node) => includes(node.textContent, labelIncludes)) ?? null;
-}
-
-function nextControl<T extends "input" | "textarea" | "select">(start: Element, selector: T) {
-  const controls = Array.from(
-    document.querySelectorAll<
-      T extends "input"
-        ? HTMLInputElement
-        : T extends "textarea"
-          ? HTMLTextAreaElement
-          : HTMLSelectElement
-    >(selector),
-  );
-  const startRect = start.getBoundingClientRect();
-  return controls.find((control) => control.getBoundingClientRect().top >= startRect.top) ?? null;
+  input.files = transfer.files;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  dropTarget.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer: transfer }));
+  return { ok: true };
 }
 
 function pageHeading() {
@@ -199,17 +302,36 @@ function pageHeading() {
     .join(" ");
 }
 
-function dispatchInput(control: HTMLElement) {
-  control.dispatchEvent(new Event("input", { bubbles: true }));
-  control.dispatchEvent(new Event("change", { bubbles: true }));
+function actionLabel(action: Exclude<FillAction, { type: "stop" }>) {
+  if (action.type === "text" || action.type === "textarea" || action.type === "file") {
+    return `${action.type}:${action.labelIncludes}`;
+  }
+
+  if (action.type === "checkbox") {
+    return `checkbox:${action.labelIncludes}`;
+  }
+
+  return `${action.type}:${action.labelIncludes}`;
 }
 
-function includes(value: string | null, search: string) {
-  return normalize(value ?? "").includes(normalize(search));
+function loadFillRun() {
+  const json = window.sessionStorage.getItem(FILL_RUN_KEY);
+  if (json === null) return null;
+
+  try {
+    return JSON.parse(json) as FillRunState;
+  } catch {
+    clearFillRun();
+    return null;
+  }
 }
 
-function normalize(value: string) {
-  return value.toLowerCase().replace(/\s+/g, " ").trim();
+function saveFillRun(state: FillRunState) {
+  window.sessionStorage.setItem(FILL_RUN_KEY, JSON.stringify(state));
+}
+
+function clearFillRun() {
+  window.sessionStorage.removeItem(FILL_RUN_KEY);
 }
 
 function showToast(message: string) {

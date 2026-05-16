@@ -131,7 +131,7 @@ export const samplePurchase: Purchase = {
   files: [
     file("file_id_front", "id_front", "Oliver_ID_1.jpg", "image/jpeg"),
     file("file_id_back", "id_back", "Oliver_ID_2.jpg", "image/jpeg"),
-    file("file_receipt", "receipt", "mort_garson_receipt.pdf", "application/pdf"),
+    file("file_receipt", "receipt", "mort_garson_receipt.jpg", "image/jpeg"),
     file("file_approval", "approval", "approval_email.pdf", "application/pdf"),
     file("file_publicity", "publicity", "weekly_event_engage.pdf", "application/pdf"),
   ],
@@ -160,6 +160,14 @@ export function recipientValueText(purchase: Purchase) {
 
 export function recipientIdText(purchase: Purchase) {
   return purchase.recipients.map((recipient) => `${recipient.name}, ${recipient.uo95}`).join("\n");
+}
+
+export function purchaseFileById(purchase: Purchase, fileId: string) {
+  const file = purchase.files.find((item) => item.id === fileId);
+  if (file === undefined) {
+    throw new Error(`Purchase file not found: ${fileId}`);
+  }
+  return file;
 }
 
 export function generateBusinessPurpose(purchase: Purchase) {

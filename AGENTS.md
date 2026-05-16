@@ -4,7 +4,7 @@ Generally speaking, you should browse the codebase to figure out what is going o
 
 ## Task Completion Requirements
 
-- All of `vp fmt`, `vp lint`, and `vp typecheck` must pass before considering tasks completed.
+- All of `vp fmt`, `vp lint`, and `vp check` must pass before considering tasks completed.
 
 ## Project Snapshot
 
@@ -32,6 +32,7 @@ Long term maintainability is a core priority. If you add new functionality, firs
 
 - `apps/web`: TanStack Start + React Web App
 - `apps/extension`: Manifest V3 Chrome extension
+- `convex/`: Convex backend
 
 ## Expectations
 
