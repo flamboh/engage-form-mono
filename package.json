@@ -11,6 +11,7 @@
   "scripts": {
     "ready": "vp fmt && vp lint && vp run -r test && vp run -r build",
     "dev": "concurrently -n web,convex -c blue,magenta \"vp run web#dev -- --port 3676\" \"bunx convex dev\"",
+    "dev:tailscale": "concurrently -n web,convex -c blue,magenta \"vp run web#dev -- --host 0.0.0.0 --port 3676\" \"bunx convex dev\"",
     "dev:web": "vp run web#dev -- --port 3676",
     "dev:convex": "bunx convex dev",
     "prepare": "vp config"
