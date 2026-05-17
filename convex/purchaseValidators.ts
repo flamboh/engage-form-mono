@@ -27,9 +27,14 @@ export const recipient = v.object({
   value: v.number(),
 });
 
+export const purchaserRef = v.union(
+  v.object({ kind: v.literal("self") }),
+  v.object({ kind: v.literal("purchaser"), purchaserId: v.id("purchasers") }),
+);
+
 export const draftPatch = v.object({
   organizationId: v.optional(v.union(v.id("organizations"), v.null())),
-  purchaserPersonId: v.optional(v.union(v.id("people"), v.null())),
+  purchaser: v.optional(purchaserRef),
   eventPresetId: v.optional(v.union(v.id("eventPresets"), v.null())),
   eventDate: v.optional(v.string()),
   vendor: v.optional(v.string()),

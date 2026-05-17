@@ -3,33 +3,34 @@
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import { convexMutation, convexQuery } from '$lib/convex-http';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
+	import { uploadFile } from '$lib/upload';
+
+	type Fund = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 
 	const clerkContext = getClerkContext();
 
 	let includeArchived = $state(false);
 	let savedData = $state<{
 		organizations: Doc<'organizations'>[];
-		people: Doc<'people'>[];
+		purchasers: Doc<'purchasers'>[];
 		eventPresets: Doc<'eventPresets'>[];
 	}>();
+	let currentUser = $state<Doc<'users'> | null>(null);
 
 	let orgId = $state<Id<'organizations'> | null>(null);
 	let orgName = $state('');
 	let orgIndex = $state('');
-	let orgFund = $state<'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T'>('I');
-	let orgBudget = $state('Event Expenses');
+	let orgFund = $state<Fund>('I');
+	let orgBudgetLines = $state<string[]>(['Event Expenses']);
 	let orgTemplate = $state(
 		'{org} wishes to reimburse {purchaser} because they purchased {item} from {vendor} for {amount}. This {item} was given as a gift to {recipient} ({recipientUo95}) for {recipientReason} during {eventName} which took place on {eventDate} at {eventTime} in {eventLocation} with about {attendance} students in attendance.'
 	);
 
-	let personOrgId = $state<Id<'organizations'> | ''>('');
-	let personId = $state<Id<'people'> | null>(null);
-	let personName = $state('');
-	let personUo95 = $state('');
-	let personAddress = $state('');
-	let personEmail = $state('');
-	let personPhone = $state('');
-	let personRequester = $state(false);
+	let purchaserOrgId = $state<Id<'organizations'> | ''>('');
+	let purchaserId = $state<Id<'purchasers'> | null>(null);
+	let purchaserName = $state('');
+	let purchaserUo95 = $state('');
+	let purchaserAddress = $state('');
 	let idFrontFileId = $state<Id<'files'> | null>(null);
 	let idBackFileId = $state<Id<'files'> | null>(null);
 
@@ -44,13 +45,21 @@
 	$effect(() => {
 		if (!clerkContext.currentSession) return;
 		void loadSaved();
+		void loadCurrentUser();
 	});
 
+	async function loadCurrentUser() {
+		const session = clerkContext.currentSession;
+		if (!session) return;
+		currentUser = await convexQuery(session, api.authed.purchaseBuilder.getCurrentUser, {});
+	}
+
 	async function loadSaved() {
-		if (!clerkContext.currentSession) return;
+		const session = clerkContext.currentSession;
+		if (!session) return;
 		error = '';
 		try {
-			savedData = await convexQuery(clerkContext.currentSession, api.authed.purchaseBuilder.listSaved, {
+			savedData = await convexQuery(session, api.authed.purchaseBuilder.listSaved, {
 				includeArchived
 			});
 		} catch (err) {
@@ -63,21 +72,18 @@
 		orgName = org.name;
 		orgIndex = org.indexNumber;
 		orgFund = org.fundLetter;
-		orgBudget = org.defaultBudgetLineItem;
+		orgBudgetLines = org.budgetLines.length > 0 ? [...org.budgetLines] : [''];
 		orgTemplate = org.businessPurposeTemplate;
 	}
 
-	function editPerson(person: Doc<'people'>) {
-		personId = person._id;
-		personOrgId = person.organizationId;
-		personName = person.name;
-		personUo95 = person.uo95;
-		personAddress = person.permanentAddress;
-		personEmail = person.email ?? '';
-		personPhone = person.phone ?? '';
-		personRequester = person.isRequester;
-		idFrontFileId = person.idCardFrontFileId;
-		idBackFileId = person.idCardBackFileId;
+	function editPurchaser(purchaser: Doc<'purchasers'>) {
+		purchaserId = purchaser._id;
+		purchaserOrgId = purchaser.organizationId;
+		purchaserName = purchaser.name;
+		purchaserUo95 = purchaser.uo95;
+		purchaserAddress = purchaser.permanentAddress;
+		idFrontFileId = purchaser.idCardFrontFileId;
+		idBackFileId = purchaser.idCardBackFileId;
 	}
 
 	function editEvent(eventPreset: Doc<'eventPresets'>) {
@@ -89,48 +95,41 @@
 		eventAttendance = eventPreset.estimatedAttendance;
 	}
 
+	function addBudgetLine() {
+		orgBudgetLines = [...orgBudgetLines, ''];
+	}
+
+	function removeBudgetLine(i: number) {
+		orgBudgetLines = orgBudgetLines.filter((_, index) => index !== i);
+	}
+
 	async function upload(kind: 'id_front' | 'id_back', input: HTMLInputElement) {
+		const session = clerkContext.currentSession;
 		const file = input.files?.[0];
-		if (!file) return;
-		if (!clerkContext.currentSession) return;
-		const uploadUrl = await convexMutation(
-			clerkContext.currentSession,
-			api.authed.purchaseBuilder.generateUploadUrl,
-			{}
-		);
-		const response = await fetch(uploadUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': file.type || 'application/octet-stream' },
-			body: file
-		});
-		const { storageId } = (await response.json()) as { storageId: Id<'_storage'> };
-		const fileId = await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.saveFile, {
-			kind,
-			storageId,
-			filename: file.name,
-			contentType: file.type || 'application/octet-stream',
-			size: file.size
-		});
+		if (!session || !file) return;
+		const fileId = await uploadFile(session, kind, file);
 		if (kind === 'id_front') idFrontFileId = fileId;
 		if (kind === 'id_back') idBackFileId = fileId;
 	}
 
 	async function saveOrg(event: SubmitEvent) {
 		event.preventDefault();
+		const session = clerkContext.currentSession;
+		if (!session) return;
 		error = '';
-		if (!clerkContext.currentSession) return;
 		try {
-			await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.upsertOrganization, {
+			await convexMutation(session, api.authed.purchaseBuilder.upsertOrganization, {
 				id: orgId,
 				name: orgName,
 				indexNumber: orgIndex,
 				fundLetter: orgFund,
-				defaultBudgetLineItem: orgBudget,
+				budgetLines: orgBudgetLines,
 				businessPurposeTemplate: orgTemplate
 			});
 			orgId = null;
 			orgName = '';
 			orgIndex = '';
+			orgBudgetLines = ['Event Expenses'];
 			await loadSaved();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -138,14 +137,15 @@
 	}
 
 	async function archiveRecord(
-		table: 'organizations' | 'people' | 'eventPresets',
-		id: Id<'organizations'> | Id<'people'> | Id<'eventPresets'>,
+		table: 'organizations' | 'purchasers' | 'eventPresets',
+		id: Id<'organizations'> | Id<'purchasers'> | Id<'eventPresets'>,
 		archived: boolean
 	) {
+		const session = clerkContext.currentSession;
+		if (!session) return;
 		error = '';
-		if (!clerkContext.currentSession) return;
 		try {
-			await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.setArchived, {
+			await convexMutation(session, api.authed.purchaseBuilder.setArchived, {
 				table,
 				id,
 				archived
@@ -156,34 +156,29 @@
 		}
 	}
 
-	async function savePerson(event: SubmitEvent) {
+	async function savePurchaser(event: SubmitEvent) {
 		event.preventDefault();
+		const session = clerkContext.currentSession;
+		if (!session) return;
 		error = '';
-		if (!personOrgId || idFrontFileId === null || idBackFileId === null) {
+		if (!purchaserOrgId || idFrontFileId === null || idBackFileId === null) {
 			error = 'Organization and ID files required.';
 			return;
 		}
-		if (!clerkContext.currentSession) return;
 		try {
-			await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.upsertPerson, {
-				id: personId,
-				organizationId: personOrgId,
-				name: personName,
-				uo95: personUo95,
-				permanentAddress: personAddress,
+			await convexMutation(session, api.authed.purchaseBuilder.upsertPurchaser, {
+				id: purchaserId,
+				organizationId: purchaserOrgId,
+				name: purchaserName,
+				uo95: purchaserUo95,
+				permanentAddress: purchaserAddress,
 				idCardFrontFileId: idFrontFileId,
-				idCardBackFileId: idBackFileId,
-				email: personEmail || null,
-				phone: personPhone || null,
-				isRequester: personRequester
+				idCardBackFileId: idBackFileId
 			});
-			personId = null;
-			personName = '';
-			personUo95 = '';
-			personAddress = '';
-			personEmail = '';
-			personPhone = '';
-			personRequester = false;
+			purchaserId = null;
+			purchaserName = '';
+			purchaserUo95 = '';
+			purchaserAddress = '';
 			idFrontFileId = null;
 			idBackFileId = null;
 			await loadSaved();
@@ -194,14 +189,15 @@
 
 	async function saveEvent(event: SubmitEvent) {
 		event.preventDefault();
+		const session = clerkContext.currentSession;
+		if (!session) return;
 		error = '';
 		if (!eventOrgId) {
 			error = 'Organization required.';
 			return;
 		}
-		if (!clerkContext.currentSession) return;
 		try {
-			await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.upsertEventPreset, {
+			await convexMutation(session, api.authed.purchaseBuilder.upsertEventPreset, {
 				id: eventId,
 				organizationId: eventOrgId,
 				name: eventName,
@@ -237,132 +233,174 @@
 					<h1 class="text-lg font-semibold">Saved</h1>
 				</div>
 				<label class="flex items-center gap-2 text-sm text-stone-600">
-					<input type="checkbox" bind:checked={includeArchived} />
+					<input type="checkbox" bind:checked={includeArchived} onchange={loadSaved} />
 					Show archived
 				</label>
 			</div>
 		</header>
 
-		<main class="mx-auto grid max-w-6xl gap-6 px-6 py-8 lg:grid-cols-3">
-			{#if error}<p class="lg:col-span-3 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>{/if}
+		<main class="mx-auto max-w-6xl space-y-6 px-6 py-8">
+			{#if error}<p class="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>{/if}
 
 			<section class="rounded-lg border border-stone-200 bg-white p-5">
-				<h2 class="text-sm font-semibold">Organizations</h2>
-				<form class="mt-4 space-y-3" onsubmit={saveOrg}>
-					<input class="field" placeholder="Name" bind:value={orgName} />
-					<input class="field" placeholder="Index number" bind:value={orgIndex} />
-					<select class="field" bind:value={orgFund}>
-						<option>I</option><option>E</option><option>G</option><option>N</option><option>U</option
-						><option>D</option><option>T</option>
-					</select>
-					<input class="field" placeholder="Budget line item" bind:value={orgBudget} />
-					<textarea class="field min-h-32" bind:value={orgTemplate}></textarea>
-					<button class="button" type="submit">Save organization</button>
-				</form>
-				<ul class="mt-5 divide-y divide-stone-200">
-					{#each savedData?.organizations ?? [] as org (org._id)}
-						<li class="py-3 text-sm">
-							<p class="font-medium">{org.name}</p>
-							<p class="text-stone-500">{org.indexNumber} · Fund {org.fundLetter}</p>
-							<div class="mt-2 flex gap-2">
-								<button class="link-button" type="button" onclick={() => editOrg(org)}>Edit</button>
-								<button
-									class="link-button"
-									type="button"
-									onclick={() => archiveRecord('organizations', org._id, !org.archived)}
-								>
-									{org.archived ? 'Unarchive' : 'Archive'}
-								</button>
-							</div>
-						</li>
-					{/each}
-				</ul>
-			</section>
-
-			<section class="rounded-lg border border-stone-200 bg-white p-5">
-				<h2 class="text-sm font-semibold">People</h2>
-				<form class="mt-4 space-y-3" onsubmit={savePerson}>
-					<select class="field" bind:value={personOrgId}>
-						<option value="">Organization</option>
-						{#each savedData?.organizations ?? [] as org (org._id)}
-							<option value={org._id}>{org.name}</option>
-						{/each}
-					</select>
-					<input class="field" placeholder="Name" bind:value={personName} />
-					<input class="field" placeholder="UO 95" bind:value={personUo95} />
-					<input class="field" placeholder="Permanent address" bind:value={personAddress} />
-					<label class="block text-xs font-medium text-stone-500">
-						ID front
-						<input class="mt-1 block text-sm" type="file" onchange={(e) => upload('id_front', e.currentTarget)} />
-					</label>
-					<label class="block text-xs font-medium text-stone-500">
-						ID back
-						<input class="mt-1 block text-sm" type="file" onchange={(e) => upload('id_back', e.currentTarget)} />
-					</label>
-					<label class="flex items-center gap-2 text-sm">
-						<input type="checkbox" bind:checked={personRequester} />
-						Set as requester
-					</label>
-					<input class="field" placeholder="Requester email" bind:value={personEmail} />
-					<input class="field" placeholder="Requester phone" bind:value={personPhone} />
-					<button class="button" type="submit">Save person</button>
-				</form>
-				<ul class="mt-5 divide-y divide-stone-200">
-					{#each savedData?.people ?? [] as person (person._id)}
-						<li class="py-3 text-sm">
-							<p class="font-medium">{person.name}</p>
-							<p class="text-stone-500">
-								{person.uo95}{person.isRequester ? ' · requester' : ''}
+				<div class="flex items-center justify-between gap-3">
+					<div>
+						<h2 class="text-sm font-semibold">Your profile</h2>
+						{#if currentUser}
+							<p class="mt-1 text-sm text-stone-500">
+								{currentUser.name} · {currentUser.uo95} · {currentUser.studentEmail}
 							</p>
-							<div class="mt-2 flex gap-2">
-								<button class="link-button" type="button" onclick={() => editPerson(person)}>Edit</button>
-								<button
-									class="link-button"
-									type="button"
-									onclick={() => archiveRecord('people', person._id, !person.archived)}
-								>
-									{person.archived ? 'Unarchive' : 'Archive'}
-								</button>
-							</div>
-						</li>
-					{/each}
-				</ul>
+						{:else}
+							<p class="mt-1 text-sm text-stone-500">Profile not set.</p>
+						{/if}
+					</div>
+					<a class="secondary" href="/app/welcome/profile">Edit profile</a>
+				</div>
 			</section>
 
-			<section class="rounded-lg border border-stone-200 bg-white p-5">
-				<h2 class="text-sm font-semibold">Event presets</h2>
-				<form class="mt-4 space-y-3" onsubmit={saveEvent}>
-					<select class="field" bind:value={eventOrgId}>
-						<option value="">Organization</option>
+			<div class="grid gap-6 lg:grid-cols-3">
+				<section class="rounded-lg border border-stone-200 bg-white p-5">
+					<h2 class="text-sm font-semibold">Organizations</h2>
+					<form class="mt-4 space-y-3" onsubmit={saveOrg}>
+						<input class="field" placeholder="Name" required bind:value={orgName} />
+						<input class="field" placeholder="Index number" required bind:value={orgIndex} />
+						<select class="field" bind:value={orgFund}>
+							<option>I</option><option>E</option><option>G</option><option>N</option><option>U</option
+							><option>D</option><option>T</option>
+						</select>
+						<div>
+							<span class="text-xs font-medium text-stone-500">Budget lines</span>
+							{#each orgBudgetLines as _, i (i)}
+								<div class="mt-1 flex items-center gap-2">
+									<input class="field flex-1" required bind:value={orgBudgetLines[i]} />
+									{#if orgBudgetLines.length > 1}
+										<button class="link-button" type="button" onclick={() => removeBudgetLine(i)}>
+											Remove
+										</button>
+									{/if}
+								</div>
+							{/each}
+							<button class="link-button mt-2" type="button" onclick={addBudgetLine}>Add line</button>
+						</div>
+						<textarea class="field min-h-32" bind:value={orgTemplate}></textarea>
+						<button class="button" type="submit">Save organization</button>
+					</form>
+					<ul class="mt-5 divide-y divide-stone-200">
 						{#each savedData?.organizations ?? [] as org (org._id)}
-							<option value={org._id}>{org.name}</option>
+							<li class="py-3 text-sm">
+								<p class="font-medium">{org.name}</p>
+								<p class="text-stone-500">{org.indexNumber} · Fund {org.fundLetter}</p>
+								<div class="mt-2 flex gap-2">
+									<button class="link-button" type="button" onclick={() => editOrg(org)}>Edit</button>
+									<button
+										class="link-button"
+										type="button"
+										onclick={() => archiveRecord('organizations', org._id, !org.archived)}
+									>
+										{org.archived ? 'Unarchive' : 'Archive'}
+									</button>
+								</div>
+							</li>
 						{/each}
-					</select>
-					<input class="field" placeholder="Name" bind:value={eventName} />
-					<input class="field" placeholder="Time" bind:value={eventTime} />
-					<input class="field" placeholder="Location" bind:value={eventLocation} />
-					<input class="field" type="number" min="1" bind:value={eventAttendance} />
-					<button class="button" type="submit">Save event</button>
-				</form>
-				<ul class="mt-5 divide-y divide-stone-200">
-					{#each savedData?.eventPresets ?? [] as eventPreset (eventPreset._id)}
-						<li class="py-3 text-sm">
-							<p class="font-medium">{eventPreset.name}</p>
-							<p class="text-stone-500">{eventPreset.time} · {eventPreset.location}</p>
-							<div class="mt-2 flex gap-2">
-								<button class="link-button" type="button" onclick={() => editEvent(eventPreset)}>Edit</button>
-								<button
-									class="link-button"
-									type="button"
-									onclick={() => archiveRecord('eventPresets', eventPreset._id, !eventPreset.archived)}
-								>
-									{eventPreset.archived ? 'Unarchive' : 'Archive'}
-								</button>
-							</div>
-						</li>
-					{/each}
-				</ul>
-			</section>
+					</ul>
+				</section>
+
+				<section class="rounded-lg border border-stone-200 bg-white p-5">
+					<h2 class="text-sm font-semibold">Purchasers</h2>
+					<p class="mt-1 text-xs text-stone-500">Other people who paid (not you).</p>
+					<form class="mt-4 space-y-3" onsubmit={savePurchaser}>
+						<select class="field" bind:value={purchaserOrgId}>
+							<option value="">Organization</option>
+							{#each savedData?.organizations ?? [] as org (org._id)}
+								<option value={org._id}>{org.name}</option>
+							{/each}
+						</select>
+						<input class="field" placeholder="Name" required bind:value={purchaserName} />
+						<input class="field" placeholder="UO 95" required bind:value={purchaserUo95} />
+						<input
+							class="field"
+							placeholder="Permanent address"
+							autocomplete="street-address"
+							required
+							bind:value={purchaserAddress}
+						/>
+						<label class="block text-xs font-medium text-stone-500">
+							ID front
+							<input
+								class="mt-1 block text-sm"
+								type="file"
+								onchange={(e) => upload('id_front', e.currentTarget)}
+							/>
+						</label>
+						<label class="block text-xs font-medium text-stone-500">
+							ID back
+							<input
+								class="mt-1 block text-sm"
+								type="file"
+								onchange={(e) => upload('id_back', e.currentTarget)}
+							/>
+						</label>
+						<button class="button" type="submit">Save purchaser</button>
+					</form>
+					<ul class="mt-5 divide-y divide-stone-200">
+						{#each savedData?.purchasers ?? [] as purchaser (purchaser._id)}
+							<li class="py-3 text-sm">
+								<p class="font-medium">{purchaser.name}</p>
+								<p class="text-stone-500">{purchaser.uo95}</p>
+								<div class="mt-2 flex gap-2">
+									<button class="link-button" type="button" onclick={() => editPurchaser(purchaser)}>
+										Edit
+									</button>
+									<button
+										class="link-button"
+										type="button"
+										onclick={() => archiveRecord('purchasers', purchaser._id, !purchaser.archived)}
+									>
+										{purchaser.archived ? 'Unarchive' : 'Archive'}
+									</button>
+								</div>
+							</li>
+						{/each}
+					</ul>
+				</section>
+
+				<section class="rounded-lg border border-stone-200 bg-white p-5">
+					<h2 class="text-sm font-semibold">Event presets</h2>
+					<form class="mt-4 space-y-3" onsubmit={saveEvent}>
+						<select class="field" bind:value={eventOrgId}>
+							<option value="">Organization</option>
+							{#each savedData?.organizations ?? [] as org (org._id)}
+								<option value={org._id}>{org.name}</option>
+							{/each}
+						</select>
+						<input class="field" placeholder="Name" required bind:value={eventName} />
+						<input class="field" placeholder="Time" required bind:value={eventTime} />
+						<input class="field" placeholder="Location" required bind:value={eventLocation} />
+						<input class="field" type="number" min="1" bind:value={eventAttendance} />
+						<button class="button" type="submit">Save event</button>
+					</form>
+					<ul class="mt-5 divide-y divide-stone-200">
+						{#each savedData?.eventPresets ?? [] as eventPreset (eventPreset._id)}
+							<li class="py-3 text-sm">
+								<p class="font-medium">{eventPreset.name}</p>
+								<p class="text-stone-500">{eventPreset.time} · {eventPreset.location}</p>
+								<div class="mt-2 flex gap-2">
+									<button class="link-button" type="button" onclick={() => editEvent(eventPreset)}>
+										Edit
+									</button>
+									<button
+										class="link-button"
+										type="button"
+										onclick={() => archiveRecord('eventPresets', eventPreset._id, !eventPreset.archived)}
+									>
+										{eventPreset.archived ? 'Unarchive' : 'Archive'}
+									</button>
+								</div>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			</div>
 		</main>
 	</div>
 {/if}
@@ -383,6 +421,18 @@
 		font-size: 0.875rem;
 		font-weight: 500;
 		color: white;
+	}
+
+	.secondary {
+		display: inline-flex;
+		align-items: center;
+		border-radius: 0.375rem;
+		border: 1px solid rgb(214 211 209);
+		padding: 0.45rem 0.75rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		text-decoration: none;
+		color: inherit;
 	}
 
 	.link-button {

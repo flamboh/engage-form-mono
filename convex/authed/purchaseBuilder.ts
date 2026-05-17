@@ -8,10 +8,10 @@ import { authedMutation, authedQuery } from "./helpers";
 import {
   applyDraftPatch,
   assertReady,
+  getUserProfile,
   ownerFromIdentity,
   requireOwnedDoc,
   requireText,
-  setRequester,
   type DraftPatch,
 } from "../purchaseModel";
 import { draftPatch, fileKind, fundLetter } from "../purchaseValidators";
@@ -29,6 +29,73 @@ const debouncer = new Debouncer(components.debouncer as unknown as DebouncerComp
   mode: "sliding",
 });
 
+export const getCurrentUser = authedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    return await getUserProfile(ctx, owner);
+  },
+});
+
+export const welcomeState = authedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    const user = await getUserProfile(ctx, owner);
+    const organization = await ctx.db
+      .query("organizations")
+      .withIndex("by_owner", (q) => q.eq("owner", owner))
+      .first();
+    const sessions = await ctx.db
+      .query("extensionSessions")
+      .withIndex("by_owner", (q) => q.eq("owner", owner))
+      .take(50);
+    const hasExtensionLink = sessions.some((session) => session.revokedAt === null);
+    return {
+      hasProfile: user !== null,
+      hasOrganization: organization !== null,
+      hasExtensionLink,
+    };
+  },
+});
+
+export const upsertUserProfile = authedMutation({
+  args: {
+    name: v.string(),
+    uo95: v.string(),
+    permanentAddress: v.string(),
+    studentEmail: v.string(),
+    phone: v.string(),
+    idCardFrontFileId: v.id("files"),
+    idCardBackFileId: v.id("files"),
+  },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    requireText(args.name, "Name missing.");
+    requireText(args.uo95, "UO 95 missing.");
+    requireText(args.permanentAddress, "Permanent address missing.");
+    requireText(args.studentEmail, "Student email missing.");
+    requireText(args.phone, "Phone missing.");
+    await requireOwnedDoc(ctx, "files", args.idCardFrontFileId, owner);
+    await requireOwnedDoc(ctx, "files", args.idCardBackFileId, owner);
+    const fields = {
+      owner,
+      name: args.name,
+      uo95: args.uo95,
+      permanentAddress: args.permanentAddress,
+      studentEmail: args.studentEmail,
+      phone: args.phone,
+      idCardFrontFileId: args.idCardFrontFileId,
+      idCardBackFileId: args.idCardBackFileId,
+      updatedAt: Date.now(),
+    };
+    const existing = await getUserProfile(ctx, owner);
+    if (existing === null) return await ctx.db.insert("users", fields);
+    await ctx.db.patch(existing._id, fields);
+    return existing._id;
+  },
+});
+
 export const listSaved = authedQuery({
   args: { includeArchived: v.boolean() },
   handler: async (ctx, args) => {
@@ -42,8 +109,8 @@ export const listSaved = authedQuery({
           .query("organizations")
           .withIndex("by_owner_and_archived", (q) => q.eq("owner", owner).eq("archived", false))
           .take(100);
-    const people = await ctx.db
-      .query("people")
+    const purchasers = await ctx.db
+      .query("purchasers")
       .withIndex("by_owner", (q) => q.eq("owner", owner))
       .take(200);
     const eventPresets = await ctx.db
@@ -53,7 +120,9 @@ export const listSaved = authedQuery({
 
     return {
       organizations,
-      people: args.includeArchived ? people : people.filter((person) => !person.archived),
+      purchasers: args.includeArchived
+        ? purchasers
+        : purchasers.filter((purchaser) => !purchaser.archived),
       eventPresets: args.includeArchived
         ? eventPresets
         : eventPresets.filter((eventPreset) => !eventPreset.archived),
@@ -111,21 +180,22 @@ export const upsertOrganization = authedMutation({
     name: v.string(),
     indexNumber: v.string(),
     fundLetter,
-    defaultBudgetLineItem: v.string(),
+    budgetLines: v.array(v.string()),
     businessPurposeTemplate: v.string(),
   },
   handler: async (ctx, args) => {
     const owner = ownerFromIdentity(ctx.identity);
     requireText(args.name, "Organization name missing.");
     requireText(args.indexNumber, "Index number missing.");
-    requireText(args.defaultBudgetLineItem, "Budget line item missing.");
     requireText(args.businessPurposeTemplate, "Business purpose template missing.");
+    const budgetLines = args.budgetLines.map((line) => line.trim()).filter((line) => line !== "");
+    if (budgetLines.length === 0) throw new Error("Add at least one budget line.");
     const fields = {
       owner,
       name: args.name,
       indexNumber: args.indexNumber,
       fundLetter: args.fundLetter,
-      defaultBudgetLineItem: args.defaultBudgetLineItem,
+      budgetLines,
       businessPurposeTemplate: args.businessPurposeTemplate,
       archived: false,
       updatedAt: Date.now(),
@@ -137,31 +207,24 @@ export const upsertOrganization = authedMutation({
   },
 });
 
-export const upsertPerson = authedMutation({
+export const upsertPurchaser = authedMutation({
   args: {
-    id: v.union(v.id("people"), v.null()),
+    id: v.union(v.id("purchasers"), v.null()),
     organizationId: v.id("organizations"),
     name: v.string(),
     uo95: v.string(),
     permanentAddress: v.string(),
     idCardFrontFileId: v.id("files"),
     idCardBackFileId: v.id("files"),
-    email: v.union(v.string(), v.null()),
-    phone: v.union(v.string(), v.null()),
-    isRequester: v.boolean(),
   },
   handler: async (ctx, args) => {
     const owner = ownerFromIdentity(ctx.identity);
     await requireOwnedDoc(ctx, "organizations", args.organizationId, owner);
     await requireOwnedDoc(ctx, "files", args.idCardFrontFileId, owner);
     await requireOwnedDoc(ctx, "files", args.idCardBackFileId, owner);
-    requireText(args.name, "Person name missing.");
+    requireText(args.name, "Purchaser name missing.");
     requireText(args.uo95, "UO 95 missing.");
     requireText(args.permanentAddress, "Permanent address missing.");
-    if (args.isRequester) {
-      requireText(args.email ?? "", "Requester email missing.");
-      requireText(args.phone ?? "", "Requester phone missing.");
-    }
     const fields = {
       owner,
       organizationId: args.organizationId,
@@ -170,19 +233,13 @@ export const upsertPerson = authedMutation({
       permanentAddress: args.permanentAddress,
       idCardFrontFileId: args.idCardFrontFileId,
       idCardBackFileId: args.idCardBackFileId,
-      email: args.email,
-      phone: args.phone,
-      isRequester: args.isRequester,
       archived: false,
       updatedAt: Date.now(),
     };
-    const personId = args.id === null ? await ctx.db.insert("people", fields) : args.id;
-    if (args.id !== null) {
-      await requireOwnedDoc(ctx, "people", args.id, owner);
-      await ctx.db.patch(args.id, fields);
-    }
-    if (args.isRequester) await setRequester(ctx, owner, args.organizationId, personId);
-    return personId;
+    if (args.id === null) return await ctx.db.insert("purchasers", fields);
+    await requireOwnedDoc(ctx, "purchasers", args.id, owner);
+    await ctx.db.patch(args.id, fields);
+    return args.id;
   },
 });
 
@@ -221,8 +278,8 @@ export const upsertEventPreset = authedMutation({
 
 export const setArchived = authedMutation({
   args: {
-    table: v.union(v.literal("organizations"), v.literal("people"), v.literal("eventPresets")),
-    id: v.union(v.id("organizations"), v.id("people"), v.id("eventPresets")),
+    table: v.union(v.literal("organizations"), v.literal("purchasers"), v.literal("eventPresets")),
+    id: v.union(v.id("organizations"), v.id("purchasers"), v.id("eventPresets")),
     archived: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -241,7 +298,7 @@ export const createDraft = authedMutation({
       owner,
       status: "draft",
       organizationId: null,
-      purchaserPersonId: null,
+      purchaser: { kind: "self" },
       eventPresetId: null,
       eventDate: "",
       vendor: "",

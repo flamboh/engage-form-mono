@@ -1,4 +1,5 @@
 <script lang="ts">
+	import OnboardingGate from '$lib/welcome/OnboardingGate.svelte';
 	import ClerkWrapper from '$lib/wrappers/ClerkWrapper.svelte';
 	import ConvexWrapper from '$lib/wrappers/ConvexWrapper.svelte';
 
@@ -6,11 +7,13 @@
 </script>
 
 <svelte:head>
-	<title>Conference Tracker</title>
+	<title>Engage Form</title>
 </svelte:head>
 
 <ClerkWrapper>
 	<ConvexWrapper>
-		{@render children()}
+		<OnboardingGate>
+			{@render children()}
+		</OnboardingGate>
 	</ConvexWrapper>
 </ClerkWrapper>

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { authedMutation } from "./authed/helpers";
+import { authedMutation, authedQuery } from "./authed/helpers";
 import { assemblePurchase, assertReady, ownerFromIdentity } from "./purchaseModel";
 
 export const createDeviceLinkToken = authedMutation({
@@ -17,6 +17,46 @@ export const createDeviceLinkToken = authedMutation({
       revokedAt: null,
     });
     return token;
+  },
+});
+
+export const listDeviceTokens = authedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    const sessions = await ctx.db
+      .query("extensionSessions")
+      .withIndex("by_owner", (q) => q.eq("owner", owner))
+      .take(50);
+    return sessions.map((session) => ({
+      id: session._id,
+      name: session.name,
+      createdAt: session.createdAt,
+      lastUsedAt: session.lastUsedAt,
+      revokedAt: session.revokedAt,
+    }));
+  },
+});
+
+export const revokeDeviceToken = authedMutation({
+  args: { id: v.id("extensionSessions") },
+  handler: async (ctx, args) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    const session = await ctx.db.get(args.id);
+    if (session === null || session.owner !== owner) throw new Error("Token not found.");
+    await ctx.db.patch(args.id, { revokedAt: Date.now() });
+  },
+});
+
+export const hasActiveDeviceToken = authedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const owner = ownerFromIdentity(ctx.identity);
+    const sessions = await ctx.db
+      .query("extensionSessions")
+      .withIndex("by_owner", (q) => q.eq("owner", owner))
+      .take(50);
+    return sessions.some((session) => session.revokedAt === null);
   },
 });
 
