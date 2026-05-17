@@ -10,7 +10,7 @@ Generally speaking, you should browse the codebase to figure out what is going o
 
 This project is a browser extension and companion web app that helps autofill/speed up the process of submitting purchase requests on Engage for University of Oregon students.
 
-This repository is WIP. Proposing sweeping changes that improve long-term maintainability is encouraged.
+This repository is WIP and greenfield. Desctructive actions are encouraged for any sort of improvement. Proposing sweeping changes that improve long-term maintainability is encouraged.
 
 ## Core Priorities
 
@@ -39,6 +39,7 @@ Long term maintainability is a core priority. If you add new functionality, firs
 - Use SvelteKit/Svelte components for `apps/web`; prefer simple local components unless a shared UI primitive is clearly needed.
 - Keep designs simple, no over explaining, plain colors, no gradients, no decorative elements.
 - Assume dev servers for both Convex and `bun dev` are already running.
+- Use EffectTS for business logic and server side code
 
 This project uses [Convex](https://convex.dev) as its backend.
 
@@ -50,17 +51,3 @@ When working on Convex code, **always read `convex/_generated/ai/guidelines.md` 
 - Convex code demos: ~/Code/oss/convex-demos
 - Clerk + Convex: https://clerk.com/docs/guides/development/integrations/databases/convex
 - Skills: use ~/.agents/skills/find-skills to locate relevant skills wherever possible
-
-<!-- convex-ai-start -->
-
-This project uses [Convex](https://convex.dev) as its backend.
-
-When working on Convex code, **always read
-`convex/_generated/ai/guidelines.md` first** for important guidelines on
-how to correctly use Convex APIs and patterns. The file contains rules that
-override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running
-`npx convex ai-files install`.
-
-<!-- convex-ai-end -->
