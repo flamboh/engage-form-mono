@@ -1,23 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '$convex/_generated/api';
-	import { convexQuery } from '$lib/convex-http';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
-	import { firstIncompleteStep, type WelcomeState } from '$lib/welcome/steps';
+	import { firstIncompleteStep } from '$lib/welcome/steps';
+	import { useQuery } from 'convex-svelte';
 
 	const clerkContext = getClerkContext();
+	const welcomeState = useQuery(api.authed.purchaseBuilder.welcomeState, () =>
+		clerkContext.currentSession ? {} : 'skip'
+	);
 
 	$effect(() => {
-		const session = clerkContext.currentSession;
-		if (!session) return;
-		void (async () => {
-			const state: WelcomeState = await convexQuery(
-				session,
-				api.authed.purchaseBuilder.welcomeState,
-				{}
-			);
-			await goto(`/app/welcome/${firstIncompleteStep(state)}`, { replaceState: true });
-		})();
+		if (!welcomeState.data) return;
+		void goto(`/app/welcome/${firstIncompleteStep(welcomeState.data)}`, { replaceState: true });
 	});
 </script>
 

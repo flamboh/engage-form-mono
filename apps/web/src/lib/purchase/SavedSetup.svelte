@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import { convexMutation, type ClerkSession } from '$lib/convex-http';
+	import type { ClerkSession } from '$lib/convex-http';
 	import FilePicker from '$lib/purchase/FilePicker.svelte';
 	import { uploadFile } from '$lib/upload';
+	import { useConvexClient } from 'convex-svelte';
 
 	type SavedData = {
 		organizations: Doc<'organizations'>[];
@@ -34,6 +35,8 @@
 		onChange,
 		onSavedChange
 	}: Props = $props();
+
+	const client = useConvexClient();
 
 	let mode = $state<'none' | 'org' | 'purchaser' | 'event'>('none');
 	let error = $state('');
@@ -117,18 +120,14 @@
 		event.preventDefault();
 		error = '';
 		try {
-			organizationId = await convexMutation(
-				session,
-				api.authed.purchaseBuilder.upsertOrganization,
-				{
-					id: null,
-					name: orgName,
-					indexNumber: orgIndex,
-					fundLetter: 'I',
-					budgetLines: orgBudgetLines,
-					businessPurposeTemplate: orgTemplate
-				}
-			);
+			organizationId = await client.mutation(api.authed.purchaseBuilder.upsertOrganization, {
+				id: null,
+				name: orgName,
+				indexNumber: orgIndex,
+				fundLetter: 'I',
+				budgetLines: orgBudgetLines,
+				businessPurposeTemplate: orgTemplate
+			});
 			purchaser = { kind: 'self' };
 			eventPresetId = null;
 			mode = 'none';
@@ -147,19 +146,15 @@
 			return;
 		}
 		try {
-			const id = await convexMutation(
-				session,
-				api.authed.purchaseBuilder.upsertPurchaser,
-				{
-					id: null,
-					organizationId,
-					name: purchaserName,
-					uo95: purchaserUo95,
-					permanentAddress: purchaserAddress,
-					idCardFrontFileId: idFrontFileId,
-					idCardBackFileId: idBackFileId
-				}
-			);
+			const id = await client.mutation(api.authed.purchaseBuilder.upsertPurchaser, {
+				id: null,
+				organizationId,
+				name: purchaserName,
+				uo95: purchaserUo95,
+				permanentAddress: purchaserAddress,
+				idCardFrontFileId: idFrontFileId,
+				idCardBackFileId: idBackFileId
+			});
 			purchaser = { kind: 'purchaser', purchaserId: id };
 			mode = 'none';
 			await onSavedChange();
@@ -177,18 +172,14 @@
 			return;
 		}
 		try {
-			eventPresetId = await convexMutation(
-				session,
-				api.authed.purchaseBuilder.upsertEventPreset,
-				{
-					id: null,
-					organizationId,
-					name: eventName,
-					time: eventTime,
-					location: eventLocation,
-					estimatedAttendance: eventAttendance
-				}
-			);
+			eventPresetId = await client.mutation(api.authed.purchaseBuilder.upsertEventPreset, {
+				id: null,
+				organizationId,
+				name: eventName,
+				time: eventTime,
+				location: eventLocation,
+				estimatedAttendance: eventAttendance
+			});
 			mode = 'none';
 			await onSavedChange();
 			onChange();
@@ -296,10 +287,7 @@
 			<button class="button" type="submit">Create organization</button>
 		</form>
 	{:else if mode === 'purchaser'}
-		<form
-			class="mt-4 grid gap-3 rounded-md border border-stone-200 p-3"
-			onsubmit={createPurchaser}
-		>
+		<form class="mt-4 grid gap-3 rounded-md border border-stone-200 p-3" onsubmit={createPurchaser}>
 			<input class="field" placeholder="Name" required bind:value={purchaserName} />
 			<input class="field" placeholder="UO 95" required bind:value={purchaserUo95} />
 			<input

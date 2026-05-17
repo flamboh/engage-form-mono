@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { convexMutation, convexQuery } from '$lib/convex-http';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
+	import { useConvexClient, useQuery } from 'convex-svelte';
 
 	type DeviceToken = {
 		id: Id<'extensionSessions'>;
@@ -13,43 +13,26 @@
 	};
 
 	const clerkContext = getClerkContext();
+	const client = useConvexClient();
+	const tokensQuery = useQuery(api.extension.listDeviceTokens, () =>
+		clerkContext.currentSession ? {} : 'skip'
+	);
 
-	let tokens = $state<DeviceToken[]>([]);
-	let loading = $state(false);
 	let creating = $state(false);
 	let newToken = $state('');
 	let newTokenName = $state('Chrome extension');
 	let copying = $state(false);
 	let error = $state('');
 
-	$effect(() => {
-		if (!clerkContext.currentSession) return;
-		void load();
-	});
-
-	async function load() {
-		const session = clerkContext.currentSession;
-		if (!session) return;
-		loading = true;
-		try {
-			tokens = await convexQuery(session, api.extension.listDeviceTokens, {});
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		} finally {
-			loading = false;
-		}
-	}
+	const tokens = $derived<DeviceToken[]>(tokensQuery.data ?? []);
 
 	async function createToken() {
-		const session = clerkContext.currentSession;
-		if (!session) return;
 		error = '';
 		creating = true;
 		try {
-			newToken = await convexMutation(session, api.extension.createDeviceLinkToken, {
+			newToken = await client.mutation(api.extension.createDeviceLinkToken, {
 				name: newTokenName.trim() || 'Chrome extension'
 			});
-			await load();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -68,12 +51,9 @@
 	}
 
 	async function revoke(id: Id<'extensionSessions'>) {
-		const session = clerkContext.currentSession;
-		if (!session) return;
 		error = '';
 		try {
-			await convexMutation(session, api.extension.revokeDeviceToken, { id });
-			await load();
+			await client.mutation(api.extension.revokeDeviceToken, { id });
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -138,7 +118,7 @@
 				<div class="border-b border-stone-200 px-5 py-4">
 					<h2 class="text-sm font-semibold">Linked devices</h2>
 				</div>
-				{#if loading}
+				{#if tokensQuery.isLoading}
 					<p class="px-5 py-6 text-sm text-stone-500">Loading...</p>
 				{:else if tokens.length === 0}
 					<p class="px-5 py-6 text-sm text-stone-500">No tokens yet.</p>
@@ -155,7 +135,9 @@
 											{/if}
 										</p>
 										<p class="mt-1 text-xs text-stone-500">
-											Created {formatDate(token.createdAt)} · Last used {formatDate(token.lastUsedAt)}
+											Created {formatDate(token.createdAt)} · Last used {formatDate(
+												token.lastUsedAt
+											)}
 										</p>
 									</div>
 									{#if token.revokedAt === null}
@@ -180,7 +162,9 @@
 		padding: 0.5rem 0.75rem;
 		font-size: 0.875rem;
 	}
-	.field.h-24 { width: 100%; }
+	.field.h-24 {
+		width: 100%;
+	}
 	.button {
 		border-radius: 0.375rem;
 		background: rgb(28 25 23);
@@ -189,7 +173,9 @@
 		font-weight: 500;
 		color: white;
 	}
-	.button:disabled { opacity: 0.6; }
+	.button:disabled {
+		opacity: 0.6;
+	}
 	.secondary {
 		border-radius: 0.375rem;
 		border: 1px solid rgb(214 211 209);

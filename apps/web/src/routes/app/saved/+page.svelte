@@ -1,21 +1,31 @@
 <script lang="ts">
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import { convexMutation, convexQuery } from '$lib/convex-http';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
 	import { uploadFile } from '$lib/upload';
+	import { useConvexClient, useQuery } from 'convex-svelte';
 
 	type Fund = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 
 	const clerkContext = getClerkContext();
+	const client = useConvexClient();
 
 	let includeArchived = $state(false);
-	let savedData = $state<{
-		organizations: Doc<'organizations'>[];
-		purchasers: Doc<'purchasers'>[];
-		eventPresets: Doc<'eventPresets'>[];
-	}>();
-	let currentUser = $state<Doc<'users'> | null>(null);
+	const savedQuery = useQuery(api.authed.purchaseBuilder.listSaved, () =>
+		clerkContext.currentSession ? { includeArchived } : 'skip'
+	);
+	const currentUserQuery = useQuery(api.authed.purchaseBuilder.getCurrentUser, () =>
+		clerkContext.currentSession ? {} : 'skip'
+	);
+	const savedData = $derived<
+		| {
+				organizations: Doc<'organizations'>[];
+				purchasers: Doc<'purchasers'>[];
+				eventPresets: Doc<'eventPresets'>[];
+		  }
+		| undefined
+	>(savedQuery.data);
+	const currentUser = $derived(currentUserQuery.data ?? null);
 
 	let orgId = $state<Id<'organizations'> | null>(null);
 	let orgName = $state('');
@@ -41,31 +51,6 @@
 	let eventLocation = $state('');
 	let eventAttendance = $state(50);
 	let error = $state('');
-
-	$effect(() => {
-		if (!clerkContext.currentSession) return;
-		void loadSaved();
-		void loadCurrentUser();
-	});
-
-	async function loadCurrentUser() {
-		const session = clerkContext.currentSession;
-		if (!session) return;
-		currentUser = await convexQuery(session, api.authed.purchaseBuilder.getCurrentUser, {});
-	}
-
-	async function loadSaved() {
-		const session = clerkContext.currentSession;
-		if (!session) return;
-		error = '';
-		try {
-			savedData = await convexQuery(session, api.authed.purchaseBuilder.listSaved, {
-				includeArchived
-			});
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
-	}
 
 	function editOrg(org: Doc<'organizations'>) {
 		orgId = org._id;
@@ -114,11 +99,9 @@
 
 	async function saveOrg(event: SubmitEvent) {
 		event.preventDefault();
-		const session = clerkContext.currentSession;
-		if (!session) return;
 		error = '';
 		try {
-			await convexMutation(session, api.authed.purchaseBuilder.upsertOrganization, {
+			await client.mutation(api.authed.purchaseBuilder.upsertOrganization, {
 				id: orgId,
 				name: orgName,
 				indexNumber: orgIndex,
@@ -130,7 +113,6 @@
 			orgName = '';
 			orgIndex = '';
 			orgBudgetLines = ['Event Expenses'];
-			await loadSaved();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -141,16 +123,13 @@
 		id: Id<'organizations'> | Id<'purchasers'> | Id<'eventPresets'>,
 		archived: boolean
 	) {
-		const session = clerkContext.currentSession;
-		if (!session) return;
 		error = '';
 		try {
-			await convexMutation(session, api.authed.purchaseBuilder.setArchived, {
+			await client.mutation(api.authed.purchaseBuilder.setArchived, {
 				table,
 				id,
 				archived
 			});
-			await loadSaved();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -158,15 +137,13 @@
 
 	async function savePurchaser(event: SubmitEvent) {
 		event.preventDefault();
-		const session = clerkContext.currentSession;
-		if (!session) return;
 		error = '';
 		if (!purchaserOrgId || idFrontFileId === null || idBackFileId === null) {
 			error = 'Organization and ID files required.';
 			return;
 		}
 		try {
-			await convexMutation(session, api.authed.purchaseBuilder.upsertPurchaser, {
+			await client.mutation(api.authed.purchaseBuilder.upsertPurchaser, {
 				id: purchaserId,
 				organizationId: purchaserOrgId,
 				name: purchaserName,
@@ -181,7 +158,6 @@
 			purchaserAddress = '';
 			idFrontFileId = null;
 			idBackFileId = null;
-			await loadSaved();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -189,15 +165,13 @@
 
 	async function saveEvent(event: SubmitEvent) {
 		event.preventDefault();
-		const session = clerkContext.currentSession;
-		if (!session) return;
 		error = '';
 		if (!eventOrgId) {
 			error = 'Organization required.';
 			return;
 		}
 		try {
-			await convexMutation(session, api.authed.purchaseBuilder.upsertEventPreset, {
+			await client.mutation(api.authed.purchaseBuilder.upsertEventPreset, {
 				id: eventId,
 				organizationId: eventOrgId,
 				name: eventName,
@@ -209,7 +183,6 @@
 			eventName = '';
 			eventTime = '';
 			eventLocation = '';
-			await loadSaved();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -233,7 +206,7 @@
 					<h1 class="text-lg font-semibold">Saved</h1>
 				</div>
 				<label class="flex items-center gap-2 text-sm text-stone-600">
-					<input type="checkbox" bind:checked={includeArchived} onchange={loadSaved} />
+					<input type="checkbox" bind:checked={includeArchived} />
 					Show archived
 				</label>
 			</div>
@@ -265,7 +238,8 @@
 						<input class="field" placeholder="Name" required bind:value={orgName} />
 						<input class="field" placeholder="Index number" required bind:value={orgIndex} />
 						<select class="field" bind:value={orgFund}>
-							<option>I</option><option>E</option><option>G</option><option>N</option><option>U</option
+							<option>I</option><option>E</option><option>G</option><option>N</option><option
+								>U</option
 							><option>D</option><option>T</option>
 						</select>
 						<div>
@@ -280,7 +254,9 @@
 									{/if}
 								</div>
 							{/each}
-							<button class="link-button mt-2" type="button" onclick={addBudgetLine}>Add line</button>
+							<button class="link-button mt-2" type="button" onclick={addBudgetLine}
+								>Add line</button
+							>
 						</div>
 						<textarea class="field min-h-32" bind:value={orgTemplate}></textarea>
 						<button class="button" type="submit">Save organization</button>
@@ -291,7 +267,9 @@
 								<p class="font-medium">{org.name}</p>
 								<p class="text-stone-500">{org.indexNumber} · Fund {org.fundLetter}</p>
 								<div class="mt-2 flex gap-2">
-									<button class="link-button" type="button" onclick={() => editOrg(org)}>Edit</button>
+									<button class="link-button" type="button" onclick={() => editOrg(org)}
+										>Edit</button
+									>
 									<button
 										class="link-button"
 										type="button"
@@ -348,7 +326,11 @@
 								<p class="font-medium">{purchaser.name}</p>
 								<p class="text-stone-500">{purchaser.uo95}</p>
 								<div class="mt-2 flex gap-2">
-									<button class="link-button" type="button" onclick={() => editPurchaser(purchaser)}>
+									<button
+										class="link-button"
+										type="button"
+										onclick={() => editPurchaser(purchaser)}
+									>
 										Edit
 									</button>
 									<button
@@ -391,7 +373,8 @@
 									<button
 										class="link-button"
 										type="button"
-										onclick={() => archiveRecord('eventPresets', eventPreset._id, !eventPreset.archived)}
+										onclick={() =>
+											archiveRecord('eventPresets', eventPreset._id, !eventPreset.archived)}
 									>
 										{eventPreset.archived ? 'Unarchive' : 'Archive'}
 									</button>

@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '$convex/_generated/api';
-	import { convexMutation } from '$lib/convex-http';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
+	import { useConvexClient } from 'convex-svelte';
 
 	type Fund = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 
 	const clerkContext = getClerkContext();
+	const client = useConvexClient();
 
 	const defaultTemplate =
 		'{org} wishes to reimburse {purchaser} because they purchased {item} from {vendor} for {amount}. This {item} was given as a gift to {recipient} ({recipientUo95}) for {recipientReason} during {eventName} which took place on {eventDate} at {eventTime} in {eventLocation} with about {attendance} students in attendance.';
@@ -29,12 +30,10 @@
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
-		const session = clerkContext.currentSession;
-		if (!session) return;
 		error = '';
 		saving = true;
 		try {
-			await convexMutation(session, api.authed.purchaseBuilder.upsertOrganization, {
+			await client.mutation(api.authed.purchaseBuilder.upsertOrganization, {
 				id: null,
 				name,
 				indexNumber,
@@ -54,9 +53,7 @@
 <form class="space-y-5" onsubmit={save}>
 	<header>
 		<h2 class="text-lg font-semibold">Your organization</h2>
-		<p class="mt-1 text-sm text-stone-500">
-			You can add more orgs later from the Saved page.
-		</p>
+		<p class="mt-1 text-sm text-stone-500">You can add more orgs later from the Saved page.</p>
 	</header>
 
 	{#if error}
@@ -89,7 +86,9 @@
 				<div class="flex items-center gap-2">
 					<input class="field flex-1" required bind:value={budgetLines[i]} />
 					{#if budgetLines.length > 1}
-						<button class="secondary" type="button" onclick={() => removeBudgetLine(i)}>Remove</button>
+						<button class="secondary" type="button" onclick={() => removeBudgetLine(i)}
+							>Remove</button
+						>
 					{/if}
 				</div>
 			{/each}
@@ -99,7 +98,9 @@
 
 	<label class="block text-sm">
 		<span class="font-medium">Business purpose template</span>
-		<p class="text-xs text-stone-500">Tokens like {`{org}`} and {`{vendor}`} fill in automatically per request.</p>
+		<p class="text-xs text-stone-500">
+			Tokens like {`{org}`} and {`{vendor}`} fill in automatically per request.
+		</p>
 		<textarea class="field mt-1 min-h-32" bind:value={businessPurposeTemplate}></textarea>
 	</label>
 
@@ -124,7 +125,9 @@
 		font-weight: 500;
 		color: white;
 	}
-	.button:disabled { opacity: 0.6; }
+	.button:disabled {
+		opacity: 0.6;
+	}
 	.secondary {
 		border-radius: 0.375rem;
 		border: 1px solid rgb(214 211 209);

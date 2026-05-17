@@ -2,13 +2,17 @@
 	import { goto } from '$app/navigation';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
-	import { convexMutation, convexQuery } from '$lib/convex-http';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
+	import { useConvexClient, useQuery } from 'convex-svelte';
 
 	const clerkContext = getClerkContext();
+	const client = useConvexClient();
+	const savedQuery = useQuery(api.authed.purchaseBuilder.listSaved, () =>
+		clerkContext.currentSession ? { includeArchived: false } : 'skip'
+	);
 
 	let organizationId = $state<Id<'organizations'> | null>(null);
-	let organizations = $state<Array<{ _id: Id<'organizations'>; name: string }>>([]);
+	const organizations = $derived(savedQuery.data?.organizations ?? []);
 	let name = $state('');
 	let time = $state('');
 	let location = $state('');
@@ -17,27 +21,16 @@
 	let error = $state('');
 
 	$effect(() => {
-		const session = clerkContext.currentSession;
-		if (!session) return;
-		void (async () => {
-			const saved = await convexQuery(session, api.authed.purchaseBuilder.listSaved, {
-				includeArchived: false
-			});
-			organizations = saved.organizations;
-			if (organizations.length > 0 && organizationId === null) {
-				organizationId = organizations[0]._id;
-			}
-		})();
+		if (organizations.length > 0 && organizationId === null) organizationId = organizations[0]._id;
 	});
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
-		const session = clerkContext.currentSession;
-		if (!session || organizationId === null) return;
+		if (organizationId === null) return;
 		error = '';
 		saving = true;
 		try {
-			await convexMutation(session, api.authed.purchaseBuilder.upsertEventPreset, {
+			await client.mutation(api.authed.purchaseBuilder.upsertEventPreset, {
 				id: null,
 				organizationId,
 				name,
@@ -62,7 +55,8 @@
 	<header>
 		<h2 class="text-lg font-semibold">Event preset (optional)</h2>
 		<p class="mt-1 text-sm text-stone-500">
-			Save a recurring event so future requests prefill name, time, and location. Skip if you don't have one yet.
+			Save a recurring event so future requests prefill name, time, and location. Skip if you don't
+			have one yet.
 		</p>
 	</header>
 
@@ -125,7 +119,9 @@
 		font-weight: 500;
 		color: white;
 	}
-	.button:disabled { opacity: 0.6; }
+	.button:disabled {
+		opacity: 0.6;
+	}
 	.secondary {
 		border-radius: 0.375rem;
 		border: 1px solid rgb(214 211 209);

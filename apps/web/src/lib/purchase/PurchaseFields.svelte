@@ -30,12 +30,24 @@
 			<input class="field" type="date" bind:value={eventDate} oninput={onChange} />
 		</label>
 		<label><span>Vendor</span><input class="field" bind:value={vendor} oninput={onChange} /></label>
-		<label><span>Item</span><input class="field" bind:value={itemDescription} oninput={onChange} /></label>
+		<label
+			><span>Item</span><input
+				class="field"
+				bind:value={itemDescription}
+				oninput={onChange}
+			/></label
+		>
 		<label>
 			<span>Total</span>
 			<div class="currency-field">
 				<span>$</span>
-				<input class="field" type="number" step="0.01" bind:value={totalAmount} oninput={onChange} />
+				<input
+					class="field"
+					type="number"
+					step="0.01"
+					bind:value={totalAmount}
+					oninput={onChange}
+				/>
 			</div>
 		</label>
 		<label>

@@ -1,58 +1,27 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
-	import type { Doc } from '$convex/_generated/dataModel';
-	import { convexQuery } from '$lib/convex-http';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
+	import { useQuery } from 'convex-svelte';
 
 	const clerkContext = getClerkContext();
+	const purchasesQuery = useQuery(api.authed.purchaseBuilder.listPurchases, () =>
+		clerkContext.currentSession ? {} : 'skip'
+	);
+	const extensionLinkedQuery = useQuery(api.extension.hasActiveDeviceToken, () =>
+		clerkContext.currentSession ? {} : 'skip'
+	);
 	const authMode = $derived(
 		page.url.searchParams.get('auth') === 'sign-up' ? 'sign-up' : 'sign-in'
 	);
-
-	let purchases = $state<Doc<'purchaseRequests'>[]>([]);
-	let purchasesLoading = $state(false);
-	let purchasesError = $state('');
-	let extensionLinked = $state(false);
-
-	$effect(() => {
-		if (!clerkContext.currentSession) return;
-		void loadPurchases();
-		void loadExtensionStatus();
-	});
-
-	async function loadPurchases() {
-		const session = clerkContext.currentSession;
-		if (!session) return;
-		purchasesLoading = true;
-		purchasesError = '';
-		try {
-			purchases = await convexQuery(
-				session,
-				api.authed.purchaseBuilder.listPurchases,
-				{}
-			);
-		} catch (error) {
-			purchasesError = error instanceof Error ? error.message : String(error);
-		} finally {
-			purchasesLoading = false;
-		}
-	}
-
-	async function loadExtensionStatus() {
-		const session = clerkContext.currentSession;
-		if (!session) return;
-		try {
-			extensionLinked = await convexQuery(session, api.extension.hasActiveDeviceToken, {});
-		} catch {
-			extensionLinked = false;
-		}
-	}
 
 	function money(value: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 	}
 
+	const purchases = $derived(purchasesQuery.data ?? []);
+	const purchasesError = $derived(purchasesQuery.error?.message ?? '');
+	const extensionLinked = $derived(extensionLinkedQuery.data ?? false);
 	const drafts = $derived(purchases.filter((p) => p.status === 'draft'));
 	const ready = $derived(purchases.filter((p) => p.status === 'ready'));
 	const filled = $derived(purchases.filter((p) => p.status === 'filled'));
@@ -112,7 +81,7 @@
 				<p class="rounded-md bg-red-50 p-3 text-sm text-red-700">{purchasesError}</p>
 			{/if}
 
-			{#if purchasesLoading}
+			{#if purchasesQuery.isLoading}
 				<p class="text-sm text-stone-500">Loading...</p>
 			{:else if purchases.length === 0}
 				<section class="rounded-lg border border-stone-200 bg-white p-8 text-center">

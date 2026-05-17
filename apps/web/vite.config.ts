@@ -17,11 +17,7 @@ const localConvexSiteUrl = `http://localhost:${localConvexSiteProxyPort}`;
 const getEnvValue = (loadedEnv: Record<string, string>, key: string) =>
   process.env[key] ?? loadedEnv[key];
 
-const LOCAL_CONVEX_ENV_KEYS = [
-  "CONVEX_PRIVATE_BRIDGE_KEY",
-  "CLERK_SECRET_KEY",
-  "CLERK_JWT_ISSUER_DOMAIN",
-] as const;
+const LOCAL_CONVEX_ENV_KEYS = ["CLERK_SECRET_KEY", "CLERK_JWT_ISSUER_DOMAIN"] as const;
 
 const getLocalConvexEnvVars = (loadedEnv: Record<string, string>) => {
   return Object.fromEntries(
@@ -34,7 +30,6 @@ const getLocalConvexEnvVars = (loadedEnv: Record<string, string>) => {
 const TEMPLATE_ENV_KEYS = [
   "PUBLIC_CONVEX_URL",
   "PUBLIC_CONVEX_SITE_URL",
-  "CONVEX_PRIVATE_BRIDGE_KEY",
   "PUBLIC_CLERK_PUBLISHABLE_KEY",
   "CLERK_SECRET_KEY",
   "CLERK_JWT_ISSUER_DOMAIN",

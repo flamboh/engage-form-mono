@@ -29,7 +29,12 @@
 			<div class="grid gap-3 rounded-md border border-stone-200 p-3 md:grid-cols-4">
 				<input class="field" placeholder="Name" bind:value={recipient.name} oninput={onChange} />
 				<input class="field" placeholder="UO 95" bind:value={recipient.uo95} oninput={onChange} />
-				<input class="field" placeholder="Reason" bind:value={recipient.reason} oninput={onChange} />
+				<input
+					class="field"
+					placeholder="Reason"
+					bind:value={recipient.reason}
+					oninput={onChange}
+				/>
 				<div class="recipient-value">
 					<div class="currency-field">
 						<span>$</span>
@@ -42,7 +47,9 @@
 							oninput={onChange}
 						/>
 					</div>
-					<button class="secondary" type="button" onclick={() => removeRecipient(index)}>Remove</button>
+					<button class="secondary" type="button" onclick={() => removeRecipient(index)}
+						>Remove</button
+					>
 					{#if recipient.value > 0 && recipient.value < 10}
 						<p
 							class="recipient-note"

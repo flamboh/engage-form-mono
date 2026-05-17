@@ -34,13 +34,6 @@ const purchaserRef = v.union(
 );
 
 export default defineSchema({
-  conferences: defineTable({
-    name: v.string(),
-    location: v.string(),
-    startDate: v.number(),
-    endDate: v.number(),
-    description: v.optional(v.string()),
-  }),
   users: defineTable({
     owner: v.string(),
     name: v.string(),
@@ -85,6 +78,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_owner_and_organizationId_and_archived", ["owner", "organizationId", "archived"])
+    .index("by_owner_and_archived", ["owner", "archived"])
     .index("by_owner", ["owner"]),
   eventPresets: defineTable({
     owner: v.string(),
@@ -97,6 +91,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_owner_and_organizationId_and_archived", ["owner", "organizationId", "archived"])
+    .index("by_owner_and_archived", ["owner", "archived"])
     .index("by_owner", ["owner"]),
   purchaseRequests: defineTable({
     owner: v.string(),
@@ -120,6 +115,7 @@ export default defineSchema({
     updatedAt: v.number(),
     lastFilledAt: v.union(v.number(), v.null()),
   })
+    .index("by_owner_and_status_and_updatedAt", ["owner", "status", "updatedAt"])
     .index("by_owner_and_status", ["owner", "status"])
     .index("by_owner", ["owner"]),
   extensionSessions: defineTable({
@@ -131,5 +127,6 @@ export default defineSchema({
     revokedAt: v.union(v.number(), v.null()),
   })
     .index("by_tokenHash", ["tokenHash"])
+    .index("by_owner_and_revokedAt", ["owner", "revokedAt"])
     .index("by_owner", ["owner"]),
 });

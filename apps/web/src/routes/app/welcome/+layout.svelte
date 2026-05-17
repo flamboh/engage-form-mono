@@ -13,9 +13,7 @@
 			return WELCOME_STEPS.includes(value as WelcomeStep) ? (value as WelcomeStep) : null;
 		})()
 	);
-	const currentIndex = $derived(
-		currentStep === null ? -1 : WELCOME_STEPS.indexOf(currentStep)
-	);
+	const currentIndex = $derived(currentStep === null ? -1 : WELCOME_STEPS.indexOf(currentStep));
 </script>
 
 {#if !clerkContext.currentSession}
@@ -50,7 +48,9 @@
 						class:bg-stone-100={step === currentStep}
 						class:text-stone-400={i > currentIndex && step !== currentStep}
 					>
-						<span class="flex h-5 w-5 items-center justify-center rounded-full bg-stone-200 text-xs font-medium">
+						<span
+							class="flex h-5 w-5 items-center justify-center rounded-full bg-stone-200 text-xs font-medium"
+						>
 							{i + 1}
 						</span>
 						<span>{STEP_LABELS[step]}</span>

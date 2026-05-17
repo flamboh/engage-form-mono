@@ -2,13 +2,13 @@
 	import { browser } from '$app/environment';
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import { convexMutation, convexQuery } from '$lib/convex-http';
 	import FilePicker from '$lib/purchase/FilePicker.svelte';
 	import PurchaseFields from '$lib/purchase/PurchaseFields.svelte';
 	import RecipientRows from '$lib/purchase/RecipientRows.svelte';
 	import SavedSetup, { type PurchaserRef } from '$lib/purchase/SavedSetup.svelte';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
 	import { uploadFile } from '$lib/upload';
+	import { useConvexClient, useQuery } from 'convex-svelte';
 
 	type Recipient = { name: string; uo95: string; reason: string; value: number };
 	type SavedData = {
@@ -18,6 +18,13 @@
 	};
 
 	const clerkContext = getClerkContext();
+	const client = useConvexClient();
+	const currentUserQuery = useQuery(api.authed.purchaseBuilder.getCurrentUser, () =>
+		clerkContext.currentSession ? {} : 'skip'
+	);
+	const savedQuery = useQuery(api.authed.purchaseBuilder.listSaved, () =>
+		clerkContext.currentSession ? { includeArchived: false } : 'skip'
+	);
 
 	let currentUser = $state<Doc<'users'> | null>(null);
 	let savedData = $state<SavedData | undefined>();
@@ -60,7 +67,9 @@
 	const selectedEvent = $derived(eventPresets.find((e) => e._id === eventPresetId));
 	const purchaserIsSelf = $derived(purchaser.kind === 'self');
 	const purchaserName = $derived(
-		purchaserIsSelf ? (currentUser?.name ?? '{purchaser}') : (selectedPurchaser?.name ?? '{purchaser}')
+		purchaserIsSelf
+			? (currentUser?.name ?? '{purchaser}')
+			: (selectedPurchaser?.name ?? '{purchaser}')
 	);
 	let lastOrganizationId = $state<Id<'organizations'> | null>(null);
 
@@ -70,6 +79,11 @@
 		budgetLineItem = lines[0] ?? '';
 		lastOrganizationId = organizationId;
 		onFieldChange();
+	});
+
+	$effect(() => {
+		currentUser = currentUserQuery.data ?? null;
+		savedData = savedQuery.data;
 	});
 
 	$effect(() => {
@@ -91,16 +105,14 @@
 	}
 
 	async function loadCurrentUser() {
-		const session = clerkContext.currentSession;
-		if (!session) return;
-		currentUser = await convexQuery(session, api.authed.purchaseBuilder.getCurrentUser, {});
+		currentUser = currentUserQuery.data ?? null;
 	}
 
 	async function startDraft() {
 		const session = clerkContext.currentSession;
 		if (!session) return;
 		try {
-			draftId = await convexMutation(session, api.authed.purchaseBuilder.createDraft, {});
+			draftId = await client.mutation(api.authed.purchaseBuilder.createDraft, {});
 			saveState = 'Draft autosaves';
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -112,9 +124,7 @@
 		const session = clerkContext.currentSession;
 		if (!session) return;
 		try {
-			savedData = await convexQuery(session, api.authed.purchaseBuilder.listSaved, {
-				includeArchived: false
-			});
+			savedData = savedQuery.data;
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -124,7 +134,7 @@
 		const session = clerkContext.currentSession;
 		if (!session) return;
 		try {
-			const draft = await convexQuery(session, api.authed.purchaseBuilder.getDraft, { id });
+			const draft = await client.query(api.authed.purchaseBuilder.getDraft, { id });
 			draftId = draft._id;
 			organizationId = draft.organizationId;
 			purchaser = draft.purchaser;
@@ -173,7 +183,7 @@
 		const session = clerkContext.currentSession;
 		if (draftId === null || !session) return;
 		saveState = 'Autosaving...';
-		await convexMutation(session, api.authed.purchaseBuilder.scheduleDraftAutosave, {
+		await client.mutation(api.authed.purchaseBuilder.scheduleDraftAutosave, {
 			id: draftId,
 			patch: patch()
 		});
@@ -231,7 +241,7 @@
 		if (draftId === null || !session) return;
 		error = '';
 		try {
-			await convexMutation(session, api.authed.purchaseBuilder.markReady, {
+			await client.mutation(api.authed.purchaseBuilder.markReady, {
 				id: draftId,
 				patch: patch()
 			});
@@ -244,7 +254,7 @@
 	async function discard() {
 		const session = clerkContext.currentSession;
 		if (draftId === null || !session) return;
-		await convexMutation(session, api.authed.purchaseBuilder.discardDraft, {
+		await client.mutation(api.authed.purchaseBuilder.discardDraft, {
 			id: draftId
 		});
 		location.href = '/app';
@@ -273,7 +283,11 @@
 				</div>
 				<div class="flex items-center gap-3">
 					<span class="text-xs text-stone-500">{saveState}</span>
-					<button class="rounded-md px-3 py-2 text-sm hover:bg-stone-100" type="button" onclick={discard}>
+					<button
+						class="rounded-md px-3 py-2 text-sm hover:bg-stone-100"
+						type="button"
+						onclick={discard}
+					>
 						Discard
 					</button>
 					<button

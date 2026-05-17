@@ -2,19 +2,21 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
-	import { convexQuery } from '$lib/convex-http';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
-	import { firstIncompleteStep, wizardComplete, type WelcomeState } from '$lib/welcome/steps';
+	import { firstIncompleteStep, wizardComplete } from '$lib/welcome/steps';
+	import { useQuery } from 'convex-svelte';
 
 	const { children } = $props();
 	const clerkContext = getClerkContext();
+	const welcomeState = useQuery(api.authed.purchaseBuilder.welcomeState, () =>
+		clerkContext.currentSession ? {} : 'skip'
+	);
 
 	let checking = $state(true);
 
 	$effect(() => {
-		const session = clerkContext.currentSession;
 		const pathname = page.url.pathname;
-		if (!session) {
+		if (!clerkContext.currentSession) {
 			checking = false;
 			return;
 		}
@@ -22,24 +24,13 @@
 			checking = false;
 			return;
 		}
-		checking = true;
-		void (async () => {
-			try {
-				const state: WelcomeState = await convexQuery(
-					session,
-					api.authed.purchaseBuilder.welcomeState,
-					{}
-				);
-				if (!wizardComplete(state)) {
-					await goto(`/app/welcome/${firstIncompleteStep(state)}`, { replaceState: true });
-					return;
-				}
-			} catch (error) {
-				console.error('Onboarding gate check failed', error);
-			} finally {
-				checking = false;
-			}
-		})();
+		checking = welcomeState.isLoading;
+		if (!welcomeState.data) return;
+		if (!wizardComplete(welcomeState.data)) {
+			void goto(`/app/welcome/${firstIncompleteStep(welcomeState.data)}`, { replaceState: true });
+			return;
+		}
+		checking = false;
 	});
 </script>
 
