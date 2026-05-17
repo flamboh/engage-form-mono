@@ -6,22 +6,24 @@
 	import FilePicker from '$lib/purchase/FilePicker.svelte';
 	import PurchaseFields from '$lib/purchase/PurchaseFields.svelte';
 	import RecipientRows from '$lib/purchase/RecipientRows.svelte';
-	import SavedSetup from '$lib/purchase/SavedSetup.svelte';
+	import SavedSetup, { type PurchaserRef } from '$lib/purchase/SavedSetup.svelte';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
+	import { uploadFile } from '$lib/upload';
 
 	type Recipient = { name: string; uo95: string; reason: string; value: number };
 	type SavedData = {
 		organizations: Doc<'organizations'>[];
-		people: Doc<'people'>[];
+		purchasers: Doc<'purchasers'>[];
 		eventPresets: Doc<'eventPresets'>[];
 	};
 
 	const clerkContext = getClerkContext();
 
+	let currentUser = $state<Doc<'users'> | null>(null);
 	let savedData = $state<SavedData | undefined>();
 	let draftId = $state<Id<'purchaseRequests'> | null>(null);
 	let organizationId = $state<Id<'organizations'> | null>(null);
-	let purchaserPersonId = $state<Id<'people'> | null>(null);
+	let purchaser = $state<PurchaserRef>({ kind: 'self' });
 	let eventPresetId = $state<Id<'eventPresets'> | null>(null);
 	let eventDate = $state('');
 	let vendor = $state('');
@@ -39,25 +41,33 @@
 	let error = $state('');
 	let draftInitializing = $state(false);
 
-	const organizations = $derived(savedData?.organizations ?? []);
-	const people = $derived(
-		(savedData?.people ?? []).filter((person) => person.organizationId === organizationId)
+	const purchasers = $derived(
+		(savedData?.purchasers ?? []).filter((p) => p.organizationId === organizationId)
 	);
 	const eventPresets = $derived(
-		(savedData?.eventPresets ?? []).filter((eventPreset) => eventPreset.organizationId === organizationId)
+		(savedData?.eventPresets ?? []).filter(
+			(eventPreset) => eventPreset.organizationId === organizationId
+		)
 	);
-	const requester = $derived(people.find((person) => person.isRequester));
-	const purchaser = $derived(people.find((person) => person._id === purchaserPersonId));
-	const selectedOrg = $derived(organizations.find((org) => org._id === organizationId));
-	const selectedEvent = $derived(eventPresets.find((eventPreset) => eventPreset._id === eventPresetId));
-	const requesterIsPurchaser = $derived(
-		requester !== undefined && purchaserPersonId !== null && requester._id === purchaserPersonId
+	const selectedOrg = $derived(
+		(savedData?.organizations ?? []).find((org) => org._id === organizationId)
+	);
+	const selectedPurchaser = $derived.by(() => {
+		if (purchaser.kind !== 'purchaser') return undefined;
+		const id = purchaser.purchaserId;
+		return purchasers.find((p) => p._id === id);
+	});
+	const selectedEvent = $derived(eventPresets.find((e) => e._id === eventPresetId));
+	const purchaserIsSelf = $derived(purchaser.kind === 'self');
+	const purchaserName = $derived(
+		purchaserIsSelf ? (currentUser?.name ?? '{purchaser}') : (selectedPurchaser?.name ?? '{purchaser}')
 	);
 	let lastOrganizationId = $state<Id<'organizations'> | null>(null);
 
 	$effect(() => {
 		if (organizationId === lastOrganizationId) return;
-		budgetLineItem = selectedOrg?.defaultBudgetLineItem ?? '';
+		const lines = selectedOrg?.budgetLines ?? [];
+		budgetLineItem = lines[0] ?? '';
 		lastOrganizationId = organizationId;
 		onFieldChange();
 	});
@@ -69,7 +79,7 @@
 	});
 
 	async function initializeDraft() {
-		await loadSaved();
+		await Promise.all([loadCurrentUser(), loadSaved()]);
 		const existingDraftId = browser
 			? (new URLSearchParams(window.location.search).get('id') as Id<'purchaseRequests'> | null)
 			: null;
@@ -80,10 +90,17 @@
 		await loadDraft(existingDraftId);
 	}
 
+	async function loadCurrentUser() {
+		const session = clerkContext.currentSession;
+		if (!session) return;
+		currentUser = await convexQuery(session, api.authed.purchaseBuilder.getCurrentUser, {});
+	}
+
 	async function startDraft() {
-		if (!clerkContext.currentSession) return;
+		const session = clerkContext.currentSession;
+		if (!session) return;
 		try {
-			draftId = await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.createDraft, {});
+			draftId = await convexMutation(session, api.authed.purchaseBuilder.createDraft, {});
 			saveState = 'Draft autosaves';
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -92,9 +109,10 @@
 	}
 
 	async function loadSaved() {
-		if (!clerkContext.currentSession) return;
+		const session = clerkContext.currentSession;
+		if (!session) return;
 		try {
-			savedData = await convexQuery(clerkContext.currentSession, api.authed.purchaseBuilder.listSaved, {
+			savedData = await convexQuery(session, api.authed.purchaseBuilder.listSaved, {
 				includeArchived: false
 			});
 		} catch (err) {
@@ -103,12 +121,13 @@
 	}
 
 	async function loadDraft(id: Id<'purchaseRequests'>) {
-		if (!clerkContext.currentSession) return;
+		const session = clerkContext.currentSession;
+		if (!session) return;
 		try {
-			const draft = await convexQuery(clerkContext.currentSession, api.authed.purchaseBuilder.getDraft, { id });
+			const draft = await convexQuery(session, api.authed.purchaseBuilder.getDraft, { id });
 			draftId = draft._id;
 			organizationId = draft.organizationId;
-			purchaserPersonId = draft.purchaserPersonId;
+			purchaser = draft.purchaser;
 			eventPresetId = draft.eventPresetId;
 			eventDate = draft.eventDate;
 			vendor = draft.vendor;
@@ -133,7 +152,7 @@
 	function patch() {
 		return {
 			organizationId,
-			purchaserPersonId,
+			purchaser,
 			eventPresetId,
 			eventDate,
 			vendor,
@@ -151,9 +170,10 @@
 	}
 
 	async function autosave() {
-		if (draftId === null || !clerkContext.currentSession) return;
+		const session = clerkContext.currentSession;
+		if (draftId === null || !session) return;
 		saveState = 'Autosaving...';
-		await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.scheduleDraftAutosave, {
+		await convexMutation(session, api.authed.purchaseBuilder.scheduleDraftAutosave, {
 			id: draftId,
 			patch: patch()
 		});
@@ -169,8 +189,8 @@
 		const firstRecipient = recipients[0];
 		const values: Record<string, string> = {
 			org: selectedOrg?.name ?? '{org}',
-			requester: requester?.name ?? '{requester}',
-			purchaser: purchaser?.name ?? '{purchaser}',
+			requester: currentUser?.name ?? '{requester}',
+			purchaser: purchaserName,
 			vendor: vendor || '{vendor}',
 			item: itemDescription || '{item}',
 			amount: totalAmount > 0 ? money(totalAmount) : '{amount}',
@@ -193,31 +213,12 @@
 		kind: 'receipt' | 'second_approval' | 'publicity',
 		input: HTMLInputElement
 	) {
+		const session = clerkContext.currentSession;
 		const files = Array.from(input.files ?? []).slice(0, kind === 'receipt' ? 3 : 1);
-		if (files.length === 0) return;
-		if (!clerkContext.currentSession) return;
+		if (files.length === 0 || !session) return;
 		const ids: Id<'files'>[] = [];
 		for (const file of files) {
-			const uploadUrl = await convexMutation(
-				clerkContext.currentSession,
-				api.authed.purchaseBuilder.generateUploadUrl,
-				{}
-			);
-			const response = await fetch(uploadUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': file.type || 'application/octet-stream' },
-				body: file
-			});
-			const { storageId } = (await response.json()) as { storageId: Id<'_storage'> };
-			ids.push(
-				await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.saveFile, {
-					kind,
-					storageId,
-					filename: file.name,
-					contentType: file.type || 'application/octet-stream',
-					size: file.size
-				})
-			);
+			ids.push(await uploadFile(session, kind, file));
 		}
 		if (kind === 'receipt') receiptFileIds = ids;
 		if (kind === 'second_approval') secondApprovalFileId = ids[0] ?? null;
@@ -226,10 +227,11 @@
 	}
 
 	async function markReady() {
-		if (draftId === null || !clerkContext.currentSession) return;
+		const session = clerkContext.currentSession;
+		if (draftId === null || !session) return;
 		error = '';
 		try {
-			await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.markReady, {
+			await convexMutation(session, api.authed.purchaseBuilder.markReady, {
 				id: draftId,
 				patch: patch()
 			});
@@ -240,8 +242,9 @@
 	}
 
 	async function discard() {
-		if (draftId === null || !clerkContext.currentSession) return;
-		await convexMutation(clerkContext.currentSession, api.authed.purchaseBuilder.discardDraft, {
+		const session = clerkContext.currentSession;
+		if (draftId === null || !session) return;
+		await convexMutation(session, api.authed.purchaseBuilder.discardDraft, {
 			id: draftId
 		});
 		location.href = '/app';
@@ -289,9 +292,9 @@
 
 			<SavedSetup
 				session={clerkContext.currentSession}
-				savedData={savedData}
+				{savedData}
 				bind:organizationId
-				bind:purchaserPersonId
+				bind:purchaser
 				bind:eventPresetId
 				onChange={onFieldChange}
 				onSavedChange={loadSaved}
@@ -304,6 +307,7 @@
 				bind:totalAmount
 				bind:budgetLineItem
 				bind:reimbursementReason
+				budgetLineOptions={selectedOrg?.budgetLines ?? []}
 				onChange={onFieldChange}
 			/>
 
@@ -346,7 +350,7 @@
 						status={publicityFileId ? 'Uploaded' : 'Required'}
 						onFiles={(input) => uploadRequestFile('publicity', input)}
 					/>
-					{#if requesterIsPurchaser}
+					{#if purchaserIsSelf}
 						<FilePicker
 							label="Second approval"
 							status={secondApprovalFileId ? 'Uploaded' : 'Required'}

@@ -28,6 +28,11 @@ const recipient = v.object({
   value: v.number(),
 });
 
+const purchaserRef = v.union(
+  v.object({ kind: v.literal("self") }),
+  v.object({ kind: v.literal("purchaser"), purchaserId: v.id("purchasers") }),
+);
+
 export default defineSchema({
   conferences: defineTable({
     name: v.string(),
@@ -36,12 +41,23 @@ export default defineSchema({
     endDate: v.number(),
     description: v.optional(v.string()),
   }),
+  users: defineTable({
+    owner: v.string(),
+    name: v.string(),
+    uo95: v.string(),
+    permanentAddress: v.string(),
+    studentEmail: v.string(),
+    phone: v.string(),
+    idCardFrontFileId: v.id("files"),
+    idCardBackFileId: v.id("files"),
+    updatedAt: v.number(),
+  }).index("by_owner", ["owner"]),
   organizations: defineTable({
     owner: v.string(),
     name: v.string(),
     indexNumber: v.string(),
     fundLetter,
-    defaultBudgetLineItem: v.string(),
+    budgetLines: v.array(v.string()),
     businessPurposeTemplate: v.string(),
     archived: v.boolean(),
     updatedAt: v.number(),
@@ -57,7 +73,7 @@ export default defineSchema({
     size: v.number(),
     createdAt: v.number(),
   }).index("by_owner", ["owner"]),
-  people: defineTable({
+  purchasers: defineTable({
     owner: v.string(),
     organizationId: v.id("organizations"),
     name: v.string(),
@@ -65,18 +81,10 @@ export default defineSchema({
     permanentAddress: v.string(),
     idCardFrontFileId: v.id("files"),
     idCardBackFileId: v.id("files"),
-    email: v.union(v.string(), v.null()),
-    phone: v.union(v.string(), v.null()),
-    isRequester: v.boolean(),
     archived: v.boolean(),
     updatedAt: v.number(),
   })
     .index("by_owner_and_organizationId_and_archived", ["owner", "organizationId", "archived"])
-    .index("by_owner_and_organizationId_and_isRequester", [
-      "owner",
-      "organizationId",
-      "isRequester",
-    ])
     .index("by_owner", ["owner"]),
   eventPresets: defineTable({
     owner: v.string(),
@@ -94,7 +102,7 @@ export default defineSchema({
     owner: v.string(),
     status: v.union(v.literal("draft"), v.literal("ready"), v.literal("filled")),
     organizationId: v.union(v.id("organizations"), v.null()),
-    purchaserPersonId: v.union(v.id("people"), v.null()),
+    purchaser: purchaserRef,
     eventPresetId: v.union(v.id("eventPresets"), v.null()),
     eventDate: v.string(),
     vendor: v.string(),

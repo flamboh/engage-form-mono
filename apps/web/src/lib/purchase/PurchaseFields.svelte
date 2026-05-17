@@ -6,6 +6,7 @@
 		totalAmount: number;
 		budgetLineItem: string;
 		reimbursementReason: string;
+		budgetLineOptions: string[];
 		onChange: () => void;
 	};
 
@@ -16,6 +17,7 @@
 		totalAmount = $bindable(),
 		budgetLineItem = $bindable(),
 		reimbursementReason = $bindable(),
+		budgetLineOptions,
 		onChange
 	}: Props = $props();
 </script>
@@ -38,7 +40,15 @@
 		</label>
 		<label>
 			<span>Budget line item</span>
-			<input class="field" bind:value={budgetLineItem} oninput={onChange} />
+			{#if budgetLineOptions.length > 0}
+				<select class="field" bind:value={budgetLineItem} onchange={onChange}>
+					{#each budgetLineOptions as line (line)}
+						<option value={line}>{line}</option>
+					{/each}
+				</select>
+			{:else}
+				<input class="field" bind:value={budgetLineItem} oninput={onChange} />
+			{/if}
 		</label>
 		<label class="md:col-span-2">
 			<span>Why reimbursement was used</span>
