@@ -1,6 +1,10 @@
 <script lang="ts">
 	type Props = {
+		eventName: string;
 		eventDate: string;
+		eventTime: string;
+		eventLocation: string;
+		eventEstimatedAttendance: number;
 		vendor: string;
 		itemDescription: string;
 		totalAmount: number;
@@ -11,7 +15,11 @@
 	};
 
 	let {
+		eventName = $bindable(),
 		eventDate = $bindable(),
+		eventTime = $bindable(),
+		eventLocation = $bindable(),
+		eventEstimatedAttendance = $bindable(),
 		vendor = $bindable(),
 		itemDescription = $bindable(),
 		totalAmount = $bindable(),
@@ -26,8 +34,30 @@
 	<h2>Purchase</h2>
 	<div class="grid gap-4 md:grid-cols-2">
 		<label>
+			<span>Event name</span>
+			<input class="field" bind:value={eventName} oninput={onChange} />
+		</label>
+		<label>
 			<span>Event date</span>
 			<input class="field" type="date" bind:value={eventDate} oninput={onChange} />
+		</label>
+		<label>
+			<span>Event time</span>
+			<input class="field" bind:value={eventTime} oninput={onChange} />
+		</label>
+		<label>
+			<span>Event location</span>
+			<input class="field" bind:value={eventLocation} oninput={onChange} />
+		</label>
+		<label>
+			<span>Estimated attendance</span>
+			<input
+				class="field"
+				type="number"
+				min="1"
+				bind:value={eventEstimatedAttendance}
+				oninput={onChange}
+			/>
 		</label>
 		<label><span>Vendor</span><input class="field" bind:value={vendor} oninput={onChange} /></label>
 		<label

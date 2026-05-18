@@ -4,7 +4,7 @@
 
 The web app is the canonical purchase builder. Engage is an implementation detail.
 
-Users complete one simpler, authenticated form for the supported event prize reimbursement flow. The extension syncs with Convex, lists recent ready or filled purchases, and fills Engage from the selected purchase. The extension never submits the final Engage form.
+Users complete one simpler, authenticated form for the supported event prize reimbursement flow. The extension syncs with Convex, lists recent ready purchases, and fills Engage from the selected purchase. The extension never submits the final Engage form.
 
 ## Scope
 
@@ -78,14 +78,17 @@ Saved organizations, people, and event presets are archived instead of deleted. 
 
 ## Purchase Requests
 
-Purchases use live references for organization, requester person, purchaser person, and event preset.
+Purchase requests record the facts needed for Engage. Saved organization, purchaser, requester, and event template data only autofill drafts.
 
 Request fields:
 
 - Organization
 - Purchaser, defaulting to the requester
-- Event preset
+- Event name
 - Event date
+- Event time
+- Event location
+- Estimated attendance
 - Vendor
 - Item description
 - Total amount
@@ -97,7 +100,7 @@ Request fields:
 - Receipts, up to three
 - Second approval file
 - Publicity proof file
-- Status: `draft`, `ready`, `filled`
+- Status: `draft`, `ready`
 - `lastFilledAt`
 
 Drafts are created immediately and autosaved through Convex debounced mutations. Discarding a draft hard deletes the draft and synchronously deletes purchase-local uploaded files. Saved person ID files are not deleted by draft discard.
@@ -164,8 +167,11 @@ Ready status is blocked unless all required data exists:
 - Organization selected
 - Organization has requester
 - Purchaser selected
-- Event preset selected
+- Event name
 - Event date
+- Event time
+- Event location
+- Estimated attendance greater than zero
 - Vendor
 - Item description
 - Total amount greater than zero
@@ -188,13 +194,13 @@ The extension talks to Convex directly through a long-lived device link token cr
 
 Token capabilities:
 
-- List recent ready and filled purchase requests
+- List recent ready purchase requests
 - Fetch one assembled purchase payload
-- Mark a purchase filled when Engage review is reached
+- Record when Engage review is reached
 
 Token cannot create, update, delete, or archive saved records.
 
-The extension popup lists recent ready and filled purchases with organization, purchaser, and item purchased. Filled rows are greyed but still selectable. Re-filling a filled purchase keeps status `filled` and updates `lastFilledAt`.
+The extension popup lists recent ready purchases with organization, purchaser, and item purchased. Rows that have reached Engage review before are still selectable and show that history through `lastFilledAt`.
 
 The extension fetches file blobs in extension context before sending prepared file payloads to the content script. The content script stays focused on Engage DOM interaction.
 

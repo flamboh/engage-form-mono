@@ -21,7 +21,11 @@
 		savedData?: SavedData;
 		organizationId: Id<'organizations'> | null;
 		purchaser: PurchaserRef;
-		eventPresetId: Id<'eventPresets'> | null;
+		eventTemplateId: Id<'eventPresets'> | null;
+		eventName: string;
+		eventTime: string;
+		eventLocation: string;
+		eventEstimatedAttendance: number;
 		onChange: () => void;
 		onSavedChange: () => Promise<void>;
 	};
@@ -31,7 +35,11 @@
 		savedData,
 		organizationId = $bindable(),
 		purchaser = $bindable(),
-		eventPresetId = $bindable(),
+		eventTemplateId = $bindable(),
+		eventName = $bindable(),
+		eventTime = $bindable(),
+		eventLocation = $bindable(),
+		eventEstimatedAttendance = $bindable(),
 		onChange,
 		onSavedChange
 	}: Props = $props();
@@ -54,10 +62,10 @@
 	let idFrontFileId = $state<Id<'files'> | null>(null);
 	let idBackFileId = $state<Id<'files'> | null>(null);
 
-	let eventName = $state('');
-	let eventTime = $state('');
-	let eventLocation = $state('');
-	let eventAttendance = $state(50);
+	let eventTemplateName = $state('');
+	let eventTemplateTime = $state('');
+	let eventTemplateLocation = $state('');
+	let eventTemplateAttendance = $state(50);
 
 	const organizations = $derived(savedData?.organizations ?? []);
 	const purchasers = $derived(
@@ -72,7 +80,7 @@
 	function selectOrganization(value: string) {
 		organizationId = value === '' ? null : (value as Id<'organizations'>);
 		purchaser = { kind: 'self' };
-		eventPresetId = null;
+		eventTemplateId = null;
 		onChange();
 	}
 
@@ -96,7 +104,14 @@
 	}
 
 	function selectEvent(value: string) {
-		eventPresetId = value === '' ? null : (value as Id<'eventPresets'>);
+		eventTemplateId = value === '' ? null : (value as Id<'eventPresets'>);
+		const template = eventPresets.find((eventPreset) => eventPreset._id === eventTemplateId);
+		if (template !== undefined) {
+			eventName = template.name;
+			eventTime = template.time;
+			eventLocation = template.location;
+			eventEstimatedAttendance = template.estimatedAttendance;
+		}
 		onChange();
 	}
 
@@ -129,7 +144,7 @@
 				businessPurposeTemplate: orgTemplate
 			});
 			purchaser = { kind: 'self' };
-			eventPresetId = null;
+			eventTemplateId = null;
 			mode = 'none';
 			await onSavedChange();
 			onChange();
@@ -172,14 +187,18 @@
 			return;
 		}
 		try {
-			eventPresetId = await client.mutation(api.authed.purchaseBuilder.upsertEventPreset, {
+			eventTemplateId = await client.mutation(api.authed.purchaseBuilder.upsertEventPreset, {
 				id: null,
 				organizationId,
-				name: eventName,
-				time: eventTime,
-				location: eventLocation,
-				estimatedAttendance: eventAttendance
+				name: eventTemplateName,
+				time: eventTemplateTime,
+				location: eventTemplateLocation,
+				estimatedAttendance: eventTemplateAttendance
 			});
+			eventName = eventTemplateName;
+			eventTime = eventTemplateTime;
+			eventLocation = eventTemplateLocation;
+			eventEstimatedAttendance = eventTemplateAttendance;
 			mode = 'none';
 			await onSavedChange();
 			onChange();
@@ -217,7 +236,7 @@
 			<span>Event</span>
 			<select
 				class="field"
-				value={eventPresetId ?? ''}
+				value={eventTemplateId ?? ''}
 				onchange={(e) => selectEvent(e.currentTarget.value)}
 				disabled={organizationId === null}
 			>
@@ -313,10 +332,10 @@
 		</form>
 	{:else if mode === 'event'}
 		<form class="mt-4 grid gap-3 rounded-md border border-stone-200 p-3" onsubmit={createEvent}>
-			<input class="field" placeholder="Event name" required bind:value={eventName} />
-			<input class="field" placeholder="Time" required bind:value={eventTime} />
-			<input class="field" placeholder="Location" required bind:value={eventLocation} />
-			<input class="field" type="number" min="1" bind:value={eventAttendance} />
+			<input class="field" placeholder="Event name" required bind:value={eventTemplateName} />
+			<input class="field" placeholder="Time" required bind:value={eventTemplateTime} />
+			<input class="field" placeholder="Location" required bind:value={eventTemplateLocation} />
+			<input class="field" type="number" min="1" bind:value={eventTemplateAttendance} />
 			<button class="button" type="submit">Create event</button>
 		</form>
 	{/if}

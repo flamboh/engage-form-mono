@@ -10,8 +10,11 @@ type Ctx = QueryCtx | MutationCtx;
 export type DraftPatch = Partial<{
 	organizationId: Id<'organizations'> | null;
 	purchaser: PurchaserRef;
-	eventPresetId: Id<'eventPresets'> | null;
+	eventName: string;
 	eventDate: string;
+	eventTime: string;
+	eventLocation: string;
+	eventEstimatedAttendance: number;
 	vendor: string;
 	itemDescription: string;
 	totalAmount: number;
@@ -71,8 +74,14 @@ export function applyDraftPatch(
 		organizationId:
 			patch.organizationId !== undefined ? patch.organizationId : purchase.organizationId,
 		purchaser: patch.purchaser !== undefined ? patch.purchaser : purchase.purchaser,
-		eventPresetId: patch.eventPresetId !== undefined ? patch.eventPresetId : purchase.eventPresetId,
+		eventName: patch.eventName !== undefined ? patch.eventName : purchase.eventName,
 		eventDate: patch.eventDate !== undefined ? patch.eventDate : purchase.eventDate,
+		eventTime: patch.eventTime !== undefined ? patch.eventTime : purchase.eventTime,
+		eventLocation: patch.eventLocation !== undefined ? patch.eventLocation : purchase.eventLocation,
+		eventEstimatedAttendance:
+			patch.eventEstimatedAttendance !== undefined
+				? patch.eventEstimatedAttendance
+				: purchase.eventEstimatedAttendance,
 		vendor: patch.vendor !== undefined ? patch.vendor : purchase.vendor,
 		itemDescription:
 			patch.itemDescription !== undefined ? patch.itemDescription : purchase.itemDescription,
@@ -110,19 +119,12 @@ export function unresolvedToken(value: string) {
 
 export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'>) {
 	if (request.organizationId === null) throw new Error('Organization missing.');
-	if (request.eventPresetId === null) throw new Error('Event preset missing.');
 	if (request.publicityFileId === null) throw new Error('Publicity proof missing.');
 
 	const organization = await requireOwnedDoc(
 		ctx,
 		'organizations',
 		request.organizationId,
-		request.owner
-	);
-	const eventPreset = await requireOwnedDoc(
-		ctx,
-		'eventPresets',
-		request.eventPresetId,
 		request.owner
 	);
 	const requester = await requireUserProfile(ctx, request.owner);
@@ -154,8 +156,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		organization: orgPayload(organization),
 		requester: requesterPayload(requester),
 		purchaser,
-		eventPreset: eventPayload(eventPreset, request.publicityFileId),
-		eventDate: request.eventDate,
+		eventDetails: eventDetailsPayload(request, request.publicityFileId),
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
@@ -172,7 +173,13 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 
 export async function assertReady(ctx: Ctx, request: Doc<'purchaseRequests'>) {
 	const purchase = await assemblePurchase(ctx, request);
-	requireText(purchase.eventDate, 'Event date missing.');
+	requireText(purchase.eventDetails.name, 'Event name missing.');
+	requireText(purchase.eventDetails.date, 'Event date missing.');
+	requireText(purchase.eventDetails.time, 'Event time missing.');
+	requireText(purchase.eventDetails.location, 'Event location missing.');
+	if (purchase.eventDetails.estimatedAttendance <= 0) {
+		throw new Error('Estimated attendance missing.');
+	}
 	requireText(purchase.vendor, 'Vendor missing.');
 	requireText(purchase.itemDescription, 'Item description missing.');
 	requireText(purchase.budgetLineItem, 'Budget line item missing.');
@@ -254,14 +261,13 @@ function purchaserPayload(purchaser: Doc<'purchasers'>) {
 	};
 }
 
-function eventPayload(eventPreset: Doc<'eventPresets'>, publicityFileId: Id<'files'>) {
+function eventDetailsPayload(request: Doc<'purchaseRequests'>, publicityFileId: Id<'files'>) {
 	return {
-		id: eventPreset._id,
-		name: eventPreset.name,
-		scheduleLabel: eventPreset.name,
-		time: eventPreset.time,
-		location: eventPreset.location,
-		estimatedAttendance: eventPreset.estimatedAttendance,
+		name: request.eventName,
+		date: request.eventDate,
+		time: request.eventTime,
+		location: request.eventLocation,
+		estimatedAttendance: request.eventEstimatedAttendance,
 		publicityProofFileId: publicityFileId
 	};
 }

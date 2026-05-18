@@ -28,7 +28,7 @@ export function readyPurchaseSummary(purchase: Purchase) {
 		title: purchase.itemDescription,
 		org: purchase.organization.name,
 		amount: `$${purchase.totalAmount.toFixed(2)}`,
-		event: `${purchase.eventDate}, ${purchase.eventPreset.time}`,
+		event: `${purchase.eventDetails.date}, ${purchase.eventDetails.time}`,
 		recipient: recipient?.name ?? 'No recipient'
 	};
 }
@@ -52,7 +52,7 @@ function isReadyPurchase(value: unknown): value is Purchase {
 		Array.isArray(value.files) &&
 		isRecord(value.organization) &&
 		isRecord(value.purchaser) &&
-		isRecord(value.eventPreset) &&
+		isRecord(value.eventDetails) &&
 		Array.isArray(value.recipients)
 	);
 }

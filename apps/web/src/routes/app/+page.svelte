@@ -24,7 +24,6 @@
 	const extensionLinked = $derived(extensionLinkedQuery.data ?? false);
 	const drafts = $derived(purchases.filter((p) => p.status === 'draft'));
 	const ready = $derived(purchases.filter((p) => p.status === 'ready'));
-	const filled = $derived(purchases.filter((p) => p.status === 'filled'));
 </script>
 
 {#if !clerkContext.currentSession}
@@ -94,7 +93,7 @@
 					</a>
 				</section>
 			{:else}
-				{#each [{ label: 'Ready for extension', items: ready, kind: 'ready' }, { label: 'Drafts', items: drafts, kind: 'draft' }, { label: 'Filled', items: filled, kind: 'filled' }] as group (group.label)}
+				{#each [{ label: 'Ready for extension', items: ready }, { label: 'Drafts', items: drafts }] as group (group.label)}
 					{#if group.items.length > 0}
 						<section class="rounded-lg border border-stone-200 bg-white">
 							<div class="border-b border-stone-200 px-5 py-4">

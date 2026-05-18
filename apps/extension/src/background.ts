@@ -45,11 +45,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		}
 
 		void convex
-			.mutation(api.extension.markFilled, {
+			.mutation(api.extension.markReviewReached, {
 				token,
 				id: message.purchaseId as Id<'purchaseRequests'>
 			})
-			.then(() => sendResponse({ ok: true, message: 'Marked filled.' }))
+			.then(() => sendResponse({ ok: true, message: 'Marked review reached.' }))
 			.catch((error: unknown) =>
 				sendResponse({
 					ok: false,

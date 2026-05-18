@@ -31,8 +31,12 @@
 	let draftId = $state<Id<'purchaseRequests'> | null>(null);
 	let organizationId = $state<Id<'organizations'> | null>(null);
 	let purchaser = $state<PurchaserRef>({ kind: 'self' });
-	let eventPresetId = $state<Id<'eventPresets'> | null>(null);
+	let eventTemplateId = $state<Id<'eventPresets'> | null>(null);
+	let eventName = $state('');
 	let eventDate = $state('');
+	let eventTime = $state('');
+	let eventLocation = $state('');
+	let eventEstimatedAttendance = $state(0);
 	let vendor = $state('');
 	let itemDescription = $state('');
 	let totalAmount = $state(0);
@@ -64,7 +68,6 @@
 		const id = purchaser.purchaserId;
 		return purchasers.find((p) => p._id === id);
 	});
-	const selectedEvent = $derived(eventPresets.find((e) => e._id === eventPresetId));
 	const purchaserIsSelf = $derived(purchaser.kind === 'self');
 	const purchaserName = $derived(
 		purchaserIsSelf
@@ -138,8 +141,11 @@
 			draftId = draft._id;
 			organizationId = draft.organizationId;
 			purchaser = draft.purchaser;
-			eventPresetId = draft.eventPresetId;
+			eventName = draft.eventName;
 			eventDate = draft.eventDate;
+			eventTime = draft.eventTime;
+			eventLocation = draft.eventLocation;
+			eventEstimatedAttendance = draft.eventEstimatedAttendance;
 			vendor = draft.vendor;
 			itemDescription = draft.itemDescription;
 			totalAmount = draft.totalAmount;
@@ -163,8 +169,11 @@
 		return {
 			organizationId,
 			purchaser,
-			eventPresetId,
+			eventName,
 			eventDate,
+			eventTime,
+			eventLocation,
+			eventEstimatedAttendance,
 			vendor,
 			itemDescription,
 			totalAmount,
@@ -207,11 +216,12 @@
 			recipient: firstRecipient?.name || '{recipient}',
 			recipientUo95: firstRecipient?.uo95 || '{recipientUo95}',
 			recipientReason: firstRecipient?.reason || '{recipientReason}',
-			eventName: selectedEvent?.name ?? '{eventName}',
+			eventName: eventName || '{eventName}',
 			eventDate: eventDate || '{eventDate}',
-			eventTime: selectedEvent?.time ?? '{eventTime}',
-			eventLocation: selectedEvent?.location ?? '{eventLocation}',
-			attendance: selectedEvent?.estimatedAttendance.toString() ?? '{attendance}'
+			eventTime: eventTime || '{eventTime}',
+			eventLocation: eventLocation || '{eventLocation}',
+			attendance:
+				eventEstimatedAttendance > 0 ? eventEstimatedAttendance.toString() : '{attendance}'
 		};
 		return Object.entries(values).reduce(
 			(text, [key, value]) => text.replaceAll(`{${key}}`, value),
@@ -309,13 +319,21 @@
 				{savedData}
 				bind:organizationId
 				bind:purchaser
-				bind:eventPresetId
+				bind:eventTemplateId
+				bind:eventName
+				bind:eventTime
+				bind:eventLocation
+				bind:eventEstimatedAttendance
 				onChange={onFieldChange}
 				onSavedChange={loadSaved}
 			/>
 
 			<PurchaseFields
+				bind:eventName
 				bind:eventDate
+				bind:eventTime
+				bind:eventLocation
+				bind:eventEstimatedAttendance
 				bind:vendor
 				bind:itemDescription
 				bind:totalAmount

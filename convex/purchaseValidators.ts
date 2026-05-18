@@ -35,8 +35,11 @@ export const purchaserRef = v.union(
 export const draftPatch = v.object({
 	organizationId: v.optional(v.union(v.id('organizations'), v.null())),
 	purchaser: v.optional(purchaserRef),
-	eventPresetId: v.optional(v.union(v.id('eventPresets'), v.null())),
+	eventName: v.optional(v.string()),
 	eventDate: v.optional(v.string()),
+	eventTime: v.optional(v.string()),
+	eventLocation: v.optional(v.string()),
+	eventEstimatedAttendance: v.optional(v.number()),
 	vendor: v.optional(v.string()),
 	itemDescription: v.optional(v.string()),
 	totalAmount: v.optional(v.number()),
@@ -124,11 +127,14 @@ export const eventPresetDoc = v.object({
 export const purchaseRequestDoc = v.object({
 	...systemFields,
 	owner: v.string(),
-	status: v.union(v.literal('draft'), v.literal('ready'), v.literal('filled')),
+	status: v.union(v.literal('draft'), v.literal('ready')),
 	organizationId: v.union(v.id('organizations'), v.null()),
 	purchaser: purchaserRef,
-	eventPresetId: v.union(v.id('eventPresets'), v.null()),
+	eventName: v.string(),
 	eventDate: v.string(),
+	eventTime: v.string(),
+	eventLocation: v.string(),
+	eventEstimatedAttendance: v.number(),
 	vendor: v.string(),
 	itemDescription: v.string(),
 	totalAmount: v.number(),
@@ -163,7 +169,7 @@ export const purchaseFilePayload = v.object({
 
 export const assembledPurchase = v.object({
 	id: v.id('purchaseRequests'),
-	status: v.union(v.literal('draft'), v.literal('ready'), v.literal('filled')),
+	status: v.union(v.literal('draft'), v.literal('ready')),
 	organization: v.object({
 		id: v.id('organizations'),
 		name: v.string(),
@@ -189,16 +195,14 @@ export const assembledPurchase = v.object({
 		idCardFrontFileId: v.id('files'),
 		idCardBackFileId: v.id('files')
 	}),
-	eventPreset: v.object({
-		id: v.id('eventPresets'),
+	eventDetails: v.object({
 		name: v.string(),
-		scheduleLabel: v.string(),
+		date: v.string(),
 		time: v.string(),
 		location: v.string(),
 		estimatedAttendance: v.number(),
 		publicityProofFileId: v.id('files')
 	}),
-	eventDate: v.string(),
 	vendor: v.string(),
 	itemDescription: v.string(),
 	totalAmount: v.number(),

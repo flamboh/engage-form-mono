@@ -9,7 +9,7 @@ export type FileKind =
 	| 'brand_approval'
 	| 'recipient_list';
 
-export type PurchaseStatus = 'draft' | 'ready' | 'filled';
+export type PurchaseStatus = 'draft' | 'ready';
 
 export type Organization = {
 	id: string;
@@ -30,10 +30,9 @@ export type PersonProfile = {
 	phone?: string;
 };
 
-export type EventPreset = {
-	id: string;
+export type EventDetails = {
 	name: string;
-	scheduleLabel: string;
+	date: string;
 	time: string;
 	location: string;
 	estimatedAttendance: number;
@@ -65,8 +64,7 @@ export type Purchase = {
 	organization: Organization;
 	requester: PersonProfile;
 	purchaser: PersonProfile;
-	eventPreset: EventPreset;
-	eventDate: string;
+	eventDetails: EventDetails;
 	vendor: string;
 	itemDescription: string;
 	totalAmount: number;
@@ -115,16 +113,14 @@ export const samplePurchase: Purchase = {
 		idCardFrontFileId: 'file_id_front',
 		idCardBackFileId: 'file_id_back'
 	},
-	eventPreset: {
-		id: 'event_alc_weekly',
+	eventDetails: {
 		name: 'Album Listening Club weekly event',
-		scheduleLabel: 'Weekly Tuesday event',
+		date: '04/21',
 		time: '6:30pm',
 		location: 'McKenzie 240A',
 		estimatedAttendance: 50,
 		publicityProofFileId: 'file_publicity'
 	},
-	eventDate: '04/21',
 	vendor: 'Amazon',
 	itemDescription: 'Mort Garson music vinyl',
 	totalAmount: 22.98,
@@ -228,7 +224,21 @@ export function validatePurchaseReadiness(purchase: Purchase) {
 		purchase.purchaser.permanentAddress,
 		'Purchaser address missing.'
 	);
-	requireText(issues, 'eventDate', purchase.eventDate, 'Event date missing.');
+	requireText(issues, 'eventDetails.name', purchase.eventDetails.name, 'Event name missing.');
+	requireText(issues, 'eventDetails.date', purchase.eventDetails.date, 'Event date missing.');
+	requireText(issues, 'eventDetails.time', purchase.eventDetails.time, 'Event time missing.');
+	requireText(
+		issues,
+		'eventDetails.location',
+		purchase.eventDetails.location,
+		'Event location missing.'
+	);
+	if (purchase.eventDetails.estimatedAttendance <= 0) {
+		issues.push({
+			field: 'eventDetails.estimatedAttendance',
+			message: 'Estimated attendance missing.'
+		});
+	}
 	requireText(issues, 'vendor', purchase.vendor, 'Vendor missing.');
 	requireText(issues, 'itemDescription', purchase.itemDescription, 'Item description missing.');
 	requireText(
@@ -273,8 +283,8 @@ export function validatePurchaseReadiness(purchase: Purchase) {
 	);
 	requireText(
 		issues,
-		'eventPreset.publicityProofFileId',
-		purchase.eventPreset.publicityProofFileId,
+		'eventDetails.publicityProofFileId',
+		purchase.eventDetails.publicityProofFileId,
 		'Publicity proof missing.'
 	);
 

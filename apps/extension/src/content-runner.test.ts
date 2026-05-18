@@ -39,7 +39,7 @@ test('starts a complete fill run and advances the current step', async () => {
 	expect(state).toEqual({ purchaseId: samplePurchase.id, filled: 3, pageCount: 1 });
 });
 
-test('marks purchase filled when a saved run reaches review', async () => {
+test('records review reached when a saved run reaches review', async () => {
 	let state: FillRunState | null = { purchaseId: samplePurchase.id, filled: 18, pageCount: 9 };
 	const reviewMessages: string[] = [];
 	const runner = createContentRunner({

@@ -164,7 +164,7 @@ export const rtpSchema: RtpStepSchema[] = [
 		headingIncludes: ['event open to all students'],
 		fields: [
 			fileField('upload', (purchase) => [
-				purchaseFileById(purchase, purchase.eventPreset.publicityProofFileId)
+				purchaseFileById(purchase, purchase.eventDetails.publicityProofFileId)
 			])
 		]
 	},

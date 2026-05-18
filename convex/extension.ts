@@ -14,7 +14,7 @@ const deviceToken = v.object({
 
 const recentPurchase = v.object({
 	id: v.id('purchaseRequests'),
-	status: v.union(v.literal('ready'), v.literal('filled')),
+	status: v.literal('ready'),
 	organization: v.string(),
 	purchaser: v.string(),
 	itemDescription: v.string(),
@@ -98,23 +98,13 @@ export const listRecentPurchases = query({
 			)
 			.order('desc')
 			.take(20);
-		const filled = await ctx.db
-			.query('purchaseRequests')
-			.withIndex('by_owner_and_status_and_updatedAt', (q) =>
-				q.eq('owner', session.owner).eq('status', 'filled')
-			)
-			.order('desc')
-			.take(20);
-		const rows = [...ready, ...filled]
-			.sort((left, right) => right.updatedAt - left.updatedAt)
-			.slice(0, 20);
 
 		return await Promise.all(
-			rows.map(async (request) => {
+			ready.map(async (request) => {
 				const purchase = await assemblePurchase(ctx, request);
 				return {
 					id: request._id,
-					status: request.status as 'ready' | 'filled',
+					status: 'ready' as const,
 					organization: purchase.organization.name,
 					purchaser: purchase.purchaser.name,
 					itemDescription: purchase.itemDescription,
@@ -134,7 +124,7 @@ export const getPurchaseForFill = query({
 		const session = await sessionFromToken(ctx, args.token);
 		const request = await ctx.db.get(args.id);
 		if (request === null || request.owner !== session.owner) throw new Error('Purchase not found.');
-		if (request.status !== 'ready' && request.status !== 'filled') {
+		if (request.status !== 'ready') {
 			throw new Error('Purchase is not ready.');
 		}
 		await assertReady(ctx, request);
@@ -142,18 +132,17 @@ export const getPurchaseForFill = query({
 	}
 });
 
-export const markFilled = mutation({
+export const markReviewReached = mutation({
 	args: { token: v.string(), id: v.id('purchaseRequests') },
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		const session = await sessionFromToken(ctx, args.token);
 		const request = await ctx.db.get(args.id);
 		if (request === null || request.owner !== session.owner) throw new Error('Purchase not found.');
-		if (request.status !== 'ready' && request.status !== 'filled') {
+		if (request.status !== 'ready') {
 			throw new Error('Purchase is not ready.');
 		}
 		await ctx.db.patch(args.id, {
-			status: 'filled',
 			lastFilledAt: Date.now(),
 			updatedAt: Date.now()
 		});

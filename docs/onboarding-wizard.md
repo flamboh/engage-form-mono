@@ -100,7 +100,7 @@ Triggered by the layout guard above, not by a sign-in event. This means the wiza
 
 - Remove the "Extension link" side panel — that lives in the wizard now.
 - Add an "Extension: linked" status badge near the header, linking to `/app/extension`.
-- Split the recent list into **Drafts / Ready / Filled** sections (separate from this doc's scope but enabled by the cleaner flow).
+- Split the recent list into **Drafts / Ready** sections (separate from this doc's scope but enabled by the cleaner flow).
 
 ### New: `/app/extension`
 

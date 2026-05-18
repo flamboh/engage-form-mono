@@ -7,11 +7,12 @@ import { EXTENSION_TOKEN_KEY, READY_PURCHASE_KEY, readyPurchaseSummary } from '.
 
 type RecentPurchase = {
 	id: string;
-	status: 'draft' | 'ready' | 'filled';
+	status: 'ready';
 	organization: string;
 	purchaser: string;
 	itemDescription: string;
 	totalAmount: number;
+	lastFilledAt: number | null;
 };
 
 type ChromeRuntime = {
@@ -107,10 +108,10 @@ function render(status = '') {
               ${recentPurchases
 								.map(
 									(purchase) => `
-                    <button class="purchase-row ${purchase.status}" data-purchase-id="${purchase.id}" type="button">
+                    <button class="purchase-row ${purchase.lastFilledAt === null ? 'ready' : 'filled'}" data-purchase-id="${purchase.id}" type="button">
                       <span>${purchase.organization}</span>
                       <strong>${purchase.itemDescription || 'Untitled'}</strong>
-                      <small>${purchase.purchaser} · ${money(purchase.totalAmount)} · ${purchase.status}</small>
+                      <small>${purchase.purchaser} · ${money(purchase.totalAmount)} · ${purchase.lastFilledAt === null ? 'ready' : 'review reached before'}</small>
                     </button>
                   `
 								)

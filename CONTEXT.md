@@ -156,6 +156,5 @@ _Avoid_: ID card image, ID file, card upload
 - "user profile" describes application state; resolved: use **Requester** for the domain source of requester autofill details.
 - "file" describes storage; resolved: use **Document** for evidence attached to a **Purchase Request**.
 - "requester is purchaser" describes the rule mechanically; resolved: use **Self Reimbursement** for that domain case.
-- "filled" describes extension progress, not the purchase request's core domain status; resolved: the current domain statuses are **Draft** and **Ready**.
 - Current implementation stores live references to some autofill sources; resolved domain language says purchase requests stand on recorded facts.
 - Current implementation requires separate front and back ID card files; resolved domain language allows one combined **ID Card Document** or separate front and back documents.
