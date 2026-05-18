@@ -1,18 +1,17 @@
 {
-  "name": "@engage-form/domain",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "scripts": {
-    "build": "tsc --noEmit",
-    "test": "vp test",
-    "check": "vp check"
-  },
-  "devDependencies": {
-    "typescript": "~6.0.2",
-    "vite-plus": "catalog:"
-  }
+	"name": "@engage-form/domain",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"build": "tsc --noEmit",
+		"test": "vitest run",
+		"check": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"typescript": "~6.0.2"
+	}
 }

@@ -4,7 +4,8 @@ Generally speaking, you should browse the codebase to figure out what is going o
 
 ## Task Completion Requirements
 
-- All of `vp fmt`, `vp lint`, and `vp check` must pass before considering tasks completed.
+- All of `bun run fmt`, `bun run lint`, and `bun run check` must pass before considering tasks completed.
+- Never run `bun tes`, use `bun run test` instead (runs Vitest)
 
 ## Project Snapshot
 
@@ -44,6 +45,20 @@ Long term maintainability is a core priority. If you add new functionality, firs
 This project uses [Convex](https://convex.dev) as its backend.
 
 When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live in GitHub Issues via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default five-label triage vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo: root `CONTEXT.md` plus `docs/adr/`. See `docs/agents/domain.md`.
 
 ## References
 

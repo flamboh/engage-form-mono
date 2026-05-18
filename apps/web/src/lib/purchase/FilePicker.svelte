@@ -53,7 +53,7 @@
 
 	{#if files.length > 0}
 		<div class="file-grid">
-			{#each files as file}
+			{#each files as file (file.name)}
 				<div class="file-preview" title={file.name}>
 					{#if file.url !== null}
 						<img src={file.url} alt="" />

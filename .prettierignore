@@ -1,0 +1,24 @@
+# Package managers
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
+
+# Build outputs
+dist
+dist-ssr
+build
+.svelte-kit
+apps/web/.svelte-kit
+apps/web/.vercel
+
+# Generated
+convex/_generated
+
+# Agent tooling
+.agents
+skills-lock.json
+
+# Dependencies
+node_modules

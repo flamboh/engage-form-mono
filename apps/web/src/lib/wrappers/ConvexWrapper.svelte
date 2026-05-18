@@ -12,7 +12,7 @@
 	$effect(() => {
 		const session = clerkContext.currentSession;
 		if (!session) {
-			convex.clearAuth();
+			convex.setAuth(async () => null);
 			return;
 		}
 

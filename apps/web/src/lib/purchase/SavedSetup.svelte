@@ -271,7 +271,7 @@
 			<input class="field" placeholder="Index number" required bind:value={orgIndex} />
 			<div>
 				<span class="text-xs font-medium text-stone-500">Budget lines</span>
-				{#each orgBudgetLines as _, i (i)}
+				{#each orgBudgetLines as _line, i (i)}
 					<div class="mt-1 flex items-center gap-2">
 						<input class="field flex-1" required bind:value={orgBudgetLines[i]} />
 						{#if orgBudgetLines.length > 1}

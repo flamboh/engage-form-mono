@@ -1,12 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '$convex/_generated/api';
-	import { getClerkContext } from '$lib/stores/clerk.svelte';
 	import { useConvexClient } from 'convex-svelte';
 
 	type Fund = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 
-	const clerkContext = getClerkContext();
 	const client = useConvexClient();
 
 	const defaultTemplate =
@@ -82,7 +80,7 @@
 		<span class="font-medium">Budget lines</span>
 		<p class="text-xs text-stone-500">Match the labels in your Engage budget exactly.</p>
 		<div class="mt-2 space-y-2">
-			{#each budgetLines as _, i (i)}
+			{#each budgetLines as _line, i (i)}
 				<div class="flex items-center gap-2">
 					<input class="field flex-1" required bind:value={budgetLines[i]} />
 					{#if budgetLines.length > 1}

@@ -1,6 +1,6 @@
-import { expect, test } from "vite-plus/test";
-import { fn } from "./index.ts";
+import { expect, test } from 'vitest';
+import { fn } from './index.ts';
 
-test("fn", () => {
-  expect(fn()).toBe("Hello, tsdown!");
+test('fn', () => {
+	expect(fn()).toBe('Hello, tsdown!');
 });

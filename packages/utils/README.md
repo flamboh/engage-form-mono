@@ -1,4 +1,4 @@
-# vite-plus-starter
+# utils
 
 A starter for creating a Vite Plus project.
 
@@ -7,17 +7,17 @@ A starter for creating a Vite Plus project.
 - Install dependencies:
 
 ```bash
-vp install
+bun install
 ```
 
 - Run the unit tests:
 
 ```bash
-vp test
+bun test
 ```
 
 - Build the library:
 
 ```bash
-vp pack
+bun run build
 ```

@@ -1,21 +1,20 @@
 {
-  "name": "@engage-form/fill-engine",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "scripts": {
-    "build": "tsc --noEmit",
-    "test": "vp test",
-    "check": "vp check"
-  },
-  "dependencies": {
-    "@engage-form/domain": "workspace:*"
-  },
-  "devDependencies": {
-    "typescript": "~6.0.2",
-    "vite-plus": "catalog:"
-  }
+	"name": "@engage-form/fill-engine",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"build": "tsc --noEmit",
+		"test": "vitest run",
+		"check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@engage-form/domain": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "~6.0.2"
+	}
 }

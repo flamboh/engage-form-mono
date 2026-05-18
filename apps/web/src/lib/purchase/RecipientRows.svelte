@@ -25,7 +25,7 @@
 		<button class="secondary" type="button" onclick={addRecipient}>Add recipient</button>
 	</div>
 	<div class="mt-4 space-y-3">
-		{#each recipients as recipient, index}
+		{#each recipients as recipient, index (index)}
 			<div class="grid gap-3 rounded-md border border-stone-200 p-3 md:grid-cols-4">
 				<input class="field" placeholder="Name" bind:value={recipient.name} oninput={onChange} />
 				<input class="field" placeholder="UO 95" bind:value={recipient.uo95} oninput={onChange} />
