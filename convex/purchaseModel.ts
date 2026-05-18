@@ -4,12 +4,40 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 export type Recipient = { name: string; uo95: string; reason: string; value: number };
 
 export type PurchaserRef = { kind: 'self' } | { kind: 'purchaser'; purchaserId: Id<'purchasers'> };
+export type StudentOrganizationDetails = {
+	name: string;
+	indexNumber: string;
+	fundLetter: Doc<'organizations'>['fundLetter'];
+	budgetLines: string[];
+	businessPurposeTemplate: string;
+};
+export type RequesterDetails = {
+	id: Id<'users'>;
+	name: string;
+	email: string;
+	phone: string;
+	uo95: string;
+	permanentAddress: string;
+	idCardFrontFileId: Id<'files'>;
+	idCardBackFileId: Id<'files'>;
+};
+export type PurchaserDetails = {
+	id: Id<'users'> | Id<'purchasers'>;
+	name: string;
+	uo95: string;
+	permanentAddress: string;
+	idCardFrontFileId: Id<'files'>;
+	idCardBackFileId: Id<'files'>;
+};
 
 type Ctx = QueryCtx | MutationCtx;
 
 export type DraftPatch = Partial<{
-	organizationId: Id<'organizations'> | null;
-	purchaser: PurchaserRef;
+	organizationSourceId: Id<'organizations'> | null;
+	purchaserSource: PurchaserRef;
+	studentOrganization: StudentOrganizationDetails;
+	requester: RequesterDetails;
+	purchaser: PurchaserDetails;
 	eventName: string;
 	eventDate: string;
 	eventTime: string;
@@ -71,8 +99,17 @@ export function applyDraftPatch(
 	patch: DraftPatch
 ): Partial<Doc<'purchaseRequests'>> {
 	return {
-		organizationId:
-			patch.organizationId !== undefined ? patch.organizationId : purchase.organizationId,
+		organizationSourceId:
+			patch.organizationSourceId !== undefined
+				? patch.organizationSourceId
+				: purchase.organizationSourceId,
+		purchaserSource:
+			patch.purchaserSource !== undefined ? patch.purchaserSource : purchase.purchaserSource,
+		studentOrganization:
+			patch.studentOrganization !== undefined
+				? patch.studentOrganization
+				: purchase.studentOrganization,
+		requester: patch.requester !== undefined ? patch.requester : purchase.requester,
 		purchaser: patch.purchaser !== undefined ? patch.purchaser : purchase.purchaser,
 		eventName: patch.eventName !== undefined ? patch.eventName : purchase.eventName,
 		eventDate: patch.eventDate !== undefined ? patch.eventDate : purchase.eventDate,
@@ -118,32 +155,17 @@ export function unresolvedToken(value: string) {
 }
 
 export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'>) {
-	if (request.organizationId === null) throw new Error('Organization missing.');
 	if (request.publicityFileId === null) throw new Error('Publicity proof missing.');
 
-	const organization = await requireOwnedDoc(
-		ctx,
-		'organizations',
-		request.organizationId,
-		request.owner
-	);
-	const requester = await requireUserProfile(ctx, request.owner);
-
-	const purchaserIsSelf = request.purchaser.kind === 'self';
-	const purchaser =
-		request.purchaser.kind === 'self'
-			? userAsPurchaserPayload(requester)
-			: purchaserPayload(
-					await requireOwnedDoc(ctx, 'purchasers', request.purchaser.purchaserId, request.owner)
-				);
+	const purchaserIsSelf = request.purchaserSource.kind === 'self';
 
 	if (purchaserIsSelf && request.secondApprovalFileId === null) {
 		throw new Error('Second approval missing.');
 	}
 
 	const fileIds = [
-		purchaser.idCardFrontFileId,
-		purchaser.idCardBackFileId,
+		request.purchaser.idCardFrontFileId,
+		request.purchaser.idCardBackFileId,
 		request.publicityFileId,
 		request.secondApprovalFileId,
 		...request.receiptFileIds
@@ -153,9 +175,9 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 	return {
 		id: request._id,
 		status: request.status,
-		organization: orgPayload(organization),
-		requester: requesterPayload(requester),
-		purchaser,
+		organization: orgPayload(request),
+		requester: request.requester,
+		purchaser: request.purchaser,
 		eventDetails: eventDetailsPayload(request, request.publicityFileId),
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
@@ -173,6 +195,15 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 
 export async function assertReady(ctx: Ctx, request: Doc<'purchaseRequests'>) {
 	const purchase = await assemblePurchase(ctx, request);
+	requireText(purchase.organization.name, 'Organization name missing.');
+	requireText(purchase.organization.indexNumber, 'Index number missing.');
+	if (purchase.organization.budgetLines.length === 0) throw new Error('Budget line missing.');
+	requireText(purchase.requester.name, 'Requester name missing.');
+	requireText(purchase.requester.email, 'Requester email missing.');
+	requireText(purchase.requester.phone, 'Requester phone missing.');
+	requireText(purchase.purchaser.name, 'Purchaser name missing.');
+	requireText(purchase.purchaser.uo95, 'Purchaser UO 95 missing.');
+	requireText(purchase.purchaser.permanentAddress, 'Purchaser address missing.');
 	requireText(purchase.eventDetails.name, 'Event name missing.');
 	requireText(purchase.eventDetails.date, 'Event date missing.');
 	requireText(purchase.eventDetails.time, 'Event time missing.');
@@ -216,17 +247,7 @@ async function purchaseFile(ctx: Ctx, id: Id<'files'>, owner: string) {
 	};
 }
 
-function orgPayload(org: Doc<'organizations'>) {
-	return {
-		id: org._id,
-		name: org.name,
-		indexNumber: org.indexNumber,
-		fundLetter: org.fundLetter,
-		budgetLines: org.budgetLines
-	};
-}
-
-function requesterPayload(user: Doc<'users'>) {
+export function userAsRequesterDetails(user: Doc<'users'>): RequesterDetails {
 	return {
 		id: user._id,
 		name: user.name,
@@ -239,7 +260,7 @@ function requesterPayload(user: Doc<'users'>) {
 	};
 }
 
-function userAsPurchaserPayload(user: Doc<'users'>) {
+export function userAsPurchaserDetails(user: Doc<'users'>): PurchaserDetails {
 	return {
 		id: user._id,
 		name: user.name,
@@ -250,7 +271,7 @@ function userAsPurchaserPayload(user: Doc<'users'>) {
 	};
 }
 
-function purchaserPayload(purchaser: Doc<'purchasers'>) {
+export function purchaserDetails(purchaser: Doc<'purchasers'>): PurchaserDetails {
 	return {
 		id: purchaser._id,
 		name: purchaser.name,
@@ -258,6 +279,26 @@ function purchaserPayload(purchaser: Doc<'purchasers'>) {
 		permanentAddress: purchaser.permanentAddress,
 		idCardFrontFileId: purchaser.idCardFrontFileId,
 		idCardBackFileId: purchaser.idCardBackFileId
+	};
+}
+
+export function studentOrganizationDetails(org: Doc<'organizations'>): StudentOrganizationDetails {
+	return {
+		name: org.name,
+		indexNumber: org.indexNumber,
+		fundLetter: org.fundLetter,
+		budgetLines: org.budgetLines,
+		businessPurposeTemplate: org.businessPurposeTemplate
+	};
+}
+
+function orgPayload(request: Doc<'purchaseRequests'>) {
+	return {
+		id: request.organizationSourceId,
+		name: request.studentOrganization.name,
+		indexNumber: request.studentOrganization.indexNumber,
+		fundLetter: request.studentOrganization.fundLetter,
+		budgetLines: request.studentOrganization.budgetLines
 	};
 }
 

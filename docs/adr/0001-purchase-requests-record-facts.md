@@ -6,4 +6,4 @@ Purchase requests stand on the facts recorded into them, while requester, purcha
 
 - Draft purchase requests may be initialized or updated from autofill sources.
 - Ready purchase requests should not change meaning when autofill sources change.
-- Current live references in the implementation are a transitional mismatch with the domain model.
+- Source identifiers may remain on drafts as autofill selectors, but extension fill and readiness use recorded facts.

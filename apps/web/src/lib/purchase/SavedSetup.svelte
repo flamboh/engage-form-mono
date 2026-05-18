@@ -19,8 +19,8 @@
 	type Props = {
 		session: ClerkSession;
 		savedData?: SavedData;
-		organizationId: Id<'organizations'> | null;
-		purchaser: PurchaserRef;
+		organizationSourceId: Id<'organizations'> | null;
+		purchaserSource: PurchaserRef;
 		eventTemplateId: Id<'eventPresets'> | null;
 		eventName: string;
 		eventTime: string;
@@ -33,8 +33,8 @@
 	let {
 		session,
 		savedData,
-		organizationId = $bindable(),
-		purchaser = $bindable(),
+		organizationSourceId = $bindable(),
+		purchaserSource = $bindable(),
 		eventTemplateId = $bindable(),
 		eventName = $bindable(),
 		eventTime = $bindable(),
@@ -69,36 +69,36 @@
 
 	const organizations = $derived(savedData?.organizations ?? []);
 	const purchasers = $derived(
-		(savedData?.purchasers ?? []).filter((p) => p.organizationId === organizationId)
+		(savedData?.purchasers ?? []).filter((p) => p.organizationId === organizationSourceId)
 	);
 	const eventPresets = $derived(
 		(savedData?.eventPresets ?? []).filter(
-			(eventPreset) => eventPreset.organizationId === organizationId
+			(eventPreset) => eventPreset.organizationId === organizationSourceId
 		)
 	);
 
 	function selectOrganization(value: string) {
-		organizationId = value === '' ? null : (value as Id<'organizations'>);
-		purchaser = { kind: 'self' };
+		organizationSourceId = value === '' ? null : (value as Id<'organizations'>);
+		purchaserSource = { kind: 'self' };
 		eventTemplateId = null;
 		onChange();
 	}
 
 	function setPurchaserMode(value: 'self' | 'other') {
 		if (value === 'self') {
-			purchaser = { kind: 'self' };
-		} else if (purchaser.kind !== 'purchaser') {
+			purchaserSource = { kind: 'self' };
+		} else if (purchaserSource.kind !== 'purchaser') {
 			const first = purchasers[0];
-			purchaser = first ? { kind: 'purchaser', purchaserId: first._id } : { kind: 'self' };
+			purchaserSource = first ? { kind: 'purchaser', purchaserId: first._id } : { kind: 'self' };
 		}
 		onChange();
 	}
 
 	function selectPurchaser(value: string) {
 		if (value === '') {
-			purchaser = { kind: 'self' };
+			purchaserSource = { kind: 'self' };
 		} else {
-			purchaser = { kind: 'purchaser', purchaserId: value as Id<'purchasers'> };
+			purchaserSource = { kind: 'purchaser', purchaserId: value as Id<'purchasers'> };
 		}
 		onChange();
 	}
@@ -135,7 +135,7 @@
 		event.preventDefault();
 		error = '';
 		try {
-			organizationId = await client.mutation(api.authed.purchaseBuilder.upsertOrganization, {
+			organizationSourceId = await client.mutation(api.authed.purchaseBuilder.upsertOrganization, {
 				id: null,
 				name: orgName,
 				indexNumber: orgIndex,
@@ -143,7 +143,7 @@
 				budgetLines: orgBudgetLines,
 				businessPurposeTemplate: orgTemplate
 			});
-			purchaser = { kind: 'self' };
+			purchaserSource = { kind: 'self' };
 			eventTemplateId = null;
 			mode = 'none';
 			await onSavedChange();
@@ -156,21 +156,21 @@
 	async function createPurchaser(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
-		if (organizationId === null || idFrontFileId === null || idBackFileId === null) {
+		if (organizationSourceId === null || idFrontFileId === null || idBackFileId === null) {
 			error = 'Organization and ID files required.';
 			return;
 		}
 		try {
 			const id = await client.mutation(api.authed.purchaseBuilder.upsertPurchaser, {
 				id: null,
-				organizationId,
+				organizationId: organizationSourceId,
 				name: purchaserName,
 				uo95: purchaserUo95,
 				permanentAddress: purchaserAddress,
 				idCardFrontFileId: idFrontFileId,
 				idCardBackFileId: idBackFileId
 			});
-			purchaser = { kind: 'purchaser', purchaserId: id };
+			purchaserSource = { kind: 'purchaser', purchaserId: id };
 			mode = 'none';
 			await onSavedChange();
 			onChange();
@@ -182,14 +182,14 @@
 	async function createEvent(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
-		if (organizationId === null) {
+		if (organizationSourceId === null) {
 			error = 'Organization required.';
 			return;
 		}
 		try {
 			eventTemplateId = await client.mutation(api.authed.purchaseBuilder.upsertEventPreset, {
 				id: null,
-				organizationId,
+				organizationId: organizationSourceId,
 				name: eventTemplateName,
 				time: eventTemplateTime,
 				location: eventTemplateLocation,
@@ -228,7 +228,7 @@
 			<select class="field" onchange={(e) => selectOrganization(e.currentTarget.value)}>
 				<option value="">Select</option>
 				{#each organizations as org (org._id)}
-					<option value={org._id} selected={org._id === organizationId}>{org.name}</option>
+					<option value={org._id} selected={org._id === organizationSourceId}>{org.name}</option>
 				{/each}
 			</select>
 		</label>
@@ -238,7 +238,7 @@
 				class="field"
 				value={eventTemplateId ?? ''}
 				onchange={(e) => selectEvent(e.currentTarget.value)}
-				disabled={organizationId === null}
+				disabled={organizationSourceId === null}
 			>
 				<option value="">Select</option>
 				{#each eventPresets as eventPreset (eventPreset._id)}
@@ -255,7 +255,7 @@
 				<input
 					type="radio"
 					name="purchaser-mode"
-					checked={purchaser.kind === 'self'}
+					checked={purchaserSource.kind === 'self'}
 					onchange={() => setPurchaserMode('self')}
 				/>
 				I'm the purchaser
@@ -264,17 +264,17 @@
 				<input
 					type="radio"
 					name="purchaser-mode"
-					checked={purchaser.kind === 'purchaser'}
+					checked={purchaserSource.kind === 'purchaser'}
 					onchange={() => setPurchaserMode('other')}
-					disabled={organizationId === null}
+					disabled={organizationSourceId === null}
 				/>
 				Someone else
 			</label>
 		</div>
-		{#if purchaser.kind === 'purchaser'}
+		{#if purchaserSource.kind === 'purchaser'}
 			<select
 				class="field"
-				value={purchaser.purchaserId}
+				value={purchaserSource.purchaserId}
 				onchange={(e) => selectPurchaser(e.currentTarget.value)}
 			>
 				{#each purchasers as p (p._id)}

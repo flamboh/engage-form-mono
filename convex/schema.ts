@@ -33,6 +33,34 @@ const purchaserRef = v.union(
 	v.object({ kind: v.literal('purchaser'), purchaserId: v.id('purchasers') })
 );
 
+const studentOrganizationDetails = v.object({
+	name: v.string(),
+	indexNumber: v.string(),
+	fundLetter,
+	budgetLines: v.array(v.string()),
+	businessPurposeTemplate: v.string()
+});
+
+const requesterDetails = v.object({
+	id: v.id('users'),
+	name: v.string(),
+	email: v.string(),
+	phone: v.string(),
+	uo95: v.string(),
+	permanentAddress: v.string(),
+	idCardFrontFileId: v.id('files'),
+	idCardBackFileId: v.id('files')
+});
+
+const purchaserDetails = v.object({
+	id: v.union(v.id('users'), v.id('purchasers')),
+	name: v.string(),
+	uo95: v.string(),
+	permanentAddress: v.string(),
+	idCardFrontFileId: v.id('files'),
+	idCardBackFileId: v.id('files')
+});
+
 export default defineSchema({
 	users: defineTable({
 		owner: v.string(),
@@ -96,8 +124,11 @@ export default defineSchema({
 	purchaseRequests: defineTable({
 		owner: v.string(),
 		status: v.union(v.literal('draft'), v.literal('ready')),
-		organizationId: v.union(v.id('organizations'), v.null()),
-		purchaser: purchaserRef,
+		organizationSourceId: v.union(v.id('organizations'), v.null()),
+		purchaserSource: purchaserRef,
+		studentOrganization: studentOrganizationDetails,
+		requester: requesterDetails,
+		purchaser: purchaserDetails,
 		eventName: v.string(),
 		eventDate: v.string(),
 		eventTime: v.string(),

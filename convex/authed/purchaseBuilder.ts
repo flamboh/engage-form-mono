@@ -11,7 +11,10 @@ import {
 	getUserProfile,
 	ownerFromIdentity,
 	requireOwnedDoc,
+	requireUserProfile,
 	requireText,
+	userAsPurchaserDetails,
+	userAsRequesterDetails,
 	type DraftPatch
 } from '../purchaseModel';
 import {
@@ -315,12 +318,22 @@ export const createDraft = authedMutation({
 	returns: v.id('purchaseRequests'),
 	handler: async (ctx) => {
 		const owner = ownerFromIdentity(ctx.identity);
+		const requester = await requireUserProfile(ctx, owner);
 		const now = Date.now();
 		return await ctx.db.insert('purchaseRequests', {
 			owner,
 			status: 'draft',
-			organizationId: null,
-			purchaser: { kind: 'self' },
+			organizationSourceId: null,
+			purchaserSource: { kind: 'self' },
+			studentOrganization: {
+				name: '',
+				indexNumber: '',
+				fundLetter: 'I',
+				budgetLines: [],
+				businessPurposeTemplate: ''
+			},
+			requester: userAsRequesterDetails(requester),
+			purchaser: userAsPurchaserDetails(requester),
 			eventName: '',
 			eventDate: '',
 			eventTime: '',

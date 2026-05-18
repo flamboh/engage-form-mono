@@ -16,6 +16,32 @@
 		purchasers: Doc<'purchasers'>[];
 		eventPresets: Doc<'eventPresets'>[];
 	};
+	type FundLetter = Doc<'organizations'>['fundLetter'];
+	type StudentOrganizationDetails = {
+		name: string;
+		indexNumber: string;
+		fundLetter: FundLetter;
+		budgetLines: string[];
+		businessPurposeTemplate: string;
+	};
+	type RequesterDetails = {
+		id: Id<'users'>;
+		name: string;
+		email: string;
+		phone: string;
+		uo95: string;
+		permanentAddress: string;
+		idCardFrontFileId: Id<'files'>;
+		idCardBackFileId: Id<'files'>;
+	};
+	type PurchaserDetails = {
+		id: Id<'users'> | Id<'purchasers'>;
+		name: string;
+		uo95: string;
+		permanentAddress: string;
+		idCardFrontFileId: Id<'files'>;
+		idCardBackFileId: Id<'files'>;
+	};
 
 	const clerkContext = getClerkContext();
 	const client = useConvexClient();
@@ -29,8 +55,17 @@
 	let currentUser = $state<Doc<'users'> | null>(null);
 	let savedData = $state<SavedData | undefined>();
 	let draftId = $state<Id<'purchaseRequests'> | null>(null);
-	let organizationId = $state<Id<'organizations'> | null>(null);
-	let purchaser = $state<PurchaserRef>({ kind: 'self' });
+	let organizationSourceId = $state<Id<'organizations'> | null>(null);
+	let purchaserSource = $state<PurchaserRef>({ kind: 'self' });
+	let studentOrganization = $state<StudentOrganizationDetails>({
+		name: '',
+		indexNumber: '',
+		fundLetter: 'I',
+		budgetLines: [],
+		businessPurposeTemplate: ''
+	});
+	let requester = $state<RequesterDetails | null>(null);
+	let purchaser = $state<PurchaserDetails | null>(null);
 	let eventTemplateId = $state<Id<'eventPresets'> | null>(null);
 	let eventName = $state('');
 	let eventDate = $state('');
@@ -53,34 +88,67 @@
 	let draftInitializing = $state(false);
 
 	const purchasers = $derived(
-		(savedData?.purchasers ?? []).filter((p) => p.organizationId === organizationId)
+		(savedData?.purchasers ?? []).filter((p) => p.organizationId === organizationSourceId)
 	);
 	const eventPresets = $derived(
 		(savedData?.eventPresets ?? []).filter(
-			(eventPreset) => eventPreset.organizationId === organizationId
+			(eventPreset) => eventPreset.organizationId === organizationSourceId
 		)
 	);
 	const selectedOrg = $derived(
-		(savedData?.organizations ?? []).find((org) => org._id === organizationId)
+		(savedData?.organizations ?? []).find((org) => org._id === organizationSourceId)
 	);
 	const selectedPurchaser = $derived.by(() => {
-		if (purchaser.kind !== 'purchaser') return undefined;
-		const id = purchaser.purchaserId;
+		if (purchaserSource.kind !== 'purchaser') return undefined;
+		const id = purchaserSource.purchaserId;
 		return purchasers.find((p) => p._id === id);
 	});
-	const purchaserIsSelf = $derived(purchaser.kind === 'self');
-	const purchaserName = $derived(
-		purchaserIsSelf
-			? (currentUser?.name ?? '{purchaser}')
-			: (selectedPurchaser?.name ?? '{purchaser}')
-	);
+	const purchaserIsSelf = $derived(purchaserSource.kind === 'self');
+	const purchaserName = $derived(purchaser?.name ?? '{purchaser}');
 	let lastOrganizationId = $state<Id<'organizations'> | null>(null);
+	let lastPurchaserKey = $state('');
 
 	$effect(() => {
-		if (organizationId === lastOrganizationId) return;
-		const lines = selectedOrg?.budgetLines ?? [];
+		if (organizationSourceId === lastOrganizationId) return;
+		if (selectedOrg === undefined) {
+			studentOrganization = {
+				name: '',
+				indexNumber: '',
+				fundLetter: 'I',
+				budgetLines: [],
+				businessPurposeTemplate: ''
+			};
+		} else {
+			studentOrganization = {
+				name: selectedOrg.name,
+				indexNumber: selectedOrg.indexNumber,
+				fundLetter: selectedOrg.fundLetter,
+				budgetLines: selectedOrg.budgetLines,
+				businessPurposeTemplate: selectedOrg.businessPurposeTemplate
+			};
+		}
+		const lines = studentOrganization.budgetLines;
 		budgetLineItem = lines[0] ?? '';
-		lastOrganizationId = organizationId;
+		lastOrganizationId = organizationSourceId;
+		onFieldChange();
+	});
+
+	$effect(() => {
+		const key =
+			purchaserSource.kind === 'self'
+				? `self:${currentUser?._id ?? ''}`
+				: `purchaser:${selectedPurchaser?._id ?? purchaserSource.purchaserId}`;
+		if (key === lastPurchaserKey) return;
+		lastPurchaserKey = key;
+		if (currentUser !== null) requester = userAsRequester(currentUser);
+		purchaser =
+			purchaserSource.kind === 'self'
+				? currentUser === null
+					? purchaser
+					: userAsPurchaser(currentUser)
+				: selectedPurchaser === undefined
+					? purchaser
+					: savedPurchaserDetails(selectedPurchaser);
 		onFieldChange();
 	});
 
@@ -139,7 +207,10 @@
 		try {
 			const draft = await client.query(api.authed.purchaseBuilder.getDraft, { id });
 			draftId = draft._id;
-			organizationId = draft.organizationId;
+			organizationSourceId = draft.organizationSourceId;
+			purchaserSource = draft.purchaserSource;
+			studentOrganization = draft.studentOrganization;
+			requester = draft.requester;
 			purchaser = draft.purchaser;
 			eventName = draft.eventName;
 			eventDate = draft.eventDate;
@@ -157,7 +228,7 @@
 			secondApprovalFileId = draft.secondApprovalFileId;
 			publicityFileId = draft.publicityFileId;
 			recipients = draft.recipients.length === 0 ? recipients : draft.recipients;
-			lastOrganizationId = draft.organizationId;
+			lastOrganizationId = draft.organizationSourceId;
 			saveState = 'Draft autosaves';
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -167,8 +238,11 @@
 
 	function patch() {
 		return {
-			organizationId,
-			purchaser,
+			organizationSourceId,
+			purchaserSource,
+			studentOrganization,
+			...(requester === null ? {} : { requester }),
+			...(purchaser === null ? {} : { purchaser }),
 			eventName,
 			eventDate,
 			eventTime,
@@ -207,8 +281,8 @@
 	function renderBusinessPurpose() {
 		const firstRecipient = recipients[0];
 		const values: Record<string, string> = {
-			org: selectedOrg?.name ?? '{org}',
-			requester: currentUser?.name ?? '{requester}',
+			org: studentOrganization.name || '{org}',
+			requester: requester?.name ?? '{requester}',
 			purchaser: purchaserName,
 			vendor: vendor || '{vendor}',
 			item: itemDescription || '{item}',
@@ -225,7 +299,7 @@
 		};
 		return Object.entries(values).reduce(
 			(text, [key, value]) => text.replaceAll(`{${key}}`, value),
-			selectedOrg?.businessPurposeTemplate ?? ''
+			studentOrganization.businessPurposeTemplate
 		);
 	}
 
@@ -273,6 +347,41 @@
 	function money(value: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 	}
+
+	function userAsRequester(user: Doc<'users'>): RequesterDetails {
+		return {
+			id: user._id,
+			name: user.name,
+			email: user.studentEmail,
+			phone: user.phone,
+			uo95: user.uo95,
+			permanentAddress: user.permanentAddress,
+			idCardFrontFileId: user.idCardFrontFileId,
+			idCardBackFileId: user.idCardBackFileId
+		};
+	}
+
+	function userAsPurchaser(user: Doc<'users'>): PurchaserDetails {
+		return {
+			id: user._id,
+			name: user.name,
+			uo95: user.uo95,
+			permanentAddress: user.permanentAddress,
+			idCardFrontFileId: user.idCardFrontFileId,
+			idCardBackFileId: user.idCardBackFileId
+		};
+	}
+
+	function savedPurchaserDetails(savedPurchaser: Doc<'purchasers'>): PurchaserDetails {
+		return {
+			id: savedPurchaser._id,
+			name: savedPurchaser.name,
+			uo95: savedPurchaser.uo95,
+			permanentAddress: savedPurchaser.permanentAddress,
+			idCardFrontFileId: savedPurchaser.idCardFrontFileId,
+			idCardBackFileId: savedPurchaser.idCardBackFileId
+		};
+	}
 </script>
 
 {#if !clerkContext.currentSession}
@@ -317,8 +426,8 @@
 			<SavedSetup
 				session={clerkContext.currentSession}
 				{savedData}
-				bind:organizationId
-				bind:purchaser
+				bind:organizationSourceId
+				bind:purchaserSource
 				bind:eventTemplateId
 				bind:eventName
 				bind:eventTime
@@ -339,7 +448,7 @@
 				bind:totalAmount
 				bind:budgetLineItem
 				bind:reimbursementReason
-				budgetLineOptions={selectedOrg?.budgetLines ?? []}
+				budgetLineOptions={studentOrganization.budgetLines}
 				onChange={onFieldChange}
 			/>
 
