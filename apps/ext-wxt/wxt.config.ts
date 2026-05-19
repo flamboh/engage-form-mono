@@ -31,7 +31,16 @@ export default defineConfig({
 				hostPermission(engageOrigin),
 				hostPermission(env.PUBLIC_CLERK_SYNC_HOST ?? env.PUBLIC_WEB_APP_URL ?? 'http://localhost'),
 				clerkFrontendApi ? hostPermission(clerkFrontendApi) : null
-			].filter((value): value is string => value !== null)
+			].filter((value): value is string => value !== null),
+			content_security_policy:
+				mode === 'development'
+					? {
+							extension_pages:
+								"script-src 'self' 'wasm-unsafe-eval' http://localhost:*; object-src 'self';",
+							sandbox:
+								"script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*; sandbox allow-scripts allow-forms allow-popups allow-modals; child-src 'self';"
+						}
+					: undefined
 		};
 	},
 	vite: () => ({

@@ -5,12 +5,25 @@ import { readClerkPublishableKey, readClerkSyncHost } from '../lib/env';
 import { type RuntimeMessage, type RuntimeResponse, runtimeError } from '../lib/messages';
 
 let clerk: ReturnType<typeof createSyncedClerk> | null = null;
+const clerkTokenTimeoutMs = 4_000;
 
 export default defineBackground(() => {
 	browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+		const runtimeMessage = message as RuntimeMessage;
+		logBackground('message received', { type: runtimeMessage.type });
 		void Effect.runPromise(handleRuntimeMessage(message as RuntimeMessage))
-			.then(sendResponse)
-			.catch((error: unknown) => sendResponse(runtimeError(error)));
+			.then((response) => {
+				logBackground('message response', summarizeResponse(response));
+				sendResponse(response);
+			})
+			.catch((error: unknown) => {
+				const response = runtimeError(error);
+				logBackground('message error', {
+					type: runtimeMessage.type,
+					...summarizeResponse(response)
+				});
+				sendResponse(response);
+			});
 		return true;
 	});
 });
@@ -51,9 +64,16 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 
 function getConvexTokenEffect() {
 	return Effect.gen(function* () {
-		const client = yield* getClerkEffect();
+		const client = yield* refreshClerkEffect();
+		if (client.session === null) return null;
+
 		const token = yield* Effect.tryPromise({
-			try: () => client.session?.getToken({ template: 'convex' }) ?? Promise.resolve(null),
+			try: () =>
+				withTimeout(
+					client.session!.getToken({ template: 'convex' }),
+					`Clerk Convex token did not respond within ${clerkTokenTimeoutMs / 1_000}s.`,
+					clerkTokenTimeoutMs
+				),
 			catch: toError
 		});
 		return token;
@@ -97,4 +117,23 @@ function refreshClerkEffect() {
 
 function toError(error: unknown) {
 	return error instanceof Error ? error : new Error(String(error));
+}
+
+function withTimeout<T>(promise: Promise<T>, message: string, timeoutMs: number) {
+	return new Promise<T>((resolve, reject) => {
+		const timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+		promise.then(resolve, reject).finally(() => clearTimeout(timeout));
+	});
+}
+
+function logBackground(message: string, context: Record<string, unknown> = {}) {
+	console.info('[Engage Form][background]', message, context);
+}
+
+function summarizeResponse(response: RuntimeResponse) {
+	if (!response.ok) return { ok: false, message: response.message };
+	if ('token' in response) return { ok: true, tokenPresent: response.token !== null };
+	if ('signedIn' in response)
+		return { ok: true, signedIn: response.signedIn, emailPresent: response.email !== null };
+	return { ok: true, message: response.message };
 }
