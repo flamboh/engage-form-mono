@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { setFiles } from './form-controls.ts';
+import { setFiles } from './form-controls';
 
 test('uploads through hidden file inputs and tagged drop targets', async () => {
 	const dom = installFakeDom();

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { samplePurchaseRequest } from '@engage-form/domain';
 import type { FillAction } from '@engage-form/fill-engine';
-import { createContentRunner, type FillRunState } from './content-runner.ts';
+import { createContentRunner, type FillRunState } from './content-runner';
 
 test('starts a complete fill run and advances the current step', async () => {
 	let state: FillRunState | null = null;

@@ -34,6 +34,7 @@
 			return;
 		}
 		const token = await session.getToken({ template: 'convex' });
+		if (clerkContext.currentSession !== session) return;
 		if (!token) {
 			localStorage.removeItem(extensionConvexTokenStorageKey);
 			return;

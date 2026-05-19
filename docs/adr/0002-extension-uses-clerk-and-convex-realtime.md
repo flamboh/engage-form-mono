@@ -17,4 +17,4 @@ Background code is the extension's Clerk token authority and direct-operation ho
 - Manifest V3 background code should not be treated as a long-lived realtime host; use realtime in the popup and direct authenticated calls for background/content-script requests.
 - Extension runtime messages use operation names rather than Engage-prefixed names: `AUTH_STATE`, `GET_CONVEX_TOKEN`, `SIGN_OUT`, `START_FILL`, `GET_FILL_PAYLOAD`, `REVIEW_REACHED`, and `FILL_RUN_ENDED`.
 - `GET_FILL_PAYLOAD` means "fetch the assembled Ready purchase request payload for this fill run step." Content scripts may request it on each Engage page; background re-fetches the Ready payload and caches document blobs in memory for the active fill run.
-- `apps/ext-wxt` can exist as a temporary migration package until it reaches parity with `apps/extension`; the existing extension remains the working reference during migration.
+- `apps/extension` is the canonical browser extension package.

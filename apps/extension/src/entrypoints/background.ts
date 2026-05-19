@@ -68,6 +68,7 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 				catch: toError
 			});
 			yield* refreshClerkEffect();
+			clearActiveFillRun();
 			return { ok: true, message: 'Signed out.' } as const;
 		});
 	}
