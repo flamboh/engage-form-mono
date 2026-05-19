@@ -41,6 +41,7 @@ Long term maintainability is a core priority. If you add new functionality, firs
 - Keep designs simple, no over explaining, plain colors, no gradients, no decorative elements.
 - Assume dev servers for both Convex and `bun dev` are already running.
 - Use EffectTS for business logic and server side code
+- Use Graphite `gt --help` for PRs and stacked diffs, particularly with dependent issues.
 
 This project uses [Convex](https://convex.dev) as its backend.
 
