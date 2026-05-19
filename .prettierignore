@@ -9,7 +9,9 @@ bun.lockb
 dist
 dist-ssr
 build
+.output
 .svelte-kit
+.wxt
 apps/web/.svelte-kit
 apps/web/.vercel
 
