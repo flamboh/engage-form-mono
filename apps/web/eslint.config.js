@@ -18,6 +18,8 @@ export default defineConfig(
 			'**/dist/**',
 			'**/dist-ssr/**',
 			'**/build/**',
+			'**/.output/**',
+			'**/.wxt/**',
 			'**/.svelte-kit/**',
 			'**/.vercel/**',
 			'convex/_generated/**',
