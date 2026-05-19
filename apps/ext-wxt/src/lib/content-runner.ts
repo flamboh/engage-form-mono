@@ -143,7 +143,9 @@ export function createContentRunner(deps: ContentRunnerDeps) {
 	}
 
 	function handleMessage(message: FillMessage) {
-		return fillCurrentPage(message.purchase);
+		return message.type === 'START_FILL_RUN'
+			? startFillRun(message.purchase)
+			: fillCurrentPage(message.purchase);
 	}
 
 	return {
