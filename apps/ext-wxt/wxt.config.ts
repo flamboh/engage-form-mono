@@ -37,7 +37,12 @@ export default defineConfig({
 	vite: () => ({
 		envDir: workspaceRoot,
 		envPrefix: ['VITE_', 'PUBLIC_'],
-		plugins: [tailwindcss()]
+		plugins: [tailwindcss()],
+		resolve: {
+			alias: {
+				'@clerk/ui/no-rhc': resolve(extensionRoot, 'src/lib/clerk-ui-background-stub.ts')
+			}
+		}
 	})
 });
 

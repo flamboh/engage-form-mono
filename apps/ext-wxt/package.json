@@ -25,6 +25,13 @@
 		"typescript": "^5.9.3",
 		"wxt": "^0.20.26"
 	},
+	"dependencies": {
+		"@clerk/chrome-extension": "^3.1.28",
+		"@engage-form/domain": "workspace:*",
+		"@engage-form/fill-engine": "workspace:*",
+		"convex": "^1.39.1",
+		"effect": "^3.21.2"
+	},
 	"manifest": {
 		"key": "$CRX_PUBLIC_KEY",
 		"permissions": [
