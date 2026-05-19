@@ -1,6 +1,6 @@
 export type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 
-export type FileKind =
+export type DocumentKind =
 	| 'receipt'
 	| 'id_front'
 	| 'id_back'
@@ -11,7 +11,7 @@ export type FileKind =
 
 export type PurchaseStatus = 'draft' | 'ready';
 
-export type Organization = {
+export type StudentOrganization = {
 	id: string;
 	name: string;
 	indexNumber: string;
@@ -19,7 +19,7 @@ export type Organization = {
 	defaultBudgetLineItem: string;
 };
 
-export type PersonProfile = {
+export type Requester = {
 	id: string;
 	name: string;
 	uo95: string;
@@ -30,6 +30,8 @@ export type PersonProfile = {
 	phone?: string;
 };
 
+export type Purchaser = Requester;
+
 export type EventDetails = {
 	name: string;
 	date: string;
@@ -39,9 +41,9 @@ export type EventDetails = {
 	publicityProofFileId: string;
 };
 
-export type PurchaseFile = {
+export type Document = {
 	id: string;
-	kind: FileKind;
+	kind: DocumentKind;
 	filename: string;
 	contentType: string;
 	size: number;
@@ -58,12 +60,12 @@ export type Recipient = {
 	reason: string;
 };
 
-export type Purchase = {
+export type PurchaseRequest = {
 	id: string;
 	status: PurchaseStatus;
-	organization: Organization;
-	requester: PersonProfile;
-	purchaser: PersonProfile;
+	organization: StudentOrganization;
+	requester: Requester;
+	purchaser: Purchaser;
 	eventDetails: EventDetails;
 	vendor: string;
 	itemDescription: string;
@@ -75,7 +77,7 @@ export type Purchase = {
 	receiptFileIds: string[];
 	secondApprovalFileId: string | null;
 	recipients: Recipient[];
-	files: PurchaseFile[];
+	documents: Document[];
 };
 
 export type ReadinessIssue = {
@@ -83,7 +85,7 @@ export type ReadinessIssue = {
 	message: string;
 };
 
-export const samplePurchase: Purchase = {
+export const samplePurchaseRequest: PurchaseRequest = {
 	id: 'purchase_mort_garson',
 	status: 'ready',
 	organization: {
@@ -140,12 +142,12 @@ export const samplePurchase: Purchase = {
 			reason: 'winning the Kahoot! Trivia'
 		}
 	],
-	files: [
-		file('file_id_front', 'id_front', 'Oliver_ID_1.jpg', 'image/jpeg'),
-		file('file_id_back', 'id_back', 'Oliver_ID_2.jpg', 'image/jpeg'),
-		file('file_receipt', 'receipt', 'mort_garson_receipt.jpg', 'image/jpeg'),
-		file('file_approval', 'second_approval', 'approval_email.pdf', 'application/pdf'),
-		file('file_publicity', 'publicity', 'weekly_event_engage.pdf', 'application/pdf')
+	documents: [
+		document('file_id_front', 'id_front', 'Oliver_ID_1.jpg', 'image/jpeg'),
+		document('file_id_back', 'id_back', 'Oliver_ID_2.jpg', 'image/jpeg'),
+		document('file_receipt', 'receipt', 'mort_garson_receipt.jpg', 'image/jpeg'),
+		document('file_approval', 'second_approval', 'approval_email.pdf', 'application/pdf'),
+		document('file_publicity', 'publicity', 'weekly_event_engage.pdf', 'application/pdf')
 	]
 };
 
@@ -156,167 +158,183 @@ export function formatMoney(amount: number) {
 	}).format(amount);
 }
 
-export function budgetLineText(purchase: Purchase) {
-	return `${formatMoney(purchase.totalAmount)} from ${purchase.budgetLineItem}`;
+export function budgetLineText(purchaseRequest: PurchaseRequest) {
+	return `${formatMoney(purchaseRequest.totalAmount)} from ${purchaseRequest.budgetLineItem}`;
 }
 
-export function reimbursementRecipientText(purchase: Purchase) {
-	return `${purchase.purchaser.name}, ${purchase.purchaser.uo95}`;
+export function reimbursementRecipientText(purchaseRequest: PurchaseRequest) {
+	return `${purchaseRequest.purchaser.name}, ${purchaseRequest.purchaser.uo95}`;
 }
 
-export function recipientValueText(purchase: Purchase) {
-	return reportableRecipients(purchase)
+export function recipientValueText(purchaseRequest: PurchaseRequest) {
+	return enteredRecipients(purchaseRequest)
 		.map((recipient) => `${recipient.name}, ${formatMoney(recipient.value)}`)
 		.join('\n');
 }
 
-export function recipientIdText(purchase: Purchase) {
-	return reportableRecipients(purchase)
+export function recipientIdText(purchaseRequest: PurchaseRequest) {
+	return enteredRecipients(purchaseRequest)
 		.map((recipient) => `${recipient.name}, ${recipient.uo95}`)
 		.join('\n');
 }
 
-export function purchaseFileById(purchase: Purchase, fileId: string) {
-	const file = purchase.files.find((item) => item.id === fileId);
-	if (file === undefined) {
-		throw new Error(`Purchase file not found: ${fileId}`);
+export function documentById(purchaseRequest: PurchaseRequest, documentId: string) {
+	const document = purchaseRequest.documents.find((item) => item.id === documentId);
+	if (document === undefined) {
+		throw new Error(`Document not found: ${documentId}`);
 	}
-	return file;
+	return document;
 }
 
-export function generateBusinessPurpose(purchase: Purchase) {
-	return purchase.businessPurposeText;
+export function generateBusinessPurpose(purchaseRequest: PurchaseRequest) {
+	return purchaseRequest.businessPurposeText;
 }
 
-export function validatePurchaseReadiness(purchase: Purchase) {
+export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 	const issues: ReadinessIssue[] = [];
 
 	requireText(
 		issues,
 		'organization.name',
-		purchase.organization.name,
-		'Organization name missing.'
+		purchaseRequest.organization.name,
+		'Student organization name missing.'
 	);
 	requireText(
 		issues,
 		'organization.indexNumber',
-		purchase.organization.indexNumber,
+		purchaseRequest.organization.indexNumber,
 		'Index missing.'
 	);
-	requireText(issues, 'requester.name', purchase.requester.name, 'Requester name missing.');
+	requireText(issues, 'requester.name', purchaseRequest.requester.name, 'Requester name missing.');
 	requireText(
 		issues,
 		'requester.email',
-		purchase.requester.email ?? '',
+		purchaseRequest.requester.email ?? '',
 		'Requester email missing.'
 	);
 	requireText(
 		issues,
 		'requester.phone',
-		purchase.requester.phone ?? '',
+		purchaseRequest.requester.phone ?? '',
 		'Requester phone missing.'
 	);
-	requireText(issues, 'purchaser.name', purchase.purchaser.name, 'Purchaser name missing.');
-	requireText(issues, 'purchaser.uo95', purchase.purchaser.uo95, 'Purchaser UO 95 missing.');
+	requireText(issues, 'purchaser.name', purchaseRequest.purchaser.name, 'Purchaser name missing.');
+	requireText(issues, 'purchaser.uo95', purchaseRequest.purchaser.uo95, 'Purchaser UO 95 missing.');
 	requireText(
 		issues,
 		'purchaser.permanentAddress',
-		purchase.purchaser.permanentAddress,
+		purchaseRequest.purchaser.permanentAddress,
 		'Purchaser address missing.'
 	);
-	requireText(issues, 'eventDetails.name', purchase.eventDetails.name, 'Event name missing.');
-	requireText(issues, 'eventDetails.date', purchase.eventDetails.date, 'Event date missing.');
-	requireText(issues, 'eventDetails.time', purchase.eventDetails.time, 'Event time missing.');
+	requireText(
+		issues,
+		'eventDetails.name',
+		purchaseRequest.eventDetails.name,
+		'Event name missing.'
+	);
+	requireText(
+		issues,
+		'eventDetails.date',
+		purchaseRequest.eventDetails.date,
+		'Event date missing.'
+	);
+	requireText(
+		issues,
+		'eventDetails.time',
+		purchaseRequest.eventDetails.time,
+		'Event time missing.'
+	);
 	requireText(
 		issues,
 		'eventDetails.location',
-		purchase.eventDetails.location,
+		purchaseRequest.eventDetails.location,
 		'Event location missing.'
 	);
-	if (purchase.eventDetails.estimatedAttendance <= 0) {
+	if (purchaseRequest.eventDetails.estimatedAttendance <= 0) {
 		issues.push({
 			field: 'eventDetails.estimatedAttendance',
 			message: 'Estimated attendance missing.'
 		});
 	}
-	requireText(issues, 'vendor', purchase.vendor, 'Vendor missing.');
-	requireText(issues, 'itemDescription', purchase.itemDescription, 'Item description missing.');
+	requireText(issues, 'vendor', purchaseRequest.vendor, 'Vendor missing.');
+	requireText(
+		issues,
+		'itemDescription',
+		purchaseRequest.itemDescription,
+		'Item description missing.'
+	);
 	requireText(
 		issues,
 		'reimbursementReason',
-		purchase.reimbursementReason,
+		purchaseRequest.reimbursementReason,
 		'Reimbursement reason missing.'
 	);
-	requireText(issues, 'budgetLineItem', purchase.budgetLineItem, 'Budget line item missing.');
+	requireText(
+		issues,
+		'budgetLineItem',
+		purchaseRequest.budgetLineItem,
+		'Budget line item missing.'
+	);
 	requireText(
 		issues,
 		'businessPurposeText',
-		purchase.businessPurposeText,
+		purchaseRequest.businessPurposeText,
 		'Business purpose missing.'
 	);
-	if (unresolvedToken(purchase.businessPurposeText)) {
+	if (unresolvedToken(purchaseRequest.businessPurposeText)) {
 		issues.push({
 			field: 'businessPurposeText',
 			message: 'Business purpose has unresolved variables.'
 		});
 	}
 
-	if (purchase.totalAmount <= 0) {
+	if (purchaseRequest.totalAmount <= 0) {
 		issues.push({ field: 'totalAmount', message: 'Total amount must be greater than zero.' });
 	}
 
-	if (purchase.receiptFileIds.length === 0) {
-		issues.push({ field: 'receiptFileIds', message: 'Receipt file missing.' });
+	if (purchaseRequest.receiptFileIds.length === 0) {
+		issues.push({ field: 'receiptFileIds', message: 'Receipt document missing.' });
 	}
 
 	requireText(
 		issues,
 		'purchaser.idCardFrontFileId',
-		purchase.purchaser.idCardFrontFileId,
-		'ID front missing.'
+		purchaseRequest.purchaser.idCardFrontFileId,
+		'ID card front document missing.'
 	);
 	requireText(
 		issues,
 		'purchaser.idCardBackFileId',
-		purchase.purchaser.idCardBackFileId,
-		'ID back missing.'
+		purchaseRequest.purchaser.idCardBackFileId,
+		'ID card back document missing.'
 	);
 	requireText(
 		issues,
 		'eventDetails.publicityProofFileId',
-		purchase.eventDetails.publicityProofFileId,
+		purchaseRequest.eventDetails.publicityProofFileId,
 		'Publicity proof missing.'
 	);
 
-	if (purchase.requesterIsPurchaser) {
+	if (purchaseRequest.requesterIsPurchaser) {
 		requireText(
 			issues,
 			'secondApprovalFileId',
-			purchase.secondApprovalFileId ?? '',
+			purchaseRequest.secondApprovalFileId ?? '',
 			'Second approval missing.'
 		);
-	}
-
-	const enteredRecipients = purchase.recipients.filter((recipient) => recipient.value > 0);
-	if (enteredRecipients.length === 0) {
-		issues.push({ field: 'recipients', message: 'Recipient missing.' });
-	}
-
-	for (const recipient of enteredRecipients) {
-		if (recipient.value >= 50) {
-			issues.push({ field: 'recipient.value', message: 'Gift value must be under $50.' });
-		}
-		if (recipient.value < 10) continue;
-		requireText(issues, 'recipient.name', recipient.name, 'Recipient name missing.');
-		requireText(issues, 'recipient.uo95', recipient.uo95, 'Recipient UO 95 missing.');
-		requireText(issues, 'recipient.reason', recipient.reason, 'Recipient reason missing.');
 	}
 
 	return issues;
 }
 
-function reportableRecipients(purchase: Purchase) {
-	return purchase.recipients.filter((recipient) => recipient.value >= 10);
+function enteredRecipients(purchaseRequest: PurchaseRequest) {
+	return purchaseRequest.recipients.filter(
+		(recipient) =>
+			recipient.name.trim() !== '' ||
+			recipient.uo95.trim() !== '' ||
+			recipient.reason.trim() !== '' ||
+			recipient.value > 0
+	);
 }
 
 function requireText(issues: ReadinessIssue[], field: string, value: string, message: string) {
@@ -329,7 +347,7 @@ function unresolvedToken(value: string) {
 	return /\{[A-Za-z][A-Za-z0-9]*\}/.test(value);
 }
 
-function file(id: string, kind: FileKind, filename: string, contentType: string): PurchaseFile {
+function document(id: string, kind: DocumentKind, filename: string, contentType: string): Document {
 	return {
 		id,
 		kind,

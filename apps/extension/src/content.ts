@@ -1,4 +1,4 @@
-import type { Purchase } from '@engage-form/domain';
+import type { PurchaseRequest } from '@engage-form/domain';
 import { detectStep, type FillAction } from '@engage-form/fill-engine';
 import {
 	createContentRunner,
@@ -20,7 +20,19 @@ import {
 type ChromeApi = {
 	runtime: {
 		getURL(path: string): string;
-		sendMessage(message: { type: 'ENGAGE_REVIEW_REACHED'; purchaseId: string }): void;
+		lastError?: { message: string };
+		sendMessage(
+			message:
+				| { type: 'ENGAGE_GET_READY_PURCHASE'; purchaseId: string }
+				| { type: 'ENGAGE_REVIEW_REACHED'; purchaseId: string }
+				| { type: 'ENGAGE_FILL_RUN_ENDED' },
+			callback?: (
+				response?:
+					| { ok: true; purchase: PurchaseRequest }
+					| { ok: true; message: string }
+					| { ok: false; message: string }
+			) => void
+		): void;
 		onMessage: {
 			addListener(
 				callback: (
@@ -31,20 +43,11 @@ type ChromeApi = {
 			): void;
 		};
 	};
-	storage: {
-		local: {
-			get(
-				keys: string[],
-				callback: (items: Partial<Record<typeof READY_PURCHASE_KEY, Purchase>>) => void
-			): void;
-		};
-	};
 };
 
 declare const chrome: ChromeApi;
 
 const FILL_RUN_KEY = 'engageFormFillRun';
-const READY_PURCHASE_KEY = 'readyPurchase';
 const windowState = window as Window & { __engageFormContentLoaded?: boolean };
 const runner = createContentRunner({
 	pageHeading,
@@ -59,7 +62,7 @@ const runner = createContentRunner({
 	loadFillRun,
 	saveFillRun,
 	clearFillRun,
-	loadPurchase
+	loadPurchaseRequest
 });
 
 if (windowState.__engageFormContentLoaded !== true) {
@@ -242,13 +245,21 @@ function saveFillRun(state: FillRunState) {
 
 function clearFillRun() {
 	window.sessionStorage.removeItem(FILL_RUN_KEY);
+	chrome.runtime.sendMessage({ type: 'ENGAGE_FILL_RUN_ENDED' });
 }
 
-function loadPurchase(purchaseId: string) {
-	return new Promise<Purchase | null>((resolve) => {
-		chrome.storage.local.get([READY_PURCHASE_KEY], (items) => {
-			const purchase = items[READY_PURCHASE_KEY] ?? null;
-			resolve(purchase?.id === purchaseId ? purchase : null);
+function loadPurchaseRequest(purchaseId: string) {
+	return new Promise<PurchaseRequest | null>((resolve) => {
+		chrome.runtime.sendMessage({ type: 'ENGAGE_GET_READY_PURCHASE', purchaseId }, (response) => {
+			if (
+				chrome.runtime.lastError !== undefined ||
+				response?.ok !== true ||
+				!('purchase' in response)
+			) {
+				resolve(null);
+				return;
+			}
+			resolve(response.purchase);
 		});
 	});
 }

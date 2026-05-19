@@ -13,7 +13,7 @@
 		"fmt": "prettier --write .",
 		"lint": "prettier --check . && eslint --config apps/web/eslint.config.js .",
 		"check": "bun run --cwd apps/web check && bun run --cwd apps/extension check && bun run --cwd packages/domain check && bun run --cwd packages/fill-engine check && bun run --cwd packages/utils check",
-		"test": "bun run --cwd apps/extension test && bun run --cwd packages/domain test && bun run --cwd packages/fill-engine test && bun run --cwd packages/utils test",
+		"test": "vitest run tests/purchaseModel.test.ts && bun run --cwd apps/extension test && bun run --cwd packages/domain test && bun run --cwd packages/fill-engine test && bun run --cwd packages/utils test",
 		"build": "bun run --cwd apps/web build && bun run --cwd apps/extension build && bun run --cwd packages/domain build && bun run --cwd packages/fill-engine build && bun run --cwd packages/utils build",
 		"ready": "bun run fmt && bun run lint && bun run test && bun run build",
 		"dev": "concurrently -n web,convex -c blue,magenta \"bun run --cwd apps/web dev -- --port 3676\" \"bunx convex dev\"",

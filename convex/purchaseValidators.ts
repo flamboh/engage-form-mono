@@ -70,10 +70,10 @@ export const draftPatch = v.object({
 	eventDate: v.optional(v.string()),
 	eventTime: v.optional(v.string()),
 	eventLocation: v.optional(v.string()),
-	eventEstimatedAttendance: v.optional(v.number()),
+	eventEstimatedAttendance: v.optional(v.union(v.number(), v.null())),
 	vendor: v.optional(v.string()),
 	itemDescription: v.optional(v.string()),
-	totalAmount: v.optional(v.number()),
+	totalAmount: v.optional(v.union(v.number(), v.null())),
 	budgetLineItem: v.optional(v.string()),
 	reimbursementReason: v.optional(v.string()),
 	businessPurposeText: v.optional(v.string()),
@@ -191,7 +191,7 @@ export const savedData = v.object({
 	eventPresets: v.array(eventPresetDoc)
 });
 
-export const purchaseFilePayload = v.object({
+export const documentPayload = v.object({
 	id: v.id('files'),
 	kind: fileKind,
 	filename: v.string(),
@@ -247,5 +247,5 @@ export const assembledPurchase = v.object({
 	receiptFileIds: v.array(v.id('files')),
 	secondApprovalFileId: v.union(v.id('files'), v.null()),
 	recipients: v.array(recipient),
-	files: v.array(purchaseFilePayload)
+	documents: v.array(documentPayload)
 });

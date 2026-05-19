@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { samplePurchase } from '@engage-form/domain';
+import { samplePurchaseRequest } from '@engage-form/domain';
 import type { FillAction } from '@engage-form/fill-engine';
 import { createContentRunner, type FillRunState } from './content-runner.ts';
 
@@ -20,8 +20,8 @@ test('starts a complete fill run and advances the current step', async () => {
 		sendReviewReached() {
 			throw new Error('Review should not be reached yet.');
 		},
-		loadPurchase: (purchaseId) =>
-			Promise.resolve(purchaseId === samplePurchase.id ? samplePurchase : null),
+		loadPurchaseRequest: (purchaseId) =>
+			Promise.resolve(purchaseId === samplePurchaseRequest.id ? samplePurchaseRequest : null),
 		loadFillRun: () => state,
 		saveFillRun(nextState) {
 			state = nextState;
@@ -31,16 +31,20 @@ test('starts a complete fill run and advances the current step', async () => {
 		}
 	});
 
-	const result = await runner.startFillRun(samplePurchase);
+	const result = await runner.startFillRun(samplePurchaseRequest);
 
 	expect(result).toMatchObject({ ok: true, step: 'about', filled: 3 });
 	expect(clickedNext).toBe(1);
 	expect(receivedActions.length).toBeGreaterThan(0);
-	expect(state).toEqual({ purchaseId: samplePurchase.id, filled: 3, pageCount: 1 });
+	expect(state).toEqual({ purchaseId: samplePurchaseRequest.id, filled: 3, pageCount: 1 });
 });
 
 test('records review reached when a saved run reaches review', async () => {
-	let state: FillRunState | null = { purchaseId: samplePurchase.id, filled: 18, pageCount: 9 };
+	let state: FillRunState | null = {
+		purchaseId: samplePurchaseRequest.id,
+		filled: 18,
+		pageCount: 9
+	};
 	const reviewMessages: string[] = [];
 	const runner = createContentRunner({
 		pageHeading: () => 'Review Submission',
@@ -53,7 +57,7 @@ test('records review reached when a saved run reaches review', async () => {
 		sendReviewReached(purchaseId) {
 			reviewMessages.push(purchaseId);
 		},
-		loadPurchase() {
+		loadPurchaseRequest() {
 			throw new Error('Review should not load purchase.');
 		},
 		loadFillRun: () => state,
@@ -74,12 +78,16 @@ test('records review reached when a saved run reaches review', async () => {
 		filled: 18,
 		missed: []
 	});
-	expect(reviewMessages).toEqual([samplePurchase.id]);
+	expect(reviewMessages).toEqual([samplePurchaseRequest.id]);
 	expect(state).toBeNull();
 });
 
 test('clears a run when the current step cannot be filled', async () => {
-	let state: FillRunState | null = { purchaseId: samplePurchase.id, filled: 4, pageCount: 2 };
+	let state: FillRunState | null = {
+		purchaseId: samplePurchaseRequest.id,
+		filled: 4,
+		pageCount: 2
+	};
 	const runner = createContentRunner({
 		pageHeading: () => 'Mandatory Claims',
 		applyFillPlan() {
@@ -95,8 +103,8 @@ test('clears a run when the current step cannot be filled', async () => {
 		sendReviewReached() {
 			throw new Error('Review should not be reached.');
 		},
-		loadPurchase: (purchaseId) =>
-			Promise.resolve(purchaseId === samplePurchase.id ? samplePurchase : null),
+		loadPurchaseRequest: (purchaseId) =>
+			Promise.resolve(purchaseId === samplePurchaseRequest.id ? samplePurchaseRequest : null),
 		loadFillRun: () => state,
 		saveFillRun(nextState) {
 			state = nextState;
@@ -113,7 +121,11 @@ test('clears a run when the current step cannot be filled', async () => {
 });
 
 test('clears a run when the cached purchase is missing', async () => {
-	let state: FillRunState | null = { purchaseId: samplePurchase.id, filled: 4, pageCount: 2 };
+	let state: FillRunState | null = {
+		purchaseId: samplePurchaseRequest.id,
+		filled: 4,
+		pageCount: 2
+	};
 	const runner = createContentRunner({
 		pageHeading: () => 'Mandatory Claims',
 		applyFillPlan() {
@@ -125,7 +137,7 @@ test('clears a run when the cached purchase is missing', async () => {
 		sendReviewReached() {
 			throw new Error('Review should not be reached.');
 		},
-		loadPurchase: () => Promise.resolve(null),
+		loadPurchaseRequest: () => Promise.resolve(null),
 		loadFillRun: () => state,
 		saveFillRun(nextState) {
 			state = nextState;
@@ -139,7 +151,7 @@ test('clears a run when the cached purchase is missing', async () => {
 
 	expect(result).toEqual({
 		ok: false,
-		message: 'Selected purchase is no longer cached in the extension.',
+		message: 'Selected purchase request could not be loaded from Convex.',
 		step: 'claims',
 		filled: 4,
 		missed: []

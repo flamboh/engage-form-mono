@@ -8,9 +8,6 @@
 	const purchasesQuery = useQuery(api.authed.purchaseBuilder.listPurchases, () =>
 		clerkContext.currentSession ? {} : 'skip'
 	);
-	const extensionLinkedQuery = useQuery(api.extension.hasActiveDeviceToken, () =>
-		clerkContext.currentSession ? {} : 'skip'
-	);
 	const authMode = $derived(
 		page.url.searchParams.get('auth') === 'sign-up' ? 'sign-up' : 'sign-in'
 	);
@@ -21,7 +18,6 @@
 
 	const purchases = $derived(purchasesQuery.data ?? []);
 	const purchasesError = $derived(purchasesQuery.error?.message ?? '');
-	const extensionLinked = $derived(extensionLinkedQuery.data ?? false);
 	const drafts = $derived(purchases.filter((p) => p.status === 'draft'));
 	const ready = $derived(purchases.filter((p) => p.status === 'ready'));
 </script>
@@ -47,16 +43,7 @@
 					<h1 class="text-lg font-semibold">Purchase requests</h1>
 				</div>
 				<div class="flex items-center gap-2">
-					<a
-						class="rounded-md px-3 py-2 text-sm hover:bg-stone-100"
-						href="/app/extension"
-						title={extensionLinked ? 'Extension linked' : 'Extension not linked'}
-					>
-						<span
-							class="mr-1 inline-block h-2 w-2 rounded-full align-middle"
-							class:bg-emerald-500={extensionLinked}
-							class:bg-stone-300={!extensionLinked}
-						></span>
+					<a class="rounded-md px-3 py-2 text-sm hover:bg-stone-100" href="/app/extension">
 						Extension
 					</a>
 					<a class="rounded-md px-3 py-2 text-sm hover:bg-stone-100" href="/app/saved">Saved</a>

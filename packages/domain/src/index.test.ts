@@ -3,25 +3,25 @@ import {
 	generateBusinessPurpose,
 	recipientIdText,
 	recipientValueText,
-	samplePurchase,
+	samplePurchaseRequest,
 	validatePurchaseReadiness
 } from './index.ts';
 
-test('sample purchase is ready', () => {
-	expect(validatePurchaseReadiness(samplePurchase)).toEqual([]);
+test('sample purchase request is ready', () => {
+	expect(validatePurchaseReadiness(samplePurchaseRequest)).toEqual([]);
 });
 
 test('generates business purpose for the observed flow', () => {
-	expect(generateBusinessPurpose(samplePurchase)).toContain(
+	expect(generateBusinessPurpose(samplePurchaseRequest)).toContain(
 		'Album Listening Club wishes to reimburse Oliver Boorstein'
 	);
-	expect(generateBusinessPurpose(samplePurchase)).toContain("Aidan O'Donnell (951951840)");
+	expect(generateBusinessPurpose(samplePurchaseRequest)).toContain("Aidan O'Donnell (951951840)");
 });
 
 test('blocks unresolved business purpose tokens', () => {
 	expect(
 		validatePurchaseReadiness({
-			...samplePurchase,
+			...samplePurchaseRequest,
 			businessPurposeText: 'Reimburse {purchaser} for {item}.'
 		})
 	).toContainEqual({
@@ -30,39 +30,56 @@ test('blocks unresolved business purpose tokens', () => {
 	});
 });
 
-test('requires recipient reasons for reportable gifts', () => {
+test('does not require recipients', () => {
 	expect(
 		validatePurchaseReadiness({
-			...samplePurchase,
-			recipients: [{ ...samplePurchase.recipients[0], reason: '', value: 10 }]
+			...samplePurchaseRequest,
+			recipients: [],
+			businessPurposeText: 'Album Listening Club wishes to reimburse Oliver Boorstein.'
 		})
-	).toEqual(
-		expect.arrayContaining([{ field: 'recipient.reason', message: 'Recipient reason missing.' }])
-	);
+	).not.toContainEqual({ field: 'recipients', message: 'Recipient missing.' });
 });
 
-test('does not require or report recipient details for gifts under $10', () => {
-	const purchase = {
-		...samplePurchase,
-		totalAmount: 8,
-		recipients: [{ name: '', uo95: '', reason: '', itemDescription: 'Sticker', value: 8 }]
-	};
-
-	expect(validatePurchaseReadiness(purchase)).not.toEqual(
+test('does not enforce recipient details or value limits', () => {
+	expect(
+		validatePurchaseReadiness({
+			...samplePurchaseRequest,
+			recipients: [
+				{ ...samplePurchaseRequest.recipients[0], name: '', uo95: '', reason: '', value: 50 }
+			]
+		})
+	).not.toEqual(
 		expect.arrayContaining([
 			{ field: 'recipient.name', message: 'Recipient name missing.' },
 			{ field: 'recipient.uo95', message: 'Recipient UO 95 missing.' },
 			{ field: 'recipient.reason', message: 'Recipient reason missing.' },
-			{ field: 'recipients.value', message: 'Recipient values must equal total.' }
+			{ field: 'recipient.value', message: 'Gift value must be under $50.' }
 		])
 	);
-	expect(recipientValueText(purchase)).toBe('');
-	expect(recipientIdText(purchase)).toBe('');
+});
+
+test('reports entered recipients regardless of value', () => {
+	const purchase = {
+		...samplePurchaseRequest,
+		totalAmount: 8,
+		recipients: [
+			{
+				name: 'Sticker recipient',
+				uo95: '950000001',
+				reason: '',
+				itemDescription: 'Sticker',
+				value: 8
+			}
+		]
+	};
+
+	expect(recipientValueText(purchase)).toBe('Sticker recipient, $8.00');
+	expect(recipientIdText(purchase)).toBe('Sticker recipient, 950000001');
 });
 
 test('requires second approval only for requester purchases', () => {
 	expect(
-		validatePurchaseReadiness({ ...samplePurchase, secondApprovalFileId: null })
+		validatePurchaseReadiness({ ...samplePurchaseRequest, secondApprovalFileId: null })
 	).toContainEqual({
 		field: 'secondApprovalFileId',
 		message: 'Second approval missing.'
@@ -70,9 +87,9 @@ test('requires second approval only for requester purchases', () => {
 
 	expect(
 		validatePurchaseReadiness({
-			...samplePurchase,
+			...samplePurchaseRequest,
 			requesterIsPurchaser: false,
-			purchaser: { ...samplePurchase.purchaser, id: 'person_someone_else' },
+			purchaser: { ...samplePurchaseRequest.purchaser, id: 'person_someone_else' },
 			secondApprovalFileId: null
 		})
 	).not.toContainEqual({

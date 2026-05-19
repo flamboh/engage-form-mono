@@ -79,7 +79,7 @@
 	let reimbursementReason = $state('');
 	let businessPurposeText = $state('');
 	let businessPurposeTouched = $state(false);
-	let recipients = $state<Recipient[]>([{ name: '', uo95: '', reason: '', value: 0 }]);
+	let recipients = $state<Recipient[]>([]);
 	let receiptFileIds = $state<Id<'files'>[]>([]);
 	let secondApprovalFileId = $state<Id<'files'> | null>(null);
 	let publicityFileId = $state<Id<'files'> | null>(null);
@@ -227,7 +227,7 @@
 			receiptFileIds = draft.receiptFileIds;
 			secondApprovalFileId = draft.secondApprovalFileId;
 			publicityFileId = draft.publicityFileId;
-			recipients = draft.recipients.length === 0 ? recipients : draft.recipients;
+			recipients = draft.recipients;
 			lastOrganizationId = draft.organizationSourceId;
 			saveState = 'Draft autosaves';
 		} catch (err) {
@@ -287,9 +287,9 @@
 			vendor: vendor || '{vendor}',
 			item: itemDescription || '{item}',
 			amount: totalAmount > 0 ? money(totalAmount) : '{amount}',
-			recipient: firstRecipient?.name || '{recipient}',
-			recipientUo95: firstRecipient?.uo95 || '{recipientUo95}',
-			recipientReason: firstRecipient?.reason || '{recipientReason}',
+			recipient: firstRecipient?.name || 'N/A',
+			recipientUo95: firstRecipient?.uo95 || 'N/A',
+			recipientReason: firstRecipient?.reason || 'N/A',
 			eventName: eventName || '{eventName}',
 			eventDate: eventDate || '{eventDate}',
 			eventTime: eventTime || '{eventTime}',

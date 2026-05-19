@@ -63,7 +63,7 @@
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
 		if (idCardFrontFileId === null || idCardBackFileId === null) {
-			error = 'Upload ID front and back to continue.';
+			error = 'Upload ID card documents to continue.';
 			return;
 		}
 		error = '';
@@ -91,8 +91,8 @@
 	<header>
 		<h2 class="text-lg font-semibold">Your profile</h2>
 		<p class="mt-1 text-sm text-stone-500">
-			You're the requester on every form Engage Form fills. Add the details and ID files SOFS needs
-			once.
+			You're the requester on every form Engage Form fills. Add the details and ID card documents
+			SOFS needs once.
 		</p>
 	</header>
 
@@ -132,7 +132,7 @@
 
 	<div class="grid gap-3 md:grid-cols-2">
 		<label class="block text-sm">
-			<span class="font-medium">ID card front</span>
+			<span class="font-medium">ID card front document</span>
 			<input
 				class="mt-1 block text-sm"
 				type="file"
@@ -142,7 +142,7 @@
 			<p class="mt-1 text-xs text-stone-500">{idFrontStatus}</p>
 		</label>
 		<label class="block text-sm">
-			<span class="font-medium">ID card back</span>
+			<span class="font-medium">ID card back document</span>
 			<input
 				class="mt-1 block text-sm"
 				type="file"

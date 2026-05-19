@@ -53,7 +53,7 @@
 
 <form class="space-y-5" onsubmit={save}>
 	<header>
-		<h2 class="text-lg font-semibold">Event preset (optional)</h2>
+		<h2 class="text-lg font-semibold">Event Template (optional)</h2>
 		<p class="mt-1 text-sm text-stone-500">
 			Save a recurring event so future requests prefill name, time, and location. Skip if you don't
 			have one yet.
@@ -66,7 +66,7 @@
 
 	{#if organizations.length > 1}
 		<label class="block text-sm">
-			<span class="font-medium">Organization</span>
+			<span class="font-medium">Student Organization</span>
 			<select class="field mt-1" bind:value={organizationId}>
 				{#each organizations as org (org._id)}
 					<option value={org._id}>{org.name}</option>

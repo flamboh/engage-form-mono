@@ -9,7 +9,7 @@ export const FIELDS = [
 		label: 'Business Purpose',
 		value: 'Reimburse Oliver for the vinyl they purchased for the weekly event.'
 	},
-	{ label: 'Purchase Type', value: 'Personal Reimbursement' },
+	{ label: 'Type of Purchase', value: 'Personal Reimbursement' },
 	{ label: 'Permanent Address', value: '1395 University St, Eugene, OR 97403' },
 	{ label: 'Upload UO ID', value: 'Uploading oliver_id.jpg' },
 	{ label: 'Upload Receipt', value: 'Uploading amazon_receipt.pdf' },

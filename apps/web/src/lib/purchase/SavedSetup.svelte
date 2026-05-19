@@ -157,7 +157,7 @@
 		event.preventDefault();
 		error = '';
 		if (organizationSourceId === null || idFrontFileId === null || idBackFileId === null) {
-			error = 'Organization and ID files required.';
+			error = 'Student organization and ID card documents required.';
 			return;
 		}
 		try {
@@ -183,7 +183,7 @@
 		event.preventDefault();
 		error = '';
 		if (organizationSourceId === null) {
-			error = 'Organization required.';
+			error = 'Student organization required.';
 			return;
 		}
 		try {
@@ -212,11 +212,15 @@
 	<div class="flex items-center justify-between gap-3">
 		<h2 class="text-sm font-semibold">Setup</h2>
 		<div class="flex gap-2">
-			<button class="secondary" type="button" onclick={() => (mode = 'org')}>New org</button>
+			<button class="secondary" type="button" onclick={() => (mode = 'org')}>
+				New student organization
+			</button>
 			<button class="secondary" type="button" onclick={() => (mode = 'purchaser')}>
 				New purchaser
 			</button>
-			<button class="secondary" type="button" onclick={() => (mode = 'event')}>New event</button>
+			<button class="secondary" type="button" onclick={() => (mode = 'event')}>
+				New event template
+			</button>
 		</div>
 	</div>
 
@@ -224,7 +228,7 @@
 
 	<div class="mt-4 grid gap-4 md:grid-cols-3">
 		<label>
-			<span>Organization</span>
+			<span>Student Organization</span>
 			<select class="field" onchange={(e) => selectOrganization(e.currentTarget.value)}>
 				<option value="">Select</option>
 				{#each organizations as org (org._id)}
@@ -233,7 +237,7 @@
 			</select>
 		</label>
 		<label>
-			<span>Event</span>
+			<span>Event Template</span>
 			<select
 				class="field"
 				value={eventTemplateId ?? ''}
@@ -286,10 +290,10 @@
 
 	{#if mode === 'org'}
 		<form class="mt-4 grid gap-3 rounded-md border border-stone-200 p-3" onsubmit={createOrg}>
-			<input class="field" placeholder="Organization name" required bind:value={orgName} />
+			<input class="field" placeholder="Student organization name" required bind:value={orgName} />
 			<input class="field" placeholder="Index number" required bind:value={orgIndex} />
 			<div>
-				<span class="text-xs font-medium text-stone-500">Budget lines</span>
+				<span class="text-xs font-medium text-stone-500">Budget Line Items</span>
 				{#each orgBudgetLines as _line, i (i)}
 					<div class="mt-1 flex items-center gap-2">
 						<input class="field flex-1" required bind:value={orgBudgetLines[i]} />
@@ -303,7 +307,7 @@
 				<button class="secondary mt-2" type="button" onclick={addBudgetLine}>Add line</button>
 			</div>
 			<textarea class="field min-h-24" bind:value={orgTemplate}></textarea>
-			<button class="button" type="submit">Create organization</button>
+			<button class="button" type="submit">Create student organization</button>
 		</form>
 	{:else if mode === 'purchaser'}
 		<form class="mt-4 grid gap-3 rounded-md border border-stone-200 p-3" onsubmit={createPurchaser}>
@@ -318,12 +322,12 @@
 			/>
 			<div class="grid gap-3 md:grid-cols-2">
 				<FilePicker
-					label="ID front"
+					label="ID card front document"
 					status={idFrontFileId ? 'Uploaded' : 'Required'}
 					onFiles={(input) => uploadId('id_front', input)}
 				/>
 				<FilePicker
-					label="ID back"
+					label="ID card back document"
 					status={idBackFileId ? 'Uploaded' : 'Required'}
 					onFiles={(input) => uploadId('id_back', input)}
 				/>
@@ -336,7 +340,7 @@
 			<input class="field" placeholder="Time" required bind:value={eventTemplateTime} />
 			<input class="field" placeholder="Location" required bind:value={eventTemplateLocation} />
 			<input class="field" type="number" min="1" bind:value={eventTemplateAttendance} />
-			<button class="button" type="submit">Create event</button>
+			<button class="button" type="submit">Create event template</button>
 		</form>
 	{/if}
 </section>

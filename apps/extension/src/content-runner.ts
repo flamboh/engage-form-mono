@@ -1,4 +1,4 @@
-import type { Purchase } from '@engage-form/domain';
+import type { PurchaseRequest } from '@engage-form/domain';
 import {
 	createFillPlan,
 	detectStep,
@@ -9,11 +9,11 @@ import {
 export type ExtensionMessage =
 	| {
 			type: 'ENGAGE_FILL_READY_PURCHASE';
-			purchase: Purchase;
+			purchase: PurchaseRequest;
 	  }
 	| {
 			type: 'ENGAGE_COMPLETE_READY_PURCHASE';
-			purchase: Purchase;
+			purchase: PurchaseRequest;
 	  };
 
 export type ExtensionResponse = {
@@ -41,7 +41,7 @@ type ContentRunnerDeps = {
 	applyFillPlan(actions: FillAction[]): Promise<FillResult>;
 	clickNextStep(): boolean;
 	sendReviewReached(purchaseId: string): void;
-	loadPurchase(purchaseId: string): Promise<Purchase | null>;
+	loadPurchaseRequest(purchaseId: string): Promise<PurchaseRequest | null>;
 	loadFillRun(): FillRunState | null;
 	saveFillRun(state: FillRunState): void;
 	clearFillRun(): void;
@@ -50,9 +50,9 @@ type ContentRunnerDeps = {
 const MAX_RUN_PAGES = 16;
 
 export function createContentRunner(deps: ContentRunnerDeps) {
-	async function fillCurrentPage(purchase: Purchase): Promise<ExtensionResponse> {
+	async function fillCurrentPage(purchaseRequest: PurchaseRequest): Promise<ExtensionResponse> {
 		const step = detectStep(deps.pageHeading());
-		const plan = createFillPlan(step, purchase);
+		const plan = createFillPlan(step, purchaseRequest);
 		const result = await deps.applyFillPlan(plan.actions);
 
 		return {
@@ -64,8 +64,8 @@ export function createContentRunner(deps: ContentRunnerDeps) {
 		};
 	}
 
-	async function startFillRun(purchase: Purchase): Promise<ExtensionResponse> {
-		deps.saveFillRun({ purchaseId: purchase.id, filled: 0, pageCount: 0 });
+	async function startFillRun(purchaseRequest: PurchaseRequest): Promise<ExtensionResponse> {
+		deps.saveFillRun({ purchaseId: purchaseRequest.id, filled: 0, pageCount: 0 });
 		return continueFillRun();
 	}
 
@@ -123,19 +123,19 @@ export function createContentRunner(deps: ContentRunnerDeps) {
 			};
 		}
 
-		const purchase = await deps.loadPurchase(state.purchaseId);
-		if (purchase === null) {
+		const purchaseRequest = await deps.loadPurchaseRequest(state.purchaseId);
+		if (purchaseRequest === null) {
 			deps.clearFillRun();
 			return {
 				ok: false,
-				message: 'Selected purchase is no longer cached in the extension.',
+				message: 'Selected purchase request could not be loaded from Convex.',
 				step,
 				filled: state.filled,
 				missed: []
 			};
 		}
 
-		const result = await fillCurrentPage(purchase);
+		const result = await fillCurrentPage(purchaseRequest);
 		const filled = state.filled + result.filled;
 
 		if (result.missed.length > 0) {

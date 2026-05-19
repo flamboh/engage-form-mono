@@ -50,8 +50,10 @@
 
 <form class="space-y-5" onsubmit={save}>
 	<header>
-		<h2 class="text-lg font-semibold">Your organization</h2>
-		<p class="mt-1 text-sm text-stone-500">You can add more orgs later from the Saved page.</p>
+		<h2 class="text-lg font-semibold">Your Student Organization</h2>
+		<p class="mt-1 text-sm text-stone-500">
+			You can add more student organizations later from the Saved page.
+		</p>
 	</header>
 
 	{#if error}
@@ -59,7 +61,7 @@
 	{/if}
 
 	<label class="block text-sm">
-		<span class="font-medium">Organization name</span>
+		<span class="font-medium">Student organization name</span>
 		<input class="field mt-1" required bind:value={name} />
 	</label>
 
@@ -77,7 +79,7 @@
 	</label>
 
 	<div class="text-sm">
-		<span class="font-medium">Budget lines</span>
+		<span class="font-medium">Budget Line Items</span>
 		<p class="text-xs text-stone-500">Match the labels in your Engage budget exactly.</p>
 		<div class="mt-2 space-y-2">
 			{#each budgetLines as _line, i (i)}

@@ -139,7 +139,7 @@
 		event.preventDefault();
 		error = '';
 		if (!purchaserOrgId || idFrontFileId === null || idBackFileId === null) {
-			error = 'Organization and ID files required.';
+			error = 'Student organization and ID card documents required.';
 			return;
 		}
 		try {
@@ -167,7 +167,7 @@
 		event.preventDefault();
 		error = '';
 		if (!eventOrgId) {
-			error = 'Organization required.';
+			error = 'Student organization required.';
 			return;
 		}
 		try {
@@ -233,9 +233,14 @@
 
 			<div class="grid gap-6 lg:grid-cols-3">
 				<section class="rounded-lg border border-stone-200 bg-white p-5">
-					<h2 class="text-sm font-semibold">Organizations</h2>
+					<h2 class="text-sm font-semibold">Student Organizations</h2>
 					<form class="mt-4 space-y-3" onsubmit={saveOrg}>
-						<input class="field" placeholder="Name" required bind:value={orgName} />
+						<input
+							class="field"
+							placeholder="Student organization name"
+							required
+							bind:value={orgName}
+						/>
 						<input class="field" placeholder="Index number" required bind:value={orgIndex} />
 						<select class="field" bind:value={orgFund}>
 							<option>I</option><option>E</option><option>G</option><option>N</option><option
@@ -243,7 +248,7 @@
 							><option>D</option><option>T</option>
 						</select>
 						<div>
-							<span class="text-xs font-medium text-stone-500">Budget lines</span>
+							<span class="text-xs font-medium text-stone-500">Budget Line Items</span>
 							{#each orgBudgetLines as _line, i (i)}
 								<div class="mt-1 flex items-center gap-2">
 									<input class="field flex-1" required bind:value={orgBudgetLines[i]} />
@@ -259,7 +264,7 @@
 							>
 						</div>
 						<textarea class="field min-h-32" bind:value={orgTemplate}></textarea>
-						<button class="button" type="submit">Save organization</button>
+						<button class="button" type="submit">Save student organization</button>
 					</form>
 					<ul class="mt-5 divide-y divide-stone-200">
 						{#each savedData?.organizations ?? [] as org (org._id)}
@@ -288,7 +293,7 @@
 					<p class="mt-1 text-xs text-stone-500">Other people who paid (not you).</p>
 					<form class="mt-4 space-y-3" onsubmit={savePurchaser}>
 						<select class="field" bind:value={purchaserOrgId}>
-							<option value="">Organization</option>
+							<option value="">Student Organization</option>
 							{#each savedData?.organizations ?? [] as org (org._id)}
 								<option value={org._id}>{org.name}</option>
 							{/each}
@@ -303,7 +308,7 @@
 							bind:value={purchaserAddress}
 						/>
 						<label class="block text-xs font-medium text-stone-500">
-							ID front
+							ID card front document
 							<input
 								class="mt-1 block text-sm"
 								type="file"
@@ -311,7 +316,7 @@
 							/>
 						</label>
 						<label class="block text-xs font-medium text-stone-500">
-							ID back
+							ID card back document
 							<input
 								class="mt-1 block text-sm"
 								type="file"
@@ -347,10 +352,10 @@
 				</section>
 
 				<section class="rounded-lg border border-stone-200 bg-white p-5">
-					<h2 class="text-sm font-semibold">Event presets</h2>
+					<h2 class="text-sm font-semibold">Event Templates</h2>
 					<form class="mt-4 space-y-3" onsubmit={saveEvent}>
 						<select class="field" bind:value={eventOrgId}>
-							<option value="">Organization</option>
+							<option value="">Student Organization</option>
 							{#each savedData?.organizations ?? [] as org (org._id)}
 								<option value={org._id}>{org.name}</option>
 							{/each}
@@ -359,7 +364,7 @@
 						<input class="field" placeholder="Time" required bind:value={eventTime} />
 						<input class="field" placeholder="Location" required bind:value={eventLocation} />
 						<input class="field" type="number" min="1" bind:value={eventAttendance} />
-						<button class="button" type="submit">Save event</button>
+						<button class="button" type="submit">Save event template</button>
 					</form>
 					<ul class="mt-5 divide-y divide-stone-200">
 						{#each savedData?.eventPresets ?? [] as eventPreset (eventPreset._id)}

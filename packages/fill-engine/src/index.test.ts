@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { samplePurchase } from '../../domain/src/index.ts';
-import { createFillPlan, detectStep, rtpSchema } from './index.ts';
+import { samplePurchaseRequest } from '../../domain/src/index.ts';
+import { createFillPlan, detectStep, engageSchema } from './index.ts';
 
 test('detects Engage steps by heading', () => {
 	expect(detectStep('SOFS Request Organization Representation')).toBe('organizationRepresentation');
@@ -10,8 +10,8 @@ test('detects Engage steps by heading', () => {
 	expect(detectStep('SOFS Request to Purchase Goods or Services 2025-26')).toBe('formStart');
 });
 
-test('defines expected RTP steps', () => {
-	expect(rtpSchema.map((step) => step.step)).toEqual([
+test('defines expected Engage steps', () => {
+	expect(engageSchema.map((step) => step.step)).toEqual([
 		'organizationRepresentation',
 		'purposeInstructions',
 		'about',
@@ -29,7 +29,7 @@ test('defines expected RTP steps', () => {
 });
 
 test('creates organization representation fill plan', () => {
-	const plan = createFillPlan('organizationRepresentation', samplePurchase);
+	const plan = createFillPlan('organizationRepresentation', samplePurchaseRequest);
 
 	expect(plan.actions).toEqual([
 		{
@@ -41,7 +41,7 @@ test('creates organization representation fill plan', () => {
 });
 
 test('creates about-page fill plan', () => {
-	const plan = createFillPlan('about', samplePurchase);
+	const plan = createFillPlan('about', samplePurchaseRequest);
 
 	expect(plan.actions).toContainEqual({
 		type: 'text',
@@ -51,16 +51,16 @@ test('creates about-page fill plan', () => {
 	expect(plan.actions).toContainEqual({
 		type: 'text',
 		labelIncludes: "Requestor's first and last name",
-		value: samplePurchase.requester.name
+		value: samplePurchaseRequest.requester.name
 	});
 });
 
 test('uses purchaser data for reimbursement fields', () => {
 	const purchase = {
-		...samplePurchase,
+		...samplePurchaseRequest,
 		requesterIsPurchaser: false,
 		purchaser: {
-			...samplePurchase.purchaser,
+			...samplePurchaseRequest.purchaser,
 			id: 'person_buyer',
 			name: 'Different Buyer',
 			uo95: '950000001',
@@ -83,42 +83,52 @@ test('uses purchaser data for reimbursement fields', () => {
 });
 
 test('creates upload fill plans', () => {
-	const reimbursement = createFillPlan('reimbursement', samplePurchase);
+	const reimbursement = createFillPlan('reimbursement', samplePurchaseRequest);
 	expect(reimbursement.actions).toContainEqual({
 		type: 'file',
 		labelIncludes: 'UO ID CARD',
 		files: [
-			samplePurchase.files.find((file) => file.id === samplePurchase.purchaser.idCardFrontFileId)
+			samplePurchaseRequest.documents.find(
+				(document) => document.id === samplePurchaseRequest.purchaser.idCardFrontFileId
+			)
 		]
 	});
 	expect(reimbursement.actions).toContainEqual({
 		type: 'file',
 		labelIncludes: 'UO ID CARD : Optional second upload',
 		files: [
-			samplePurchase.files.find((file) => file.id === samplePurchase.purchaser.idCardBackFileId)
+			samplePurchaseRequest.documents.find(
+				(document) => document.id === samplePurchaseRequest.purchaser.idCardBackFileId
+			)
 		]
 	});
 	expect(reimbursement.actions).toContainEqual({
 		type: 'file',
 		labelIncludes: 'itemized receipt',
-		files: samplePurchase.files.filter((file) => file.id === samplePurchase.receiptFileIds[0])
+		files: samplePurchaseRequest.documents.filter(
+			(document) => document.id === samplePurchaseRequest.receiptFileIds[0]
+		)
 	});
 
-	expect(createFillPlan('selfApproval', samplePurchase).actions).toEqual([
-		{
-			type: 'file',
-			labelIncludes: 'upload',
-			files: [samplePurchase.files.find((file) => file.id === samplePurchase.secondApprovalFileId)]
-		}
-	]);
-
-	expect(createFillPlan('publicity', samplePurchase).actions).toEqual([
+	expect(createFillPlan('selfApproval', samplePurchaseRequest).actions).toEqual([
 		{
 			type: 'file',
 			labelIncludes: 'upload',
 			files: [
-				samplePurchase.files.find(
-					(file) => file.id === samplePurchase.eventDetails.publicityProofFileId
+				samplePurchaseRequest.documents.find(
+					(document) => document.id === samplePurchaseRequest.secondApprovalFileId
+				)
+			]
+		}
+	]);
+
+	expect(createFillPlan('publicity', samplePurchaseRequest).actions).toEqual([
+		{
+			type: 'file',
+			labelIncludes: 'upload',
+			files: [
+				samplePurchaseRequest.documents.find(
+					(document) => document.id === samplePurchaseRequest.eventDetails.publicityProofFileId
 				)
 			]
 		}
@@ -128,28 +138,30 @@ test('creates upload fill plans', () => {
 test('skips self approval upload when requester is not purchaser', () => {
 	expect(
 		createFillPlan('selfApproval', {
-			...samplePurchase,
+			...samplePurchaseRequest,
 			requesterIsPurchaser: false,
 			secondApprovalFileId: null
 		}).actions
 	).toEqual([
 		{
 			type: 'stop',
-			message: 'No upload required for this purchase.'
+			message: 'No document required for this purchase request.'
 		}
 	]);
 });
 
 test('creates separate upload actions for additional receipts', () => {
-	const firstReceipt = samplePurchase.files.find((file) => file.id === 'file_receipt');
+	const firstReceipt = samplePurchaseRequest.documents.find(
+		(document) => document.id === 'file_receipt'
+	);
 	if (firstReceipt === undefined) throw new Error('Sample receipt missing.');
 
 	const secondReceipt = { ...firstReceipt, id: 'file_receipt_2', filename: 'receipt_2.jpg' };
 	const thirdReceipt = { ...firstReceipt, id: 'file_receipt_3', filename: 'receipt_3.jpg' };
 	const purchase = {
-		...samplePurchase,
+		...samplePurchaseRequest,
 		receiptFileIds: [firstReceipt.id, secondReceipt.id, thirdReceipt.id],
-		files: [...samplePurchase.files, secondReceipt, thirdReceipt]
+		documents: [...samplePurchaseRequest.documents, secondReceipt, thirdReceipt]
 	};
 
 	const plan = createFillPlan('reimbursement', purchase);

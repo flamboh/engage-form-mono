@@ -6,8 +6,13 @@
 	"action": {
 		"default_popup": "index.html"
 	},
-	"permissions": ["activeTab", "scripting", "storage"],
-	"host_permissions": ["https://*.convex.cloud/*", "https://*.convex.site/*", "http://localhost/*"],
+	"permissions": ["activeTab", "cookies", "scripting", "storage"],
+	"host_permissions": [
+		"https://*.convex.cloud/*",
+		"https://*.convex.site/*",
+		"https://*.clerk.accounts.dev/*",
+		"http://localhost/*"
+	],
 	"background": {
 		"service_worker": "background.js",
 		"type": "module"

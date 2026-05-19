@@ -1,253 +1,258 @@
 import './style.css';
-import { ConvexHttpClient } from 'convex/browser';
-import type { Purchase } from '@engage-form/domain';
+import { ConvexClient } from 'convex/browser';
 import { api } from '../../../convex/_generated/api.js';
 import type { Id } from '../../../convex/_generated/dataModel.js';
-import { EXTENSION_TOKEN_KEY, READY_PURCHASE_KEY, readyPurchaseSummary } from './storage.ts';
+import type { ExtensionResponse } from './content-runner.ts';
 
-type RecentPurchase = {
-	id: string;
+type ReadyPurchaseRequest = {
+	id: Id<'purchaseRequests'>;
 	status: 'ready';
 	organization: string;
 	purchaser: string;
 	itemDescription: string;
 	totalAmount: number;
+	updatedAt: number;
 	lastFilledAt: number | null;
 };
 
+type RuntimeMessage =
+	| { type: 'ENGAGE_START_FILL'; purchaseId: string }
+	| { type: 'ENGAGE_AUTH_STATE' }
+	| { type: 'ENGAGE_GET_CONVEX_TOKEN' }
+	| { type: 'ENGAGE_SIGN_OUT' };
+
+type AuthStateResponse = { ok: true; signedIn: boolean; email: string | null } | ErrorResponse;
+type TokenResponse = { ok: true; token: string | null } | ErrorResponse;
+type SignOutResponse = { ok: true; message: string } | ErrorResponse;
+type ErrorResponse = { ok: false; message: string };
+
 type ChromeRuntime = {
-	scripting: {
-		executeScript(injection: ScriptInjection, callback?: () => void): void;
-	};
-	tabs: {
-		query(
-			queryInfo: { active: boolean; currentWindow: boolean },
-			callback: (tabs: { id?: number }[]) => void
-		): void;
-		sendMessage(
-			tabId: number,
-			message: ExtensionMessage,
-			callback?: (response: ExtensionResponse) => void
-		): void;
-	};
 	runtime: {
 		lastError?: { message: string };
+		sendMessage(
+			message: RuntimeMessage,
+			callback: (
+				response: ExtensionResponse | AuthStateResponse | TokenResponse | SignOutResponse
+			) => void
+		): void;
 	};
-	storage: {
-		local: {
-			get(
-				keys: string[],
-				callback: (
-					items: Partial<
-						Record<typeof READY_PURCHASE_KEY, Purchase> & Record<typeof EXTENSION_TOKEN_KEY, string>
-					>
-				) => void
-			): void;
-			set(
-				items: Partial<
-					Record<typeof READY_PURCHASE_KEY, Purchase> & Record<typeof EXTENSION_TOKEN_KEY, string>
-				>,
-				callback?: () => void
-			): void;
-		};
+	tabs: {
+		create(createProperties: { url: string }): void;
 	};
-};
-
-type ScriptInjection = { target: { tabId: number }; files: string[] };
-
-type ExtensionMessage = {
-	type: 'ENGAGE_COMPLETE_READY_PURCHASE';
-	purchase: Purchase;
-};
-
-type ExtensionResponse = {
-	ok: boolean;
-	message: string;
-	step: string;
-	filled: number;
-	missed: string[];
 };
 
 declare const chrome: ChromeRuntime;
 
-const convex = new ConvexHttpClient(readConvexUrl());
 const app = document.querySelector<HTMLDivElement>('#app');
-let token = '';
-let recentPurchases: RecentPurchase[] = [];
-let readyPurchase: Purchase | null = null;
-
 if (app === null) throw new Error('App root missing.');
 
-load();
+const webAppUrl = readWebAppUrl();
+const convex = new ConvexClient(readConvexUrl());
 
-function render(status = '') {
-	const summary = readyPurchase === null ? null : readyPurchaseSummary(readyPurchase);
-	app!.innerHTML = `
-    <main class="popup">
-      <section class="head">
-        <div>
-          <p>Engage Form</p>
-          <h1>${token ? 'Recent purchases' : 'Link extension'}</h1>
-        </div>
-        <strong class="${summary ? 'ready' : 'draft'}">${summary ? 'Selected' : 'Sync'}</strong>
-      </section>
+let readyPurchaseRequests: ReadyPurchaseRequest[] = [];
+let statusMessage = 'Loading...';
+let signedIn = false;
+let signedInEmail: string | null = null;
+let signedOutStatusMessage =
+	'OAuth opens in the browser, then this popup uses the synced Clerk session.';
+let unsubscribeReady: { unsubscribe(): void } | null = null;
 
-      ${
-				token
-					? `
-            <section class="purchase">
-              <h2>${summary?.title ?? 'No purchase selected'}</h2>
-              <dl>
-                <div><dt>Org</dt><dd>${summary?.org ?? '-'}</dd></div>
-                <div><dt>Amount</dt><dd>${summary?.amount ?? '-'}</dd></div>
-                <div><dt>Event</dt><dd>${summary?.event ?? '-'}</dd></div>
-                <div><dt>Recipient</dt><dd>${summary?.recipient ?? '-'}</dd></div>
-              </dl>
-            </section>
-            <section class="purchase-list">
-              ${recentPurchases
-								.map(
-									(purchase) => `
-                    <button class="purchase-row ${purchase.lastFilledAt === null ? 'ready' : 'filled'}" data-purchase-id="${purchase.id}" type="button">
-                      <span>${purchase.organization}</span>
-                      <strong>${purchase.itemDescription || 'Untitled'}</strong>
-                      <small>${purchase.purchaser} · ${money(purchase.totalAmount)} · ${purchase.lastFilledAt === null ? 'ready' : 'review reached before'}</small>
-                    </button>
-                  `
-								)
-								.join('')}
-            </section>
-            <button id="refresh" type="button">Refresh</button>
-          `
-					: `
-            <textarea id="token" placeholder="Paste device token"></textarea>
-            <button id="connect" type="button">Connect</button>
-          `
-			}
-      <p id="status">${status}</p>
-    </main>
-  `;
+convex.setAuth(requestConvexToken);
 
-	document.querySelector('#connect')?.addEventListener('click', connect);
-	document.querySelector('#refresh')?.addEventListener('click', () => void refresh());
-	document.querySelectorAll<HTMLButtonElement>('[data-purchase-id]').forEach((button) => {
-		button.addEventListener('click', () => void selectAndFill(button.dataset.purchaseId ?? ''));
-	});
+void refreshAuthState().catch((error: unknown) => {
+	signedOutStatusMessage = error instanceof Error ? error.message : String(error);
+	render();
+});
+
+document.addEventListener('visibilitychange', () => {
+	if (document.visibilityState === 'visible') void refreshAuthState();
+});
+
+function subscribeReadyPurchases() {
+	if (unsubscribeReady !== null) return;
+	statusMessage = 'Loading...';
+	unsubscribeReady = convex.onUpdate(
+		api.authed.extension.listReadyPurchases,
+		{},
+		(purchases) => {
+			readyPurchaseRequests = purchases;
+			statusMessage =
+				purchases.length === 0
+					? 'No ready purchase requests yet.'
+					: 'Select a purchase request to fill.';
+			render();
+		},
+		(error) => {
+			statusMessage = error.message;
+			render();
+		}
+	);
 }
 
-function load() {
-	chrome.storage.local.get([READY_PURCHASE_KEY, EXTENSION_TOKEN_KEY], (items) => {
-		token = items[EXTENSION_TOKEN_KEY] ?? '';
-		readyPurchase = items[READY_PURCHASE_KEY] ?? null;
-		render(token ? 'Syncing...' : 'Create a token in the web app.');
-		if (token) void refresh();
-	});
+function clearReadySubscription() {
+	unsubscribeReady?.unsubscribe();
+	unsubscribeReady = null;
 }
 
-function connect() {
-	const input = document.querySelector<HTMLTextAreaElement>('#token');
-	token = input?.value.trim() ?? '';
-	if (!token) {
-		render('Paste a token first.');
+function render() {
+	if (!signedIn) {
+		app!.innerHTML = `
+			<main class="popup">
+				<section class="head">
+					<div>
+						<p>Engage Form</p>
+						<h1>Sign in</h1>
+					</div>
+					<strong class="draft">Auth</strong>
+				</section>
+				<div class="actions">
+					<button id="sign-in-web" type="button">Sign in on web</button>
+				</div>
+				<p id="status">${escapeHtml(signedOutStatusMessage)}</p>
+			</main>
+		`;
+		document.querySelector('#sign-in-web')?.addEventListener('click', () => {
+			signedOutStatusMessage = 'Finish sign-in in the browser, then reopen this popup.';
+			render();
+			chrome.tabs.create({ url: `${webAppUrl}/app` });
+		});
 		return;
 	}
-	chrome.storage.local.set({ [EXTENSION_TOKEN_KEY]: token }, () => {
-		void refresh();
+
+	app!.innerHTML = `
+		<main class="popup">
+			<section class="head">
+				<div>
+					<p>Engage Form</p>
+					<h1>Ready requests</h1>
+				</div>
+				<strong class="ready">Live</strong>
+			</section>
+			<section class="purchase-list">
+				${
+					readyPurchaseRequests.length === 0
+						? '<p class="empty">No ready purchase requests.</p>'
+						: readyPurchaseRequests.map(purchaseButton).join('')
+				}
+			</section>
+			<div class="actions">
+				<button id="open-web" class="secondary" type="button">Open web app</button>
+				<button id="sign-out" class="secondary" type="button">Sign out</button>
+			</div>
+			<p id="status">${escapeHtml(statusMessage)}</p>
+			${signedInEmail === null ? '' : `<p class="muted">${escapeHtml(signedInEmail)}</p>`}
+		</main>
+	`;
+
+	document.querySelector('#sign-out')?.addEventListener('click', () => {
+		void signOut();
+	});
+	document.querySelector('#open-web')?.addEventListener('click', () => {
+		chrome.tabs.create({ url: `${webAppUrl}/app` });
+	});
+	document.querySelectorAll<HTMLButtonElement>('[data-purchase-id]').forEach((button) => {
+		button.addEventListener('click', () => void fillPurchase(button.dataset.purchaseId ?? ''));
 	});
 }
 
-async function refresh() {
-	recentPurchases = (await convex.query(api.extension.listRecentPurchases, {
-		token
-	})) as RecentPurchase[];
-	render(recentPurchases.length === 0 ? 'No ready purchases yet.' : 'Select a purchase to fill.');
+function purchaseButton(purchase: ReadyPurchaseRequest) {
+	return `
+		<button class="purchase-row ${purchase.lastFilledAt === null ? 'ready' : 'filled'}" data-purchase-id="${purchase.id}" type="button">
+			<span>${escapeHtml(purchase.organization)}</span>
+			<strong>${escapeHtml(purchase.itemDescription || 'Untitled')}</strong>
+			<small>${escapeHtml(purchase.purchaser)} · ${money(purchase.totalAmount)} · ${
+				purchase.lastFilledAt === null ? 'ready' : 'review reached before'
+			}</small>
+		</button>
+	`;
 }
 
-async function selectAndFill(purchaseId: string) {
-	render('Fetching purchase...');
-	const purchase = (await convex.query(api.extension.getPurchaseForFill, {
-		token,
-		id: purchaseId as Id<'purchaseRequests'>
-	})) as unknown as Purchase;
-	readyPurchase = await prepareFiles(purchase);
-	chrome.storage.local.set({ [READY_PURCHASE_KEY]: readyPurchase }, () => {
-		fillSelectedPurchase();
-	});
+async function fillPurchase(purchaseId: string) {
+	statusMessage = 'Checking current tab...';
+	render();
+	const response = await sendStartFill(purchaseId);
+	const missed = response.missed.length > 0 ? ` Missed: ${response.missed.join(', ')}.` : '';
+	statusMessage = `${response.message} Step: ${response.step}. Filled: ${response.filled}.${missed}`;
+	render();
 }
 
-async function prepareFiles(purchase: Purchase): Promise<Purchase> {
-	return {
-		...purchase,
-		files: await Promise.all(
-			purchase.files.map(async (file) => {
-				if (!file.url) return file;
-				const response = await fetch(file.url);
-				const blob = await response.blob();
-				return { ...file, dataUrl: await blobToDataUrl(blob) };
-			})
-		)
-	};
-}
-
-function fillSelectedPurchase() {
-	if (readyPurchase === null) return;
-	render('Checking current tab...');
-	chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-		const tabId = tabs[0]?.id;
-		if (tabId === undefined || readyPurchase === null) {
-			render('No active tab.');
-			return;
-		}
-		fillActiveTab(
-			tabId,
-			{ type: 'ENGAGE_COMPLETE_READY_PURCHASE', purchase: readyPurchase },
-			false
-		);
-	});
-}
-
-function fillActiveTab(tabId: number, message: ExtensionMessage, injected: boolean) {
-	chrome.tabs.sendMessage(tabId, message, (response) => {
-		if (chrome.runtime.lastError !== undefined) {
-			if (injected) {
-				render('Open the Engage form first.');
+function sendStartFill(purchaseId: string) {
+	return new Promise<ExtensionResponse>((resolve) => {
+		chrome.runtime.sendMessage({ type: 'ENGAGE_START_FILL', purchaseId }, (response) => {
+			const error = chrome.runtime.lastError;
+			if (error !== undefined) {
+				resolve({
+					ok: false,
+					message: error.message,
+					step: 'unknown',
+					filled: 0,
+					missed: []
+				});
 				return;
 			}
-			injectContentScript(tabId, message);
-			return;
-		}
-		const missed = response.missed.length > 0 ? ` Missed: ${response.missed.join(', ')}.` : '';
-		render(`${response.message} Step: ${response.step}. Filled: ${response.filled}.${missed}`);
+			resolve(response as ExtensionResponse);
+		});
 	});
 }
 
-function injectContentScript(tabId: number, message: ExtensionMessage) {
-	chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }, () => {
-		if (chrome.runtime.lastError !== undefined) {
-			render('Open the Engage form first.');
-			return;
-		}
-		fillActiveTab(tabId, message, true);
-	});
+async function refreshAuthState() {
+	const response = await sendRuntimeMessage<AuthStateResponse>({ type: 'ENGAGE_AUTH_STATE' });
+	if (!response.ok) throw new Error(response.message);
+
+	signedIn = response.signedIn;
+	signedInEmail = response.email;
+
+	if (!signedIn) {
+		clearReadySubscription();
+		readyPurchaseRequests = [];
+	}
+
+	render();
+	if (signedIn) subscribeReadyPurchases();
 }
 
-function blobToDataUrl(blob: Blob) {
-	return new Promise<string>((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => {
-			if (typeof reader.result !== 'string') {
-				reject(new Error('File could not be encoded.'));
+async function requestConvexToken() {
+	const response = await sendRuntimeMessage<TokenResponse>({ type: 'ENGAGE_GET_CONVEX_TOKEN' });
+	if (!response.ok) throw new Error(response.message);
+	return response.token;
+}
+
+async function signOut() {
+	statusMessage = 'Signing out...';
+	render();
+	const response = await sendRuntimeMessage<SignOutResponse>({ type: 'ENGAGE_SIGN_OUT' });
+	if (!response.ok) {
+		statusMessage = response.message;
+		render();
+		return;
+	}
+	await refreshAuthState();
+}
+
+function sendRuntimeMessage<Response>(message: RuntimeMessage) {
+	return new Promise<Response>((resolve, reject) => {
+		chrome.runtime.sendMessage(message, (response) => {
+			const error = chrome.runtime.lastError;
+			if (error !== undefined) {
+				reject(new Error(error.message));
 				return;
 			}
-			resolve(reader.result);
-		};
-		reader.onerror = () => reject(reader.error);
-		reader.readAsDataURL(blob);
+			resolve(response as Response);
+		});
 	});
 }
 
 function money(value: number) {
 	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+function escapeHtml(value: string) {
+	return value
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('"', '&quot;')
+		.replaceAll("'", '&#39;');
 }
 
 function readConvexUrl() {
@@ -256,4 +261,12 @@ function readConvexUrl() {
 		throw new Error('Missing PUBLIC_CONVEX_URL for extension.');
 	}
 	return env;
+}
+
+function readWebAppUrl() {
+	const env = import.meta.env.PUBLIC_WEB_APP_URL ?? 'http://localhost:3676';
+	if (typeof env !== 'string' || env.trim() === '') {
+		throw new Error('Missing PUBLIC_WEB_APP_URL for extension.');
+	}
+	return env.replace(/\/$/, '');
 }

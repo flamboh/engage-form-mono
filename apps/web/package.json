@@ -17,6 +17,7 @@
 	"dependencies": {
 		"@clerk/backend": "^3.4.9",
 		"@clerk/clerk-js": "^6.11.1",
+		"@clerk/ui": "^1.12.1",
 		"@effect/platform-node": "^0.106.0",
 		"convex": "^1.39.1",
 		"convex-helpers": "^0.1.118",

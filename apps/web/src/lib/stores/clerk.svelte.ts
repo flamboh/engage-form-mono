@@ -1,4 +1,5 @@
 import { Clerk } from '@clerk/clerk-js';
+import { ui } from '@clerk/ui';
 import { env } from '$env/dynamic/public';
 import { createContext, onMount } from 'svelte';
 
@@ -45,6 +46,7 @@ class ClerkStore {
 		onMount(async () => {
 			try {
 				await this.clerk.load({
+					ui,
 					afterSignOutUrl: '/app',
 					signInForceRedirectUrl: '/app',
 					signUpForceRedirectUrl: '/app'

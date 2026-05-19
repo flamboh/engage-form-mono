@@ -42,10 +42,10 @@ export type DraftPatch = Partial<{
 	eventDate: string;
 	eventTime: string;
 	eventLocation: string;
-	eventEstimatedAttendance: number;
+	eventEstimatedAttendance: number | null;
 	vendor: string;
 	itemDescription: string;
-	totalAmount: number;
+	totalAmount: number | null;
 	budgetLineItem: string;
 	reimbursementReason: string;
 	businessPurposeText: string;
@@ -117,12 +117,13 @@ export function applyDraftPatch(
 		eventLocation: patch.eventLocation !== undefined ? patch.eventLocation : purchase.eventLocation,
 		eventEstimatedAttendance:
 			patch.eventEstimatedAttendance !== undefined
-				? patch.eventEstimatedAttendance
+				? numberInput(patch.eventEstimatedAttendance)
 				: purchase.eventEstimatedAttendance,
 		vendor: patch.vendor !== undefined ? patch.vendor : purchase.vendor,
 		itemDescription:
 			patch.itemDescription !== undefined ? patch.itemDescription : purchase.itemDescription,
-		totalAmount: patch.totalAmount !== undefined ? patch.totalAmount : purchase.totalAmount,
+		totalAmount:
+			patch.totalAmount !== undefined ? numberInput(patch.totalAmount) : purchase.totalAmount,
 		budgetLineItem:
 			patch.budgetLineItem !== undefined ? patch.budgetLineItem : purchase.budgetLineItem,
 		reimbursementReason:
@@ -154,6 +155,33 @@ export function unresolvedToken(value: string) {
 	return /\{[A-Za-z][A-Za-z0-9]*\}/.test(value);
 }
 
+export function renderBusinessPurpose(request: Doc<'purchaseRequests'>) {
+	const firstRecipient = request.recipients[0];
+	const values: Record<string, string> = {
+		org: request.studentOrganization.name || '{org}',
+		requester: request.requester.name || '{requester}',
+		purchaser: request.purchaser.name || '{purchaser}',
+		vendor: request.vendor || '{vendor}',
+		item: request.itemDescription || '{item}',
+		amount: request.totalAmount > 0 ? formatMoney(request.totalAmount) : '{amount}',
+		recipient: firstRecipient?.name || 'N/A',
+		recipientUo95: firstRecipient?.uo95 || 'N/A',
+		recipientReason: firstRecipient?.reason || 'N/A',
+		eventName: request.eventName || '{eventName}',
+		eventDate: request.eventDate || '{eventDate}',
+		eventTime: request.eventTime || '{eventTime}',
+		eventLocation: request.eventLocation || '{eventLocation}',
+		attendance:
+			request.eventEstimatedAttendance > 0
+				? request.eventEstimatedAttendance.toString()
+				: '{attendance}'
+	};
+	return Object.entries(values).reduce(
+		(text, [key, value]) => text.replaceAll(`{${key}}`, value),
+		request.studentOrganization.businessPurposeTemplate
+	);
+}
+
 export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'>) {
 	if (request.publicityFileId === null) throw new Error('Publicity proof missing.');
 
@@ -170,7 +198,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		request.secondApprovalFileId,
 		...request.receiptFileIds
 	].filter((id): id is Id<'files'> => id !== null);
-	const files = await Promise.all(fileIds.map((id) => purchaseFile(ctx, id, request.owner)));
+	const documents = await Promise.all(fileIds.map((id) => documentPayload(ctx, id, request.owner)));
 
 	return {
 		id: request._id,
@@ -189,52 +217,44 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		receiptFileIds: request.receiptFileIds,
 		secondApprovalFileId: purchaserIsSelf ? request.secondApprovalFileId : null,
 		recipients: request.recipients,
-		files
+		documents
 	};
 }
 
 export async function assertReady(ctx: Ctx, request: Doc<'purchaseRequests'>) {
-	const purchase = await assemblePurchase(ctx, request);
-	requireText(purchase.organization.name, 'Organization name missing.');
-	requireText(purchase.organization.indexNumber, 'Index number missing.');
-	if (purchase.organization.budgetLines.length === 0) throw new Error('Budget line missing.');
-	requireText(purchase.requester.name, 'Requester name missing.');
-	requireText(purchase.requester.email, 'Requester email missing.');
-	requireText(purchase.requester.phone, 'Requester phone missing.');
-	requireText(purchase.purchaser.name, 'Purchaser name missing.');
-	requireText(purchase.purchaser.uo95, 'Purchaser UO 95 missing.');
-	requireText(purchase.purchaser.permanentAddress, 'Purchaser address missing.');
-	requireText(purchase.eventDetails.name, 'Event name missing.');
-	requireText(purchase.eventDetails.date, 'Event date missing.');
-	requireText(purchase.eventDetails.time, 'Event time missing.');
-	requireText(purchase.eventDetails.location, 'Event location missing.');
-	if (purchase.eventDetails.estimatedAttendance <= 0) {
+	const purchaseRequest = await assemblePurchase(ctx, request);
+	requireText(purchaseRequest.organization.name, 'Student organization name missing.');
+	requireText(purchaseRequest.organization.indexNumber, 'Index number missing.');
+	if (purchaseRequest.organization.budgetLines.length === 0)
+		throw new Error('Budget line missing.');
+	requireText(purchaseRequest.requester.name, 'Requester name missing.');
+	requireText(purchaseRequest.requester.email, 'Requester email missing.');
+	requireText(purchaseRequest.requester.phone, 'Requester phone missing.');
+	requireText(purchaseRequest.purchaser.name, 'Purchaser name missing.');
+	requireText(purchaseRequest.purchaser.uo95, 'Purchaser UO 95 missing.');
+	requireText(purchaseRequest.purchaser.permanentAddress, 'Purchaser address missing.');
+	requireText(purchaseRequest.eventDetails.name, 'Event name missing.');
+	requireText(purchaseRequest.eventDetails.date, 'Event date missing.');
+	requireText(purchaseRequest.eventDetails.time, 'Event time missing.');
+	requireText(purchaseRequest.eventDetails.location, 'Event location missing.');
+	if (purchaseRequest.eventDetails.estimatedAttendance <= 0) {
 		throw new Error('Estimated attendance missing.');
 	}
-	requireText(purchase.vendor, 'Vendor missing.');
-	requireText(purchase.itemDescription, 'Item description missing.');
-	requireText(purchase.budgetLineItem, 'Budget line item missing.');
-	requireText(purchase.reimbursementReason, 'Reimbursement reason missing.');
-	requireText(purchase.businessPurposeText, 'Business purpose missing.');
-	if (unresolvedToken(purchase.businessPurposeText)) {
+	requireText(purchaseRequest.vendor, 'Vendor missing.');
+	requireText(purchaseRequest.itemDescription, 'Item description missing.');
+	requireText(purchaseRequest.budgetLineItem, 'Budget line item missing.');
+	requireText(purchaseRequest.reimbursementReason, 'Reimbursement reason missing.');
+	requireText(purchaseRequest.businessPurposeText, 'Business purpose missing.');
+	if (unresolvedToken(purchaseRequest.businessPurposeText)) {
 		throw new Error('Business purpose has unresolved variables.');
 	}
-	if (purchase.totalAmount <= 0) throw new Error('Total amount must be greater than zero.');
-	if (purchase.receiptFileIds.length === 0) throw new Error('Receipt missing.');
-	if (purchase.receiptFileIds.length > 3) throw new Error('Receipts are limited to three.');
-	const enteredRecipients = purchase.recipients.filter((recipient) => recipient.value > 0);
-	if (enteredRecipients.length === 0) throw new Error('Recipient missing.');
-
-	for (const recipient of enteredRecipients) {
-		if (recipient.value >= 50) throw new Error('Recipient value must be under $50.');
-		if (recipient.value < 10) continue;
-		requireText(recipient.name, 'Recipient name missing.');
-		requireText(recipient.uo95, 'Recipient UO 95 missing.');
-		requireText(recipient.reason, 'Recipient reason missing.');
-	}
+	if (purchaseRequest.totalAmount <= 0) throw new Error('Total amount must be greater than zero.');
+	if (purchaseRequest.receiptFileIds.length === 0) throw new Error('Receipt document missing.');
+	if (purchaseRequest.receiptFileIds.length > 3)
+		throw new Error('Receipt documents are limited to three.');
 }
 
-async function purchaseFile(ctx: Ctx, id: Id<'files'>, owner: string) {
+async function documentPayload(ctx: Ctx, id: Id<'files'>, owner: string) {
 	const doc = await requireOwnedDoc(ctx, 'files', id, owner);
 	return {
 		id: doc._id,
@@ -311,4 +331,12 @@ function eventDetailsPayload(request: Doc<'purchaseRequests'>, publicityFileId: 
 		estimatedAttendance: request.eventEstimatedAttendance,
 		publicityProofFileId: publicityFileId
 	};
+}
+
+function numberInput(value: number | null) {
+	return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function formatMoney(value: number) {
+	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }

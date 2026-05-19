@@ -31,7 +31,7 @@
 </script>
 
 <section class="panel">
-	<h2>Purchase</h2>
+	<h2>Purchase Request</h2>
 	<div class="grid gap-4 md:grid-cols-2">
 		<label>
 			<span>Event name</span>

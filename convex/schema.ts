@@ -151,16 +151,5 @@ export default defineSchema({
 	})
 		.index('by_owner_and_status_and_updatedAt', ['owner', 'status', 'updatedAt'])
 		.index('by_owner_and_status', ['owner', 'status'])
-		.index('by_owner', ['owner']),
-	extensionSessions: defineTable({
-		owner: v.string(),
-		tokenHash: v.string(),
-		name: v.string(),
-		createdAt: v.number(),
-		lastUsedAt: v.union(v.number(), v.null()),
-		revokedAt: v.union(v.number(), v.null())
-	})
-		.index('by_tokenHash', ['tokenHash'])
-		.index('by_owner_and_revokedAt', ['owner', 'revokedAt'])
 		.index('by_owner', ['owner'])
 });

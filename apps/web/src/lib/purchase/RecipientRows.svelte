@@ -50,14 +50,6 @@
 					<button class="secondary" type="button" onclick={() => removeRecipient(index)}
 						>Remove</button
 					>
-					{#if recipient.value > 0 && recipient.value < 10}
-						<p
-							class="recipient-note"
-							title="SOFS guidelines do not require recipient details for gifts under $10."
-						>
-							Recipient details are optional for gifts under $10.
-						</p>
-					{/if}
 				</div>
 			</div>
 		{/each}
@@ -120,12 +112,5 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
 		gap: 0.5rem;
-	}
-
-	.recipient-note {
-		grid-column: 1 / -1;
-		color: rgb(87 83 78);
-		font-size: 0.75rem;
-		line-height: 1.25;
 	}
 </style>

@@ -1,62 +1,12 @@
-import type { Purchase } from '@engage-form/domain';
+import type { PurchaseRequest } from '@engage-form/domain';
 
-export const READY_PURCHASE_KEY = 'readyPurchase';
-export const EXTENSION_TOKEN_KEY = 'extensionToken';
-
-export type ReadyPurchaseStore = {
-	local: {
-		get(
-			keys: string[],
-			callback: (
-				items: Partial<
-					Record<typeof READY_PURCHASE_KEY, Purchase> & Record<typeof EXTENSION_TOKEN_KEY, string>
-				>
-			) => void
-		): void;
-		set(
-			items: Partial<
-				Record<typeof READY_PURCHASE_KEY, Purchase> & Record<typeof EXTENSION_TOKEN_KEY, string>
-			>,
-			callback?: () => void
-		): void;
-	};
-};
-
-export function readyPurchaseSummary(purchase: Purchase) {
-	const [recipient] = purchase.recipients;
+export function readyPurchaseRequestSummary(purchaseRequest: PurchaseRequest) {
+	const [recipient] = purchaseRequest.recipients;
 	return {
-		title: purchase.itemDescription,
-		org: purchase.organization.name,
-		amount: `$${purchase.totalAmount.toFixed(2)}`,
-		event: `${purchase.eventDetails.date}, ${purchase.eventDetails.time}`,
+		title: purchaseRequest.itemDescription,
+		org: purchaseRequest.organization.name,
+		amount: `$${purchaseRequest.totalAmount.toFixed(2)}`,
+		event: `${purchaseRequest.eventDetails.date}, ${purchaseRequest.eventDetails.time}`,
 		recipient: recipient?.name ?? 'No recipient'
 	};
-}
-
-export function parseReadyPurchaseJson(json: string): Purchase | null {
-	try {
-		const value: unknown = JSON.parse(json);
-		if (!isReadyPurchase(value)) return null;
-		return value;
-	} catch {
-		return null;
-	}
-}
-
-function isReadyPurchase(value: unknown): value is Purchase {
-	if (!isRecord(value)) return false;
-	return (
-		typeof value.id === 'string' &&
-		typeof value.itemDescription === 'string' &&
-		typeof value.totalAmount === 'number' &&
-		Array.isArray(value.files) &&
-		isRecord(value.organization) &&
-		isRecord(value.purchaser) &&
-		isRecord(value.eventDetails) &&
-		Array.isArray(value.recipients)
-	);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null;
 }

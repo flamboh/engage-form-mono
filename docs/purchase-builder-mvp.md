@@ -1,10 +1,10 @@
-# Purchase Builder MVP
+# Purchase Request Builder MVP
 
 ## Product Shape
 
-The web app is the canonical purchase builder. Engage is an implementation detail.
+The web app is the canonical purchase request builder. Engage is an implementation detail.
 
-Users complete one simpler, authenticated form for the supported event prize reimbursement flow. The extension syncs with Convex, lists recent ready purchases, and fills Engage from the selected purchase. The extension never submits the final Engage form.
+Users complete one simpler, authenticated form for the supported event prize reimbursement flow. The extension syncs with Convex, lists recent ready purchase requests, and fills Engage from the selected purchase request. The extension never submits the final Engage form.
 
 ## Scope
 
@@ -20,9 +20,9 @@ First supported template:
 
 Out of scope:
 
-- Multiple RTP templates
-- Organization sharing
-- Reusable non-ID request files
+- Multiple Engage form templates
+- Student Organization sharing
+- Reusable non-ID request documents
 - Purchaser permission uploads
 - Manual Engage-facing assumptions in the builder UI
 - Extension submission
@@ -31,58 +31,53 @@ Out of scope:
 
 - `/app`: dashboard with recent purchase requests and start-new action
 - `/app/purchase/new`: single long-page purchase builder
-- `/app/saved`: one page for saved organizations, people, and event presets
+- `/app/saved`: one page for student organizations, purchasers, and event templates
 
-The builder may create saved records inline. Saved records can also be managed from `/app/saved`.
+The builder may create autofill sources inline. Autofill sources can also be managed from `/app/saved`.
 
-## Saved Records
+## Autofill Sources
 
-All saved records are personal-owned for MVP.
+All autofill sources are personal-owned for MVP.
 
-Organizations:
+Student Organizations:
 
 - Name
 - Index number
 - Fund letter
-- Default budget line item
+- Budget Line Items
 - Business purpose template
 - Archived flag
 
-People:
+Purchasers:
 
-- Nested under one organization
+- Nested under one student organization
 - Name
 - UO 95
 - Permanent address
-- ID front file
-- ID back file
-- Optional email
-- Optional phone
-- `isRequester`
+- ID card document or documents
 - Archived flag
 
-People require ID front/back at creation. Email and phone are required only when marking a person as requester. An organization may have zero requester people, but a purchase cannot be marked ready until its organization has one requester.
+Purchasers require ID card documentation at creation.
 
-At most one active requester is allowed per organization. Setting one person as requester unsets the previous requester for that organization.
+Event Templates:
 
-Event presets:
-
-- Nested under one organization
+- Nested under one student organization
 - Name
 - Time
 - Location
 - Estimated attendance
 - Archived flag
 
-Saved organizations, people, and event presets are archived instead of deleted. Archived records are hidden by default, recoverable with a "Show archived" toggle, and unavailable for new purchases.
+Student organizations, purchasers, and event templates are archived instead of deleted. Archived records are hidden by default, recoverable with a "Show archived" toggle, and unavailable for new purchase requests.
 
 ## Purchase Requests
 
-Purchase requests record the facts needed for Engage. Saved organization, purchaser, requester, and event template data only autofill drafts.
+Purchase requests record the facts needed for Engage. Student organization, purchaser, requester, and event template data only autofill drafts.
 
 Request fields:
 
-- Organization
+- Student Organization
+- Requester
 - Purchaser, defaulting to the requester
 - Event name
 - Event date
@@ -92,18 +87,18 @@ Request fields:
 - Vendor
 - Item description
 - Total amount
-- Budget line item
+- Budget Line Item
 - Reimbursement reason
 - Business purpose text
 - `businessPurposeTouched`
 - Recipients
-- Receipts, up to three
-- Second approval file
-- Publicity proof file
+- Receipt documents, up to three
+- Second Approval document
+- Publicity Proof document
 - Status: `draft`, `ready`
 - `lastFilledAt`
 
-Drafts are created immediately and autosaved through Convex debounced mutations. Discarding a draft hard deletes the draft and synchronously deletes purchase-local uploaded files. Saved person ID files are not deleted by draft discard.
+Drafts are created immediately and autosaved through Convex debounced mutations. Discarding a draft hard deletes the draft and synchronously deletes purchase-request-local uploaded documents. Saved purchaser ID card documents are not deleted by draft discard.
 
 ## Business Purpose
 
@@ -143,16 +138,15 @@ Each recipient has:
 
 The item description is global for the purchase. Recipient values should sum to the purchase total, and each recipient value must be under `$50`.
 
-## Files
+## Documents
 
-MVP accepts any file type and records filename, content type, size, and Convex storage ID.
+MVP accepts any document type and records filename, content type, size, and Convex storage ID.
 
-Reusable files:
+Reusable documents:
 
-- Person ID front
-- Person ID back
+- Purchaser ID card document or documents
 
-Purchase-local files:
+Purchase-request-local documents:
 
 - Receipts, up to three
 - Second approval
@@ -164,8 +158,8 @@ Second approval is required only when selected purchaser is the requester.
 
 Ready status is blocked unless all required data exists:
 
-- Organization selected
-- Organization has requester
+- Student Organization selected
+- Requester recorded
 - Purchaser selected
 - Event name
 - Event date
@@ -175,7 +169,7 @@ Ready status is blocked unless all required data exists:
 - Vendor
 - Item description
 - Total amount greater than zero
-- Budget line item
+- Budget Line Item
 - Reimbursement reason
 - Business purpose text
 - No unresolved business purpose tokens
@@ -183,30 +177,30 @@ Ready status is blocked unless all required data exists:
 - Recipient name, UO 95, reason, and value
 - Each recipient value under `$50`
 - Recipient values sum to purchase total
-- Purchaser ID front/back
-- Receipt upload
-- Publicity proof upload
+- Purchaser ID card document or documents
+- Receipt document
+- Publicity Proof document
 - Second approval when purchaser is requester
 
 ## Extension
 
-The extension talks to Convex directly through a long-lived device link token created by the authenticated web app.
+The extension signs in with Clerk and talks to Convex with the same authenticated owner model as the web app.
 
-Token capabilities:
+Extension capabilities:
 
-- List recent ready purchase requests
-- Fetch one assembled purchase payload
+- List recent ready purchase requests through Convex realtime while the popup is open
+- Fetch one assembled purchase payload by id for each fill step
 - Record when Engage review is reached
 
-Token cannot create, update, delete, or archive saved records.
+The extension cannot create, update, delete, or archive autofill sources.
 
-The extension popup lists recent ready purchases with organization, purchaser, and item purchased. Rows that have reached Engage review before are still selectable and show that history through `lastFilledAt`.
+The extension popup lists recent ready purchase requests with Student Organization, purchaser, and item purchased. Rows that have reached Engage review before are still selectable and show that history through `lastFilledAt`.
 
-The extension fetches file blobs in extension context before sending prepared file payloads to the content script. The content script stays focused on Engage DOM interaction.
+The extension background fetches document blobs in extension context and caches them in memory for the active fill run. The content script stays focused on Engage DOM interaction.
 
 ## Engage Mapping
 
-The builder hides Engage page structure. Fill logic maps the simplified purchase model to the existing Engage RTP fill plan.
+The builder hides Engage page structure. Fill logic maps the Purchase Request model to the existing Engage fill plan.
 
 Requester fields fill Engage requestor fields. Purchaser fields fill reimbursement recipient fields, address, and ID uploads.
 

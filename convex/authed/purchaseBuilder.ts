@@ -10,9 +10,11 @@ import {
 	assertReady,
 	getUserProfile,
 	ownerFromIdentity,
+	renderBusinessPurpose,
 	requireOwnedDoc,
 	requireUserProfile,
 	requireText,
+	unresolvedToken,
 	userAsPurchaserDetails,
 	userAsRequesterDetails,
 	type DraftPatch
@@ -44,8 +46,7 @@ export const welcomeState = authedQuery({
 	args: {},
 	returns: v.object({
 		hasProfile: v.boolean(),
-		hasOrganization: v.boolean(),
-		hasExtensionLink: v.boolean()
+		hasOrganization: v.boolean()
 	}),
 	handler: async (ctx) => {
 		const owner = ownerFromIdentity(ctx.identity);
@@ -54,14 +55,9 @@ export const welcomeState = authedQuery({
 			.query('organizations')
 			.withIndex('by_owner', (q) => q.eq('owner', owner))
 			.first();
-		const activeSession = await ctx.db
-			.query('extensionSessions')
-			.withIndex('by_owner_and_revokedAt', (q) => q.eq('owner', owner).eq('revokedAt', null))
-			.first();
 		return {
 			hasProfile: user !== null,
-			hasOrganization: organization !== null,
-			hasExtensionLink: activeSession !== null
+			hasOrganization: organization !== null
 		};
 	}
 });
@@ -386,9 +382,16 @@ export const markReady = authedMutation({
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		if (args.patch !== undefined) {
-			await ctx.db.patch(args.id, applyDraftPatch(request, args.patch as DraftPatch));
+		const patch =
+			args.patch !== undefined ? applyDraftPatch(request, args.patch as DraftPatch) : {};
+		const nextRequest = { ...request, ...patch };
+		if (unresolvedToken(nextRequest.businessPurposeText)) {
+			patch.businessPurposeText = renderBusinessPurpose(nextRequest);
+			patch.businessPurposeTouched = false;
+			nextRequest.businessPurposeText = patch.businessPurposeText;
+			nextRequest.businessPurposeTouched = false;
 		}
+		if (Object.keys(patch).length > 0) await ctx.db.patch(args.id, patch);
 		const updated = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
 		await assertReady(ctx, updated);
 		await ctx.db.patch(args.id, { status: 'ready', updatedAt: Date.now() });

@@ -1,4 +1,4 @@
-# Purchase Flow
+# Purchase Request Flow
 
 Reference notes for the first supported Engage purchase request flow.
 
@@ -8,7 +8,7 @@ Build a friendlier web app for creating purchase requests, then use the Chrome e
 
 First supported case:
 
-- Purchase type: Personal Reimbursement
+- Type of purchase: Personal Reimbursement
 - Fund context: ASUO funds
 - Documentation category: gift/apparel/prize
 - Example: reimburse a club member for buying a prize for a weekly event
@@ -16,58 +16,56 @@ First supported case:
 
 ## Product Flow
 
-1. User creates reusable org, purchaser, and event preset data in the web app.
-2. User creates a purchase from those saved records.
-3. Web app validates that all required info/files are present.
-4. Purchase is marked ready for Engage.
+1. User creates reusable student organization, purchaser, and event template data in the web app.
+2. User creates a purchase request from those autofill sources.
+3. Web app validates that all required information and documents are present.
+4. Purchase request is marked Ready for Engage.
 5. User opens the Engage purchase request form.
-6. Extension detects the current form step and fills that page from the selected purchase.
+6. Extension detects the current form step and fills that page from the selected purchase request.
 7. User advances through Engage manually or via explicit extension action.
 8. Extension stops at the review/submission page.
 
 ## Core Records
 
-Organization:
+Student Organization:
 
 - Name
 - Index number
 - Fund letter
 - Budget line items
-- Authorized signers later
 
-Purchaser profile:
+Purchaser:
 
 - Name
 - Email
 - Phone
 - UO 95 ID
 - Permanent address
-- ID card front file
-- ID card back file
+- ID card document or documents
 
-Event preset:
+Event Template:
 
 - Name
 - Date pattern or weekly schedule
 - Time
 - Location
 - Estimated attendance
-- Default publicity proof file
 
-Purchase:
+Purchase Request:
 
-- Organization
-- Purchaser profile
-- Event preset plus actual event date
+- Student Organization
+- Requester
+- Purchaser
+- Event Details
 - Vendor
 - Item description
 - Total amount
-- Budget line item
+- Budget Line Item
 - Reimbursement reason
 - Business purpose
-- Receipt files
-- Second approval file when requester is reimbursee
-- Publicity proof file
+- Receipt documents
+- Second Approval document when requester is purchaser
+- Publicity Proof document
 - Recipients
 
 Recipient:
@@ -77,7 +75,7 @@ Recipient:
 - Item or prize received
 - Value
 
-File metadata:
+Document metadata:
 
 - Kind: receipt, id_front, id_back, approval, publicity, brand_approval, recipient_list
 - Filename
@@ -125,7 +123,7 @@ Required acknowledgements:
 - Restaurant rule acknowledgement
 - Personal reimbursement risk acknowledgement
 
-### Type Of Purchase
+### Type of Purchase
 
 Supported option for MVP:
 
@@ -148,10 +146,10 @@ Fields:
 - Recipient name and UO 95 ID
 - Recipient permanent address
 - Mailing/direct deposit acknowledgement
-- UO ID card front/back uploads
-- Receipt uploads
+- UO ID card document uploads
+- Receipt document uploads
 
-For MVP, assume requester is the reimbursee unless purchase says otherwise.
+For MVP, assume requester is the reimbursee unless the purchase request says otherwise.
 
 ### Seeking Self Reimbursement - Upload Second Approval
 
@@ -159,8 +157,8 @@ Appears when requester and reimbursee are the same person.
 
 Required:
 
-- Upload email conversation or approval document from another authorized signer
-- Approval should include signer name, UO email, total amount, and purchase purpose
+- Upload the Second Approval document
+- Approval should include approver name, UO email, total amount, and purchase purpose
 
 ### Documentation Inquiry
 
@@ -234,16 +232,16 @@ Extension must stop here.
 
 ## Readiness Checklist
 
-A purchase can be marked ready when:
+A purchase request can be marked Ready when:
 
-- Organization name, index, fund letter, and budget line item are present
-- Purchaser profile is complete
+- Student Organization name, index, fund letter, and Budget Line Item are present
+- Purchaser is complete
 - Event date, time, location, attendance are present
 - Vendor, item, amount, and reimbursement reason are present
-- Receipt file is attached
-- ID front and back files are attached
-- Approval file is attached when requester is reimbursee
-- Publicity proof is attached for ASUO funds
+- Receipt document is attached
+- ID card documents are attached
+- Second Approval document is attached when requester is purchaser
+- Publicity Proof is attached for ASUO funds
 - Recipient name and UO 95 ID are present
 - Gift value is under the policy limit
 - Business purpose has been generated and reviewed

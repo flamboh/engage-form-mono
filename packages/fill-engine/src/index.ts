@@ -1,12 +1,12 @@
 import {
 	budgetLineText,
+	documentById,
 	generateBusinessPurpose,
-	purchaseFileById,
 	recipientIdText,
 	recipientValueText,
 	reimbursementRecipientText,
-	type PurchaseFile,
-	type Purchase
+	type Document,
+	type PurchaseRequest
 } from '@engage-form/domain';
 
 export type EngageStep =
@@ -32,7 +32,7 @@ export type FillAction =
 	| { type: 'radio'; labelIncludes: string }
 	| { type: 'combobox'; labelIncludes: string; valueIncludes: string }
 	| { type: 'select'; labelIncludes: string; valueIncludes: string }
-	| { type: 'file'; labelIncludes: string; files: PurchaseFile[] }
+	| { type: 'file'; labelIncludes: string; files: Document[] }
 	| { type: 'stop'; message: string };
 
 export type FillPlan = {
@@ -40,15 +40,15 @@ export type FillPlan = {
 	actions: FillAction[];
 };
 
-type RtpField =
+type EngageField =
 	| {
 			type: 'text' | 'textarea' | 'combobox' | 'select';
 			labelIncludes: string;
-			resolve: (purchase: Purchase) => string;
+			resolve: (purchaseRequest: PurchaseRequest) => string;
 	  }
 	| {
 			type: 'checkbox';
-			labelIncludes: string | ((purchase: Purchase) => string);
+			labelIncludes: string | ((purchaseRequest: PurchaseRequest) => string);
 			checked: boolean;
 	  }
 	| {
@@ -58,7 +58,7 @@ type RtpField =
 	| {
 			type: 'file' | 'conditionalFile';
 			labelIncludes: string;
-			resolve: (purchase: Purchase) => PurchaseFile[];
+			resolve: (purchaseRequest: PurchaseRequest) => Document[];
 	  }
 	| {
 			type: 'receiptFiles';
@@ -68,13 +68,13 @@ type RtpField =
 			message: string;
 	  };
 
-type RtpStepSchema = {
+type EngageStepSchema = {
 	step: EngageStep;
 	headingIncludes: string[];
-	fields: RtpField[];
+	fields: EngageField[];
 };
 
-export const rtpSchema: RtpStepSchema[] = [
+export const engageSchema: EngageStepSchema[] = [
 	{
 		step: 'organizationRepresentation',
 		headingIncludes: ['organization representation'],
@@ -128,10 +128,10 @@ export const rtpSchema: RtpStepSchema[] = [
 			textField('permanent address', (purchase) => purchase.purchaser.permanentAddress),
 			checkboxField('mailing address', true),
 			fileField('UO ID CARD', (purchase) => [
-				purchaseFileById(purchase, purchase.purchaser.idCardFrontFileId)
+				documentById(purchase, purchase.purchaser.idCardFrontFileId)
 			]),
 			fileField('UO ID CARD : Optional second upload', (purchase) => [
-				purchaseFileById(purchase, purchase.purchaser.idCardBackFileId)
+				documentById(purchase, purchase.purchaser.idCardBackFileId)
 			]),
 			receiptFilesField()
 		]
@@ -142,7 +142,7 @@ export const rtpSchema: RtpStepSchema[] = [
 		fields: [
 			conditionalFileField('upload', (purchase) =>
 				purchase.requesterIsPurchaser && purchase.secondApprovalFileId !== null
-					? [purchaseFileById(purchase, purchase.secondApprovalFileId)]
+					? [documentById(purchase, purchase.secondApprovalFileId)]
 					: []
 			)
 		]
@@ -164,7 +164,7 @@ export const rtpSchema: RtpStepSchema[] = [
 		headingIncludes: ['event open to all students'],
 		fields: [
 			fileField('upload', (purchase) => [
-				purchaseFileById(purchase, purchase.eventDetails.publicityProofFileId)
+				documentById(purchase, purchase.eventDetails.publicityProofFileId)
 			])
 		]
 	},
@@ -195,7 +195,7 @@ export const rtpSchema: RtpStepSchema[] = [
 
 export function detectStep(headingText: string): EngageStep {
 	const text = normalize(headingText);
-	const step = rtpSchema.find((item) =>
+	const step = engageSchema.find((item) =>
 		item.headingIncludes.some((heading) => text.includes(heading))
 	);
 
@@ -204,13 +204,16 @@ export function detectStep(headingText: string): EngageStep {
 	return 'unknown';
 }
 
-export function createFillPlan(step: EngageStep, purchase: Purchase): FillPlan {
-	const schema = rtpSchema.find((item) => item.step === step);
+export function createFillPlan(step: EngageStep, purchaseRequest: PurchaseRequest): FillPlan {
+	const schema = engageSchema.find((item) => item.step === step);
 	if (schema === undefined) {
 		return { step, actions: [stop('Unknown Engage step. No fields filled.')] };
 	}
 
-	return { step, actions: schema.fields.flatMap((field) => resolveField(field, purchase)) };
+	return {
+		step,
+		actions: schema.fields.flatMap((field) => resolveField(field, purchaseRequest))
+	};
 }
 
 export function stepLabel(step: EngageStep) {
@@ -218,7 +221,7 @@ export function stepLabel(step: EngageStep) {
 		case 'formStart':
 			return 'Form start';
 		case 'organizationRepresentation':
-			return 'Organization';
+			return 'Student organization';
 		case 'purposeInstructions':
 			return 'Instructions';
 		case 'about':
@@ -230,13 +233,13 @@ export function stepLabel(step: EngageStep) {
 		case 'reimbursement':
 			return 'Reimbursement info';
 		case 'selfApproval':
-			return 'Self approval';
+			return 'Second approval';
 		case 'documentation':
 			return 'Documentation inquiry';
 		case 'publicity':
 			return 'Event publicity';
 		case 'gifts':
-			return 'Gifts/apparel';
+			return 'Merchandise/apparel/gifts';
 		case 'thankYou':
 			return 'Thank you';
 		case 'review':
@@ -246,16 +249,23 @@ export function stepLabel(step: EngageStep) {
 	}
 }
 
-function resolveField(field: RtpField, purchase: Purchase): FillAction | FillAction[] {
+function resolveField(
+	field: EngageField,
+	purchaseRequest: PurchaseRequest
+): FillAction | FillAction[] {
 	if (field.type === 'text' || field.type === 'textarea') {
-		return { type: field.type, labelIncludes: field.labelIncludes, value: field.resolve(purchase) };
+		return {
+			type: field.type,
+			labelIncludes: field.labelIncludes,
+			value: field.resolve(purchaseRequest)
+		};
 	}
 
 	if (field.type === 'combobox' || field.type === 'select') {
 		return {
 			type: field.type,
 			labelIncludes: field.labelIncludes,
-			valueIncludes: field.resolve(purchase)
+			valueIncludes: field.resolve(purchaseRequest)
 		};
 	}
 
@@ -265,7 +275,7 @@ function resolveField(field: RtpField, purchase: Purchase): FillAction | FillAct
 			labelIncludes:
 				typeof field.labelIncludes === 'string'
 					? field.labelIncludes
-					: field.labelIncludes(purchase),
+					: field.labelIncludes(purchaseRequest),
 			checked: field.checked
 		};
 	}
@@ -275,83 +285,99 @@ function resolveField(field: RtpField, purchase: Purchase): FillAction | FillAct
 	}
 
 	if (field.type === 'file') {
-		return { type: 'file', labelIncludes: field.labelIncludes, files: field.resolve(purchase) };
+		return {
+			type: 'file',
+			labelIncludes: field.labelIncludes,
+			files: field.resolve(purchaseRequest)
+		};
 	}
 
 	if (field.type === 'conditionalFile') {
-		const files = field.resolve(purchase);
+		const files = field.resolve(purchaseRequest);
 		return files.length > 0
 			? { type: 'file', labelIncludes: field.labelIncludes, files }
-			: stop('No upload required for this purchase.');
+			: stop('No document required for this purchase request.');
 	}
 
 	if (field.type === 'receiptFiles') {
-		return receiptFileActions(purchase);
+		return receiptDocumentActions(purchaseRequest);
 	}
 
-	throw new Error('Unsupported RTP field.');
+	throw new Error('Unsupported Engage field.');
 }
 
-function textField(labelIncludes: string, resolve: (purchase: Purchase) => string): RtpField {
+function textField(
+	labelIncludes: string,
+	resolve: (purchaseRequest: PurchaseRequest) => string
+): EngageField {
 	return { type: 'text', labelIncludes, resolve };
 }
 
-function textareaField(labelIncludes: string, resolve: (purchase: Purchase) => string): RtpField {
+function textareaField(
+	labelIncludes: string,
+	resolve: (purchaseRequest: PurchaseRequest) => string
+): EngageField {
 	return { type: 'textarea', labelIncludes, resolve };
 }
 
-function comboboxField(labelIncludes: string, resolve: (purchase: Purchase) => string): RtpField {
+function comboboxField(
+	labelIncludes: string,
+	resolve: (purchaseRequest: PurchaseRequest) => string
+): EngageField {
 	return { type: 'combobox', labelIncludes, resolve };
 }
 
-function selectField(labelIncludes: string, resolve: (purchase: Purchase) => string): RtpField {
+function selectField(
+	labelIncludes: string,
+	resolve: (purchaseRequest: PurchaseRequest) => string
+): EngageField {
 	return { type: 'select', labelIncludes, resolve };
 }
 
 function checkboxField(
-	labelIncludes: string | ((purchase: Purchase) => string),
+	labelIncludes: string | ((purchaseRequest: PurchaseRequest) => string),
 	checked: boolean
-): RtpField {
+): EngageField {
 	return { type: 'checkbox', labelIncludes, checked };
 }
 
-function radioField(labelIncludes: string): RtpField {
+function radioField(labelIncludes: string): EngageField {
 	return { type: 'radio', labelIncludes };
 }
 
 function fileField(
 	labelIncludes: string,
-	resolve: (purchase: Purchase) => PurchaseFile[]
-): RtpField {
+	resolve: (purchaseRequest: PurchaseRequest) => Document[]
+): EngageField {
 	return { type: 'file', labelIncludes, resolve };
 }
 
 function conditionalFileField(
 	labelIncludes: string,
-	resolve: (purchase: Purchase) => PurchaseFile[]
-): RtpField {
+	resolve: (purchaseRequest: PurchaseRequest) => Document[]
+): EngageField {
 	return { type: 'conditionalFile', labelIncludes, resolve };
 }
 
-function receiptFilesField(): RtpField {
+function receiptFilesField(): EngageField {
 	return { type: 'receiptFiles' };
 }
 
-function receiptFileActions(purchase: Purchase): FillAction[] {
+function receiptDocumentActions(purchaseRequest: PurchaseRequest): FillAction[] {
 	const labels = [
 		'itemized receipt',
 		'RECEIPT : Optional second upload',
 		'RECEIPT : Optional third upload'
 	];
 
-	return purchase.receiptFileIds.slice(0, labels.length).map((fileId, index) => ({
+	return purchaseRequest.receiptFileIds.slice(0, labels.length).map((fileId, index) => ({
 		type: 'file',
 		labelIncludes: labels[index],
-		files: [purchaseFileById(purchase, fileId)]
+		files: [documentById(purchaseRequest, fileId)]
 	}));
 }
 
-function stopField(message: string): RtpField {
+function stopField(message: string): EngageField {
 	return { type: 'stop', message };
 }
 

@@ -20,6 +20,7 @@
 body {
 	margin: 0;
 	width: 360px;
+	height: 780px;
 }
 
 button {
@@ -31,6 +32,12 @@ button {
 	font: inherit;
 	padding: 10px 12px;
 	cursor: pointer;
+}
+
+button.secondary {
+	background: var(--panel);
+	color: var(--ink);
+	border-color: var(--line);
 }
 
 button:disabled {
@@ -49,7 +56,10 @@ textarea {
 
 .popup {
 	display: grid;
+	grid-template-rows: auto minmax(0, 1fr) auto auto;
 	gap: 14px;
+	height: 100vh;
+	box-sizing: border-box;
 	padding: 16px;
 }
 
@@ -62,14 +72,16 @@ textarea {
 
 .head p,
 dt,
-#status {
+#status,
+.muted {
 	color: var(--muted);
 }
 
 .head p,
 h1,
 h2,
-#status {
+#status,
+.muted {
 	margin: 0;
 }
 
@@ -103,6 +115,16 @@ strong {
 	color: var(--warn);
 }
 
+.hidden {
+	display: none !important;
+}
+
+.actions {
+	display: grid;
+	gap: 8px;
+	align-content: start;
+}
+
 .purchase {
 	border: 1px solid var(--line);
 	border-radius: 8px;
@@ -112,8 +134,9 @@ strong {
 
 .purchase-list {
 	display: grid;
+	align-content: start;
 	gap: 8px;
-	max-height: 260px;
+	min-height: 0;
 	overflow: auto;
 }
 
