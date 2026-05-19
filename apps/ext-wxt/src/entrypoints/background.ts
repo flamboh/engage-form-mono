@@ -1,11 +1,24 @@
 import { createClerkClient } from '@clerk/chrome-extension/client';
+import type { PurchaseRequest } from '@engage-form/domain';
+import { ConvexHttpClient } from 'convex/browser';
 import { Effect } from 'effect';
 import { browser } from 'wxt/browser';
-import { readClerkPublishableKey, readClerkSyncHost } from '../lib/env';
-import { type RuntimeMessage, type RuntimeResponse, runtimeError } from '../lib/messages';
+import { api } from '../../../../convex/_generated/api';
+import type { Id } from '../../../../convex/_generated/dataModel';
+import { readClerkPublishableKey, readClerkSyncHost, readConvexUrl } from '../lib/env';
+import {
+	type FillMessage,
+	type FillResponse,
+	type RuntimeMessage,
+	type RuntimeResponse,
+	runtimeError
+} from '../lib/messages';
 
 let clerk: ReturnType<typeof createSyncedClerk> | null = null;
 const clerkTokenTimeoutMs = 4_000;
+const documentDataUrls = new Map<string, string>();
+let activePurchaseId: string | null = null;
+let activeConvexToken: string | null = null;
 
 export default defineBackground(() => {
 	browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -56,6 +69,23 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 			});
 			yield* refreshClerkEffect();
 			return { ok: true, message: 'Signed out.' } as const;
+		});
+	}
+
+	if (message.type === 'GET_FILL_PAYLOAD') {
+		return Effect.tryPromise({
+			try: async () => ({
+				ok: true,
+				purchase: await getPreparedPurchase(message.purchaseId)
+			}),
+			catch: toError
+		});
+	}
+
+	if (message.type === 'START_FILL') {
+		return Effect.tryPromise({
+			try: () => fillActiveTab(message.purchaseId, message.token),
+			catch: toError
 		});
 	}
 
@@ -115,6 +145,98 @@ function refreshClerkEffect() {
 	});
 }
 
+async function fillActiveTab(purchaseId: string, token: string): Promise<FillResponse> {
+	const purchase = await getPreparedPurchase(purchaseId, token);
+	const tab = await currentEngageTab();
+	const message: FillMessage = {
+		type: 'FILL_CURRENT_PAGE',
+		purchase
+	};
+	return await sendFillMessage(tab.id, message);
+}
+
+async function currentEngageTab() {
+	const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+	if (tab?.id === undefined) throw new Error('No active tab.');
+	if (!isEngageFormUrl(tab.url)) throw new Error('Open the Engage purchase request form first.');
+	return { id: tab.id };
+}
+
+function isEngageFormUrl(url: string | undefined) {
+	return url?.startsWith('https://uoregon.campuslabs.com/engage/submitter/form/') === true;
+}
+
+async function sendFillMessage(tabId: number, message: FillMessage): Promise<FillResponse> {
+	try {
+		return (await browser.tabs.sendMessage(tabId, message)) as FillResponse;
+	} catch {
+		throw new Error('Refresh the Engage form and try again.');
+	}
+}
+
+async function authedConvex(token?: string) {
+	const convexToken =
+		token ?? activeConvexToken ?? (await Effect.runPromise(getConvexTokenEffect()));
+	if (convexToken === null) throw new Error('Signed in session missing Convex token.');
+	const convex = new ConvexHttpClient(readConvexUrl());
+	convex.setAuth(convexToken);
+	return convex;
+}
+
+async function getPreparedPurchase(purchaseId: string, token?: string): Promise<PurchaseRequest> {
+	if (activePurchaseId !== purchaseId) {
+		clearActiveFillRun();
+		activePurchaseId = purchaseId;
+	}
+	activeConvexToken = token ?? activeConvexToken;
+
+	const convex = await authedConvex(token);
+	const purchase = (await convex.query(api.authed.extension.getReadyPurchaseForFill, {
+		id: purchaseId as Id<'purchaseRequests'>
+	})) as unknown as PurchaseRequest;
+
+	return {
+		...purchase,
+		documents: await Promise.all(
+			purchase.documents.map(async (document) => {
+				if (!document.url) return document;
+				const cached = documentDataUrls.get(document.id);
+				if (cached !== undefined) return { ...document, dataUrl: cached };
+				const dataUrl = await downloadDocumentDataUrl(document.url, document.filename);
+				documentDataUrls.set(document.id, dataUrl);
+				return { ...document, dataUrl };
+			})
+		)
+	};
+}
+
+async function downloadDocumentDataUrl(url: string, filename: string) {
+	const response = await fetch(url);
+	if (!response.ok) throw new Error(`Document unavailable: ${filename}.`);
+	return await blobToDataUrl(await response.blob());
+}
+
+function blobToDataUrl(blob: Blob) {
+	return new Promise<string>((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => {
+			if (typeof reader.result !== 'string') {
+				reject(new Error('Document could not be encoded.'));
+				return;
+			}
+			resolve(reader.result);
+		};
+		reader.onerror = () => reject(reader.error);
+		reader.readAsDataURL(blob);
+	});
+}
+
+function clearActiveFillRun() {
+	activePurchaseId = null;
+	activeConvexToken = null;
+	documentDataUrls.clear();
+}
+
 function toError(error: unknown) {
 	return error instanceof Error ? error : new Error(String(error));
 }
@@ -135,5 +257,8 @@ function summarizeResponse(response: RuntimeResponse) {
 	if ('token' in response) return { ok: true, tokenPresent: response.token !== null };
 	if ('signedIn' in response)
 		return { ok: true, signedIn: response.signedIn, emailPresent: response.email !== null };
+	if ('purchase' in response) return { ok: true, purchasePresent: true };
+	if ('step' in response)
+		return { ok: true, message: response.message, step: response.step, filled: response.filled };
 	return { ok: true, message: response.message };
 }
