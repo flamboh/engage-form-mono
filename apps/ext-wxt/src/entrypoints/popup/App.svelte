@@ -23,6 +23,7 @@
 	let purchases = $state<ReadyPurchaseRequest[]>([]);
 	let readyState = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
 	let diagnostics = $state<DiagnosticEntry[]>([]);
+	let fillingPurchaseId = $state<string | null>(null);
 
 	const runtimeTimeoutMs = 5_000;
 	const readySubscriptionTimeoutMs = 8_000;
@@ -85,6 +86,30 @@
 			return;
 		}
 		await refreshAuth();
+	}
+
+	async function fillPurchase(purchaseId: string) {
+		fillingPurchaseId = purchaseId;
+		status = 'Checking current Engage tab...';
+		let response: RuntimeResponse;
+		try {
+			const token = await fetchConvexToken();
+			response = await sendRuntimeMessage({ type: 'START_FILL', purchaseId, token });
+		} catch (error) {
+			status = error instanceof Error ? error.message : String(error);
+			fillingPurchaseId = null;
+			return;
+		}
+		fillingPurchaseId = null;
+
+		if (!response.ok) {
+			status = response.message;
+			return;
+		}
+
+		if (!('step' in response)) return;
+		const missed = response.missed.length > 0 ? ` Missed: ${response.missed.join(', ')}.` : '';
+		status = `${response.message} Step: ${response.step}. Filled: ${response.filled}.${missed}`;
 	}
 
 	function startRealtime() {
@@ -317,6 +342,9 @@
 		if ('token' in response) return { ok: true, tokenPresent: response.token !== null };
 		if ('signedIn' in response)
 			return { ok: true, signedIn: response.signedIn, emailPresent: response.email !== null };
+		if ('purchase' in response) return { ok: true, purchasePresent: true };
+		if ('step' in response)
+			return { ok: true, message: response.message, step: response.step, filled: response.filled };
 		return { ok: true, message: response.message };
 	}
 
@@ -358,7 +386,12 @@
 					</p>
 				{:else}
 					{#each purchases as purchase (purchase.id)}
-						<article class="rounded-md border border-stone-200 bg-white p-3">
+						<button
+							class="block w-full rounded-md border border-stone-200 bg-white p-3 text-left hover:bg-stone-50 disabled:opacity-60"
+							type="button"
+							disabled={fillingPurchaseId !== null}
+							onclick={() => fillPurchase(purchase.id)}
+						>
 							<div class="flex items-start justify-between gap-3">
 								<div>
 									<p class="text-xs font-medium text-stone-500">{purchase.organization}</p>
@@ -373,7 +406,7 @@
 							<p class="mt-2 text-xs text-stone-600">
 								{purchase.purchaser} · {reviewStatus(purchase)}
 							</p>
-						</article>
+						</button>
 					{/each}
 				{/if}
 			</section>
