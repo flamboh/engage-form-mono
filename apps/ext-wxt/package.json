@@ -24,5 +24,16 @@
 		"tslib": "^2.8.1",
 		"typescript": "^5.9.3",
 		"wxt": "^0.20.26"
+	},
+	"manifest": {
+		"key": "$CRX_PUBLIC_KEY",
+		"permissions": [
+			"cookies",
+			"storage"
+		],
+		"host_permissions": [
+			"http://localhost/*",
+			"$CLERK_FRONTEND_API/*"
+		]
 	}
 }
