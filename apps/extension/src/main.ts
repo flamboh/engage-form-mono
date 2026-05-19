@@ -1,6 +1,4 @@
 import './style.css';
-import { ConvexClient } from 'convex/browser';
-import { api } from '../../../convex/_generated/api.js';
 import type { Id } from '../../../convex/_generated/dataModel.js';
 import type { ExtensionResponse } from './content-runner.ts';
 
@@ -18,11 +16,11 @@ type ReadyPurchaseRequest = {
 type RuntimeMessage =
 	| { type: 'ENGAGE_START_FILL'; purchaseId: string }
 	| { type: 'ENGAGE_AUTH_STATE' }
-	| { type: 'ENGAGE_GET_CONVEX_TOKEN' }
+	| { type: 'ENGAGE_LIST_READY_PURCHASES' }
 	| { type: 'ENGAGE_SIGN_OUT' };
 
 type AuthStateResponse = { ok: true; signedIn: boolean; email: string | null } | ErrorResponse;
-type TokenResponse = { ok: true; token: string | null } | ErrorResponse;
+type ListReadyResponse = { ok: true; purchases: ReadyPurchaseRequest[] } | ErrorResponse;
 type SignOutResponse = { ok: true; message: string } | ErrorResponse;
 type ErrorResponse = { ok: false; message: string };
 
@@ -32,7 +30,7 @@ type ChromeRuntime = {
 		sendMessage(
 			message: RuntimeMessage,
 			callback: (
-				response: ExtensionResponse | AuthStateResponse | TokenResponse | SignOutResponse
+				response: ExtensionResponse | AuthStateResponse | ListReadyResponse | SignOutResponse
 			) => void
 		): void;
 	};
@@ -47,7 +45,6 @@ const app = document.querySelector<HTMLDivElement>('#app');
 if (app === null) throw new Error('App root missing.');
 
 const webAppUrl = readWebAppUrl();
-const convex = new ConvexClient(readConvexUrl());
 
 let readyPurchaseRequests: ReadyPurchaseRequest[] = [];
 let statusMessage = 'Loading...';
@@ -55,43 +52,21 @@ let signedIn = false;
 let signedInEmail: string | null = null;
 let signedOutStatusMessage =
 	'OAuth opens in the browser, then this popup uses the synced Clerk session.';
-let unsubscribeReady: { unsubscribe(): void } | null = null;
 
-convex.setAuth(requestConvexToken);
-
-void refreshAuthState().catch((error: unknown) => {
-	signedOutStatusMessage = error instanceof Error ? error.message : String(error);
-	render();
-});
+void refreshAuthState().catch(showAuthError);
 
 document.addEventListener('visibilitychange', () => {
-	if (document.visibilityState === 'visible') void refreshAuthState();
+	if (document.visibilityState === 'visible') void refreshAuthState().catch(showAuthError);
 });
 
-function subscribeReadyPurchases() {
-	if (unsubscribeReady !== null) return;
-	statusMessage = 'Loading...';
-	unsubscribeReady = convex.onUpdate(
-		api.authed.extension.listReadyPurchases,
-		{},
-		(purchases) => {
-			readyPurchaseRequests = purchases;
-			statusMessage =
-				purchases.length === 0
-					? 'No ready purchase requests yet.'
-					: 'Select a purchase request to fill.';
-			render();
-		},
-		(error) => {
-			statusMessage = error.message;
-			render();
-		}
-	);
-}
-
-function clearReadySubscription() {
-	unsubscribeReady?.unsubscribe();
-	unsubscribeReady = null;
+function showAuthError(error: unknown) {
+	const message = error instanceof Error ? error.message : String(error);
+	if (signedIn) {
+		statusMessage = message;
+	} else {
+		signedOutStatusMessage = message;
+	}
+	render();
 }
 
 function render() {
@@ -203,18 +178,14 @@ async function refreshAuthState() {
 	signedInEmail = response.email;
 
 	if (!signedIn) {
-		clearReadySubscription();
 		readyPurchaseRequests = [];
+		render();
+		return;
 	}
 
+	statusMessage = 'Loading...';
 	render();
-	if (signedIn) subscribeReadyPurchases();
-}
-
-async function requestConvexToken() {
-	const response = await sendRuntimeMessage<TokenResponse>({ type: 'ENGAGE_GET_CONVEX_TOKEN' });
-	if (!response.ok) throw new Error(response.message);
-	return response.token;
+	await refreshReadyPurchases();
 }
 
 async function signOut() {
@@ -227,6 +198,24 @@ async function signOut() {
 		return;
 	}
 	await refreshAuthState();
+}
+
+async function refreshReadyPurchases() {
+	const response = await sendRuntimeMessage<ListReadyResponse>({
+		type: 'ENGAGE_LIST_READY_PURCHASES'
+	});
+	if (!response.ok) {
+		statusMessage = response.message;
+		render();
+		return;
+	}
+
+	readyPurchaseRequests = response.purchases;
+	statusMessage =
+		response.purchases.length === 0
+			? 'No ready purchase requests yet.'
+			: 'Select a purchase request to fill.';
+	render();
 }
 
 function sendRuntimeMessage<Response>(message: RuntimeMessage) {
@@ -253,14 +242,6 @@ function escapeHtml(value: string) {
 		.replaceAll('>', '&gt;')
 		.replaceAll('"', '&quot;')
 		.replaceAll("'", '&#39;');
-}
-
-function readConvexUrl() {
-	const env = import.meta.env.PUBLIC_CONVEX_URL ?? import.meta.env.VITE_CONVEX_URL;
-	if (typeof env !== 'string' || env.trim() === '') {
-		throw new Error('Missing PUBLIC_CONVEX_URL for extension.');
-	}
-	return env;
 }
 
 function readWebAppUrl() {

@@ -1,26 +1,37 @@
 import { createClerkClient } from '@clerk/chrome-extension/client';
 import type { PurchaseRequest } from '@engage-form/domain';
-import { ConvexClient } from 'convex/browser';
+import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../convex/_generated/api.js';
 import type { Id } from '../../../convex/_generated/dataModel.js';
 import type { ExtensionMessage, ExtensionResponse } from './content-runner.ts';
 
 type RuntimeMessage =
 	| { type: 'ENGAGE_START_FILL'; purchaseId: string }
+	| { type: 'ENGAGE_LIST_READY_PURCHASES' }
 	| { type: 'ENGAGE_GET_READY_PURCHASE'; purchaseId: string }
 	| { type: 'ENGAGE_REVIEW_REACHED'; purchaseId: string }
 	| { type: 'ENGAGE_FILL_RUN_ENDED' }
 	| { type: 'ENGAGE_AUTH_STATE' }
-	| { type: 'ENGAGE_GET_CONVEX_TOKEN' }
 	| { type: 'ENGAGE_SIGN_OUT' };
 
 type RuntimeResponse =
 	| ExtensionResponse
+	| { ok: true; purchases: ReadyPurchaseRequest[] }
 	| { ok: true; purchase: PurchaseRequest }
 	| { ok: true; message: string }
 	| { ok: true; signedIn: boolean; email: string | null }
-	| { ok: true; token: string | null }
 	| { ok: false; message: string };
+
+type ReadyPurchaseRequest = {
+	id: Id<'purchaseRequests'>;
+	status: 'ready';
+	organization: string;
+	purchaser: string;
+	itemDescription: string;
+	totalAmount: number;
+	updatedAt: number;
+	lastFilledAt: number | null;
+};
 
 type ChromeApi = {
 	runtime: {
@@ -57,12 +68,9 @@ type ChromeApi = {
 
 declare const chrome: ChromeApi;
 
-let clerk = createSyncedClerk();
-const convex = new ConvexClient(readConvexUrl());
+let clerk: ReturnType<typeof createSyncedClerk> | null = null;
 const documentDataUrls = new Map<string, string>();
 let activePurchaseId: string | null = null;
-
-convex.setAuth(getConvexToken);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	void handleRuntimeMessage(message)
@@ -86,15 +94,17 @@ async function handleRuntimeMessage(message: RuntimeMessage): Promise<RuntimeRes
 		};
 	}
 
-	if (message.type === 'ENGAGE_GET_CONVEX_TOKEN') {
-		return { ok: true, token: await getConvexToken() };
-	}
-
 	if (message.type === 'ENGAGE_SIGN_OUT') {
-		await (await clerk).signOut();
+		await (await getClerk()).signOut();
 		await refreshClerk();
 		clearActiveFillRun();
 		return { ok: true, message: 'Signed out.' };
+	}
+
+	if (message.type === 'ENGAGE_LIST_READY_PURCHASES') {
+		const convex = await authedConvex();
+		const purchases = await convex.query(api.authed.extension.listReadyPurchases, {});
+		return { ok: true, purchases };
 	}
 
 	if (message.type === 'ENGAGE_FILL_RUN_ENDED') {
@@ -110,6 +120,7 @@ async function handleRuntimeMessage(message: RuntimeMessage): Promise<RuntimeRes
 	}
 
 	if (message.type === 'ENGAGE_REVIEW_REACHED') {
+		const convex = await authedConvex();
 		await convex.mutation(api.authed.extension.markReviewReached, {
 			id: message.purchaseId as Id<'purchaseRequests'>
 		});
@@ -121,7 +132,15 @@ async function handleRuntimeMessage(message: RuntimeMessage): Promise<RuntimeRes
 }
 
 async function getConvexToken() {
-	return (await clerk).session?.getToken({ template: 'convex' }) ?? null;
+	return (await getClerk()).session?.getToken({ template: 'convex' }) ?? null;
+}
+
+async function authedConvex() {
+	const token = await getConvexToken();
+	if (token === null) throw new Error('Signed in session missing Convex token.');
+	const convex = new ConvexHttpClient(readConvexUrl());
+	convex.setAuth(token);
+	return convex;
 }
 
 function createSyncedClerk() {
@@ -132,9 +151,17 @@ function createSyncedClerk() {
 	});
 }
 
-function refreshClerk() {
-	clerk = createSyncedClerk();
+function getClerk() {
+	clerk ??= createSyncedClerk().catch((error: unknown) => {
+		clerk = null;
+		throw error;
+	});
 	return clerk;
+}
+
+function refreshClerk() {
+	clerk = null;
+	return getClerk();
 }
 
 async function fillActiveTab(purchaseId: string): Promise<ExtensionResponse> {
@@ -198,6 +225,7 @@ async function getPreparedPurchase(purchaseId: string): Promise<PurchaseRequest>
 		activePurchaseId = purchaseId;
 	}
 
+	const convex = await authedConvex();
 	const purchase = (await convex.query(api.authed.extension.getReadyPurchaseForFill, {
 		id: purchaseId as Id<'purchaseRequests'>
 	})) as unknown as PurchaseRequest;
