@@ -1,3 +1,4 @@
+import type { PurchaseRequest } from '@engage-form/domain';
 import { detectStep, type FillAction } from '@engage-form/fill-engine';
 import { browser } from 'wxt/browser';
 import { createContentRunner } from '../lib/content-runner';
@@ -12,6 +13,8 @@ import {
 	uploadMiss
 } from '../lib/form-controls';
 import type { FillMessage, FillResponse } from '../lib/messages';
+
+const FILL_RUN_KEY = 'engageFormFillRun';
 
 type UploadDocument = {
 	filename: string;
@@ -31,11 +34,11 @@ export default defineContentScript({
 			pageHeading,
 			applyFillPlan,
 			clickNextStep,
-			sendReviewReached() {},
-			loadPurchaseRequest: () => Promise.resolve(null),
-			loadFillRun: () => null,
-			saveFillRun() {},
-			clearFillRun() {}
+			sendReviewReached,
+			loadPurchaseRequest,
+			loadFillRun,
+			saveFillRun,
+			clearFillRun
 		});
 
 		browser.runtime.onMessage.addListener((message) => {
@@ -58,6 +61,12 @@ export default defineContentScript({
 					return response;
 				});
 		});
+
+		window.setTimeout(() => {
+			void runner.resumeFillRun().then((response) => {
+				if (response !== null) showToast(response.message);
+			});
+		}, 500);
 	}
 });
 
@@ -173,6 +182,58 @@ function actionLabel(action: Exclude<FillAction, { type: 'stop' }>) {
 	}
 
 	return `${action.type}:${action.labelIncludes}`;
+}
+
+function sendReviewReached(purchaseId: string) {
+	void browser.runtime.sendMessage({
+		type: 'REVIEW_REACHED',
+		purchaseId
+	});
+}
+
+function loadFillRun() {
+	const json = window.sessionStorage.getItem(FILL_RUN_KEY);
+	if (json === null) return null;
+
+	try {
+		const state = parseFillRunState(JSON.parse(json));
+		if (state === null) clearFillRun();
+		return state;
+	} catch {
+		clearFillRun();
+		return null;
+	}
+}
+
+function saveFillRun(state: { purchaseId: string; filled: number; pageCount: number }) {
+	window.sessionStorage.setItem(FILL_RUN_KEY, JSON.stringify(state));
+}
+
+function clearFillRun() {
+	window.sessionStorage.removeItem(FILL_RUN_KEY);
+	void browser.runtime.sendMessage({ type: 'FILL_RUN_ENDED' });
+}
+
+async function loadPurchaseRequest(purchaseId: string) {
+	const response = (await browser.runtime.sendMessage({
+		type: 'GET_FILL_PAYLOAD',
+		purchaseId
+	})) as { ok: true; purchase: PurchaseRequest } | { ok: false; message: string } | undefined;
+
+	return response?.ok === true && 'purchase' in response ? response.purchase : null;
+}
+
+function parseFillRunState(value: unknown) {
+	if (!isRecord(value) || typeof value.purchaseId !== 'string') return null;
+	return {
+		purchaseId: value.purchaseId,
+		filled: typeof value.filled === 'number' ? value.filled : 0,
+		pageCount: typeof value.pageCount === 'number' ? value.pageCount : 0
+	};
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
 }
 
 function showToast(message: string) {

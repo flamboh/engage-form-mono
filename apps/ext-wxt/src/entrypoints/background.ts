@@ -72,12 +72,31 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 		});
 	}
 
+	if (message.type === 'FILL_RUN_ENDED') {
+		clearActiveFillRun();
+		return Effect.succeed({ ok: true, message: 'Fill run ended.' });
+	}
+
 	if (message.type === 'GET_FILL_PAYLOAD') {
 		return Effect.tryPromise({
 			try: async () => ({
 				ok: true,
 				purchase: await getPreparedPurchase(message.purchaseId)
 			}),
+			catch: toError
+		});
+	}
+
+	if (message.type === 'REVIEW_REACHED') {
+		return Effect.tryPromise({
+			try: async () => {
+				const convex = await authedConvex();
+				await convex.mutation(api.authed.extension.markReviewReached, {
+					id: message.purchaseId as Id<'purchaseRequests'>
+				});
+				clearActiveFillRun();
+				return { ok: true, message: 'Marked review reached.' } as const;
+			},
 			catch: toError
 		});
 	}
@@ -149,7 +168,7 @@ async function fillActiveTab(purchaseId: string, token: string): Promise<FillRes
 	const purchase = await getPreparedPurchase(purchaseId, token);
 	const tab = await currentEngageTab();
 	const message: FillMessage = {
-		type: 'FILL_CURRENT_PAGE',
+		type: 'START_FILL_RUN',
 		purchase
 	};
 	return await sendFillMessage(tab.id, message);

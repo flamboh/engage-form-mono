@@ -18,12 +18,19 @@ export type RuntimeMessage =
 	| { type: 'GET_CONVEX_TOKEN' }
 	| { type: 'SIGN_OUT' }
 	| { type: 'START_FILL'; purchaseId: string; token: string }
-	| { type: 'GET_FILL_PAYLOAD'; purchaseId: string };
+	| { type: 'GET_FILL_PAYLOAD'; purchaseId: string }
+	| { type: 'REVIEW_REACHED'; purchaseId: string }
+	| { type: 'FILL_RUN_ENDED' };
 
-export type FillMessage = {
-	type: 'FILL_CURRENT_PAGE';
-	purchase: PurchaseRequest;
-};
+export type FillMessage =
+	| {
+			type: 'FILL_CURRENT_PAGE';
+			purchase: PurchaseRequest;
+	  }
+	| {
+			type: 'START_FILL_RUN';
+			purchase: PurchaseRequest;
+	  };
 
 export type RuntimeResponse =
 	| { ok: true; signedIn: boolean; email: string | null }
