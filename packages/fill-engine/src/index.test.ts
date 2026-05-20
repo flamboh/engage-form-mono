@@ -95,6 +95,17 @@ test('fills the fixed Personal Reimbursement reason', () => {
 	});
 });
 
+test('fills Engage acknowledgements mechanically', () => {
+	const plan = createFillPlan('claims', samplePurchaseRequest);
+
+	expect(plan.actions).toEqual([
+		{ type: 'checkbox', labelIncludes: 'no alcohol', checked: true },
+		{ type: 'checkbox', labelIncludes: 'not host a raffle', checked: true },
+		{ type: 'checkbox', labelIncludes: 'ASUO rule', checked: true },
+		{ type: 'checkbox', labelIncludes: 'personal reimbursements', checked: true }
+	]);
+});
+
 test('creates upload fill plans', () => {
 	const reimbursement = createFillPlan('reimbursement', samplePurchaseRequest);
 	expect(reimbursement.actions).toContainEqual({
