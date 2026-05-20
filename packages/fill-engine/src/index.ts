@@ -153,13 +153,11 @@ export const engageSchema: EngageStepSchema[] = [
 		step: 'documentation',
 		headingIncludes: ['documentation inquiry'],
 		fields: [
-			checkboxField('ASUO funds', (purchase) =>
-				effectiveDocumentationCategories(purchase).includes('asuo_funds')
-			),
-			checkboxField('food', false),
-			checkboxField('printing services', false),
+			categoryCheckboxField('ASUO funds', 'asuo_funds'),
+			categoryCheckboxField('food', 'food'),
+			categoryCheckboxField('printing services', 'printing_services'),
 			checkboxField('merchandise/apparel or gifts', true),
-			checkboxField('office supplies/goods', false)
+			categoryCheckboxField('office supplies/goods', 'office_supplies_goods')
 		]
 	},
 	{
@@ -344,6 +342,15 @@ function checkboxField(
 	checked: boolean | ((purchaseRequest: PurchaseRequest) => boolean)
 ): EngageField {
 	return { type: 'checkbox', labelIncludes, checked };
+}
+
+function categoryCheckboxField(
+	labelIncludes: string,
+	category: PurchaseRequest['documentationCategories'][number]
+): EngageField {
+	return checkboxField(labelIncludes, (purchase) =>
+		effectiveDocumentationCategories(purchase).includes(category)
+	);
 }
 
 function radioField(labelIncludes: string): EngageField {

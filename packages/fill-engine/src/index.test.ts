@@ -194,6 +194,26 @@ test('fills ASUO Funds when a non-I Fund Letter selects it', () => {
 	});
 });
 
+test('fills selected additive Documentation Categories', () => {
+	const plan = createFillPlan('documentation', {
+		...samplePurchaseRequest,
+		documentationCategories: ['food', 'printing_services', 'office_supplies_goods'],
+		organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
+	});
+
+	expect(plan.actions).toContainEqual({ type: 'checkbox', labelIncludes: 'food', checked: true });
+	expect(plan.actions).toContainEqual({
+		type: 'checkbox',
+		labelIncludes: 'printing services',
+		checked: true
+	});
+	expect(plan.actions).toContainEqual({
+		type: 'checkbox',
+		labelIncludes: 'office supplies/goods',
+		checked: true
+	});
+});
+
 test('skips self approval upload when requester is not purchaser', () => {
 	expect(
 		createFillPlan('selfApproval', {

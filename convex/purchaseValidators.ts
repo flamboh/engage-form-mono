@@ -19,7 +19,12 @@ export const typeOfPurchase = v.union(
 	v.literal('service_agreement_or_purchase_order_for_service')
 );
 
-export const documentationCategory = v.union(v.literal('asuo_funds'));
+export const documentationCategory = v.union(
+	v.literal('asuo_funds'),
+	v.literal('food'),
+	v.literal('printing_services'),
+	v.literal('office_supplies_goods')
+);
 
 export const fileKind = v.union(
 	v.literal('receipt'),
@@ -27,6 +32,10 @@ export const fileKind = v.union(
 	v.literal('id_back'),
 	v.literal('second_approval'),
 	v.literal('publicity'),
+	v.literal('catering_waiver'),
+	v.literal('printing_invoice'),
+	v.literal('building_manager_approval'),
+	v.literal('computer_price_quote'),
 	v.literal('brand_approval'),
 	v.literal('recipient_list')
 );
@@ -94,6 +103,11 @@ export const draftPatch = v.object({
 	receiptFileIds: v.optional(v.array(v.id('files'))),
 	secondApprovalFileId: v.optional(v.union(v.id('files'), v.null())),
 	publicityFileId: v.optional(v.union(v.id('files'), v.null())),
+	cateringWaiverFileId: v.optional(v.union(v.id('files'), v.null())),
+	printingInvoiceFileId: v.optional(v.union(v.id('files'), v.null())),
+	officeLocation: v.optional(v.string()),
+	buildingManagerApprovalFileId: v.optional(v.union(v.id('files'), v.null())),
+	computerPriceQuoteFileId: v.optional(v.union(v.id('files'), v.null())),
 	recipients: v.optional(v.array(recipient))
 });
 
@@ -194,6 +208,11 @@ export const purchaseRequestDoc = v.object({
 	receiptFileIds: v.array(v.id('files')),
 	secondApprovalFileId: v.union(v.id('files'), v.null()),
 	publicityFileId: v.union(v.id('files'), v.null()),
+	cateringWaiverFileId: v.union(v.id('files'), v.null()),
+	printingInvoiceFileId: v.union(v.id('files'), v.null()),
+	officeLocation: v.string(),
+	buildingManagerApprovalFileId: v.union(v.id('files'), v.null()),
+	computerPriceQuoteFileId: v.union(v.id('files'), v.null()),
 	recipients: v.array(recipient),
 	createdAt: v.number(),
 	updatedAt: v.number(),
@@ -263,6 +282,11 @@ export const assembledPurchase = v.object({
 	requesterIsPurchaser: v.boolean(),
 	receiptFileIds: v.array(v.id('files')),
 	secondApprovalFileId: v.union(v.id('files'), v.null()),
+	cateringWaiverFileId: v.union(v.id('files'), v.null()),
+	printingInvoiceFileId: v.union(v.id('files'), v.null()),
+	officeLocation: v.string(),
+	buildingManagerApprovalFileId: v.union(v.id('files'), v.null()),
+	computerPriceQuoteFileId: v.union(v.id('files'), v.null()),
 	recipients: v.array(recipient),
 	documents: v.array(documentPayload)
 });

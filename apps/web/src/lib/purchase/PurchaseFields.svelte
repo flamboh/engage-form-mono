@@ -6,7 +6,11 @@
 		| 'pcard'
 		| 'co_sponsorship_payment'
 		| 'service_agreement_or_purchase_order_for_service';
-	type DocumentationCategory = 'asuo_funds';
+	type DocumentationCategory =
+		| 'asuo_funds'
+		| 'food'
+		| 'printing_services'
+		| 'office_supplies_goods';
 	type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 	type Props = {
 		typeOfPurchase: TypeOfPurchase;
@@ -22,6 +26,7 @@
 		totalAmount: number;
 		budgetLineItem: string;
 		budgetLineOptions: string[];
+		officeLocation: string;
 		onChange: () => void;
 	};
 
@@ -36,6 +41,11 @@
 			label: 'Service Agreement or Purchase Order for Service',
 			disabled: true
 		}
+	];
+	const documentationCategoryOptions: { value: DocumentationCategory; label: string }[] = [
+		{ value: 'food', label: 'Food' },
+		{ value: 'printing_services', label: 'Printing Services' },
+		{ value: 'office_supplies_goods', label: 'Office Supplies/Goods' }
 	];
 
 	let {
@@ -52,6 +62,7 @@
 		totalAmount = $bindable(),
 		budgetLineItem = $bindable(),
 		budgetLineOptions,
+		officeLocation = $bindable(),
 		onChange
 	}: Props = $props();
 
@@ -101,6 +112,17 @@
 					/>
 					<span>ASUO Funds</span>
 				</label>
+				{#each documentationCategoryOptions as option (option.value)}
+					<label>
+						<input
+							type="checkbox"
+							checked={documentationCategories.includes(option.value)}
+							onchange={(event) =>
+								setDocumentationCategory(option.value, event.currentTarget.checked)}
+						/>
+						<span>{option.label}</span>
+					</label>
+				{/each}
 			</div>
 		</fieldset>
 		<label>
@@ -162,6 +184,12 @@
 				<input class="field" bind:value={budgetLineItem} oninput={onChange} />
 			{/if}
 		</label>
+		{#if documentationCategories.includes('office_supplies_goods')}
+			<label>
+				<span>Office location</span>
+				<input class="field" bind:value={officeLocation} oninput={onChange} />
+			</label>
+		{/if}
 	</div>
 </section>
 

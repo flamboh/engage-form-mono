@@ -6,6 +6,10 @@ export type DocumentKind =
 	| 'id_back'
 	| 'second_approval'
 	| 'publicity'
+	| 'catering_waiver'
+	| 'printing_invoice'
+	| 'building_manager_approval'
+	| 'computer_price_quote'
 	| 'brand_approval'
 	| 'recipient_list';
 
@@ -17,7 +21,11 @@ export type TypeOfPurchase =
 	| 'pcard'
 	| 'co_sponsorship_payment'
 	| 'service_agreement_or_purchase_order_for_service';
-export type DocumentationCategory = 'asuo_funds';
+export type DocumentationCategory =
+	| 'asuo_funds'
+	| 'food'
+	| 'printing_services'
+	| 'office_supplies_goods';
 
 export const fixedPersonalReimbursementReason = 'Other processes are too slow.';
 
@@ -88,6 +96,11 @@ export type PurchaseRequest = {
 	requesterIsPurchaser: boolean;
 	receiptFileIds: string[];
 	secondApprovalFileId: string | null;
+	cateringWaiverFileId: string | null;
+	printingInvoiceFileId: string | null;
+	officeLocation: string;
+	buildingManagerApprovalFileId: string | null;
+	computerPriceQuoteFileId: string | null;
 	recipients: Recipient[];
 	documents: Document[];
 };
@@ -147,6 +160,11 @@ export const samplePurchaseRequest: PurchaseRequest = {
 	requesterIsPurchaser: true,
 	receiptFileIds: ['file_receipt'],
 	secondApprovalFileId: 'file_approval',
+	cateringWaiverFileId: null,
+	printingInvoiceFileId: null,
+	officeLocation: '',
+	buildingManagerApprovalFileId: null,
+	computerPriceQuoteFileId: null,
 	recipients: [
 		{
 			name: "Aidan O'Donnell",
@@ -323,12 +341,37 @@ export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 		purchaseRequest.purchaser.idCardBackFileId,
 		'ID card back document missing.'
 	);
-	if (effectiveDocumentationCategories(purchaseRequest).includes('asuo_funds')) {
+	const documentationCategories = effectiveDocumentationCategories(purchaseRequest);
+	if (documentationCategories.includes('asuo_funds')) {
 		requireText(
 			issues,
 			'eventDetails.publicityProofFileId',
 			purchaseRequest.eventDetails.publicityProofFileId ?? '',
 			'Publicity proof missing.'
+		);
+	}
+	if (documentationCategories.includes('food')) {
+		requireText(
+			issues,
+			'cateringWaiverFileId',
+			purchaseRequest.cateringWaiverFileId ?? '',
+			'Catering waiver missing.'
+		);
+	}
+	if (documentationCategories.includes('printing_services')) {
+		requireText(
+			issues,
+			'printingInvoiceFileId',
+			purchaseRequest.printingInvoiceFileId ?? '',
+			'Printing invoice missing.'
+		);
+	}
+	if (documentationCategories.includes('office_supplies_goods')) {
+		requireText(
+			issues,
+			'officeLocation',
+			purchaseRequest.officeLocation,
+			'Office location missing.'
 		);
 	}
 

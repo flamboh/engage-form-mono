@@ -86,6 +86,11 @@
 	let receiptFileIds = $state<Id<'files'>[]>([]);
 	let secondApprovalFileId = $state<Id<'files'> | null>(null);
 	let publicityFileId = $state<Id<'files'> | null>(null);
+	let cateringWaiverFileId = $state<Id<'files'> | null>(null);
+	let printingInvoiceFileId = $state<Id<'files'> | null>(null);
+	let officeLocation = $state('');
+	let buildingManagerApprovalFileId = $state<Id<'files'> | null>(null);
+	let computerPriceQuoteFileId = $state<Id<'files'> | null>(null);
 	let saveState = $state('Draft starting...');
 	let error = $state('');
 	let draftInitializing = $state(false);
@@ -109,6 +114,11 @@
 	const purchaserIsSelf = $derived(purchaserSource.kind === 'self');
 	const asuoFundsApplies = $derived(
 		studentOrganization.fundLetter === 'I' || documentationCategories.includes('asuo_funds')
+	);
+	const foodApplies = $derived(documentationCategories.includes('food'));
+	const printingServicesApplies = $derived(documentationCategories.includes('printing_services'));
+	const officeSuppliesGoodsApplies = $derived(
+		documentationCategories.includes('office_supplies_goods')
 	);
 	const purchaserName = $derived(purchaser?.name ?? '{purchaser}');
 	let lastOrganizationId = $state<Id<'organizations'> | null>(null);
@@ -234,6 +244,11 @@
 			receiptFileIds = draft.receiptFileIds;
 			secondApprovalFileId = draft.secondApprovalFileId;
 			publicityFileId = draft.publicityFileId;
+			cateringWaiverFileId = draft.cateringWaiverFileId;
+			printingInvoiceFileId = draft.printingInvoiceFileId;
+			officeLocation = draft.officeLocation;
+			buildingManagerApprovalFileId = draft.buildingManagerApprovalFileId;
+			computerPriceQuoteFileId = draft.computerPriceQuoteFileId;
 			recipients = draft.recipients;
 			lastOrganizationId = draft.organizationSourceId;
 			saveState = 'Draft autosaves';
@@ -266,6 +281,11 @@
 			receiptFileIds,
 			secondApprovalFileId,
 			publicityFileId,
+			cateringWaiverFileId,
+			printingInvoiceFileId,
+			officeLocation,
+			buildingManagerApprovalFileId,
+			computerPriceQuoteFileId,
 			recipients
 		};
 	}
@@ -312,7 +332,14 @@
 	}
 
 	async function uploadRequestFile(
-		kind: 'receipt' | 'second_approval' | 'publicity',
+		kind:
+			| 'receipt'
+			| 'second_approval'
+			| 'publicity'
+			| 'catering_waiver'
+			| 'printing_invoice'
+			| 'building_manager_approval'
+			| 'computer_price_quote',
 		input: HTMLInputElement
 	) {
 		const session = clerkContext.currentSession;
@@ -325,6 +352,10 @@
 		if (kind === 'receipt') receiptFileIds = ids;
 		if (kind === 'second_approval') secondApprovalFileId = ids[0] ?? null;
 		if (kind === 'publicity') publicityFileId = ids[0] ?? null;
+		if (kind === 'catering_waiver') cateringWaiverFileId = ids[0] ?? null;
+		if (kind === 'printing_invoice') printingInvoiceFileId = ids[0] ?? null;
+		if (kind === 'building_manager_approval') buildingManagerApprovalFileId = ids[0] ?? null;
+		if (kind === 'computer_price_quote') computerPriceQuoteFileId = ids[0] ?? null;
 		await autosave();
 	}
 
@@ -459,6 +490,7 @@
 				bind:totalAmount
 				bind:budgetLineItem
 				budgetLineOptions={studentOrganization.budgetLines}
+				bind:officeLocation
 				onChange={onFieldChange}
 			/>
 
@@ -501,6 +533,32 @@
 						status={publicityFileId ? 'Uploaded' : asuoFundsApplies ? 'Required' : 'Optional'}
 						onFiles={(input) => uploadRequestFile('publicity', input)}
 					/>
+					{#if foodApplies}
+						<FilePicker
+							label="Catering waiver"
+							status={cateringWaiverFileId ? 'Uploaded' : 'Required'}
+							onFiles={(input) => uploadRequestFile('catering_waiver', input)}
+						/>
+					{/if}
+					{#if printingServicesApplies}
+						<FilePicker
+							label="Printing invoice"
+							status={printingInvoiceFileId ? 'Uploaded' : 'Required'}
+							onFiles={(input) => uploadRequestFile('printing_invoice', input)}
+						/>
+					{/if}
+					{#if officeSuppliesGoodsApplies}
+						<FilePicker
+							label="Building manager approval"
+							status={buildingManagerApprovalFileId ? 'Uploaded' : 'Optional'}
+							onFiles={(input) => uploadRequestFile('building_manager_approval', input)}
+						/>
+						<FilePicker
+							label="Computer price quote"
+							status={computerPriceQuoteFileId ? 'Uploaded' : 'Optional'}
+							onFiles={(input) => uploadRequestFile('computer_price_quote', input)}
+						/>
+					{/if}
 					{#if purchaserIsSelf}
 						<FilePicker
 							label="Second approval"

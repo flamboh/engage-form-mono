@@ -347,6 +347,11 @@ export const createDraft = authedMutation({
 			receiptFileIds: [],
 			secondApprovalFileId: null,
 			publicityFileId: null,
+			cateringWaiverFileId: null,
+			printingInvoiceFileId: null,
+			officeLocation: '',
+			buildingManagerApprovalFileId: null,
+			computerPriceQuoteFileId: null,
 			recipients: [],
 			createdAt: now,
 			updatedAt: now,
@@ -411,7 +416,11 @@ export const discardDraft = authedMutation({
 		const fileIds = [
 			...request.receiptFileIds,
 			request.secondApprovalFileId,
-			request.publicityFileId
+			request.publicityFileId,
+			request.cateringWaiverFileId,
+			request.printingInvoiceFileId,
+			request.buildingManagerApprovalFileId,
+			request.computerPriceQuoteFileId
 		].filter((id): id is Id<'files'> => id !== null);
 		for (const fileId of fileIds) {
 			const file = await requireOwnedDoc(ctx, 'files', fileId, owner);
