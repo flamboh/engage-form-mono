@@ -198,15 +198,14 @@ export const purchaserDoc = v.object({
 	updatedAt: v.number()
 });
 
-export const eventPresetDoc = v.object({
-	_id: v.id('eventPresets'),
+export const businessPurposeTemplateDoc = v.object({
+	_id: v.id('businessPurposeTemplates'),
 	_creationTime: v.number(),
 	owner: v.string(),
 	organizationId: v.id('organizations'),
-	name: v.string(),
-	time: v.string(),
-	location: v.string(),
-	estimatedAttendance: v.number(),
+	title: v.string(),
+	businessPurposeTemplate: v.string(),
+	searchText: v.string(),
 	archived: v.boolean(),
 	updatedAt: v.number()
 });
@@ -252,7 +251,7 @@ export const purchaseRequestDoc = v.object({
 export const savedData = v.object({
 	organizations: v.array(organizationDoc),
 	purchasers: v.array(purchaserDoc),
-	eventPresets: v.array(eventPresetDoc)
+	businessPurposeTemplates: v.array(businessPurposeTemplateDoc)
 });
 
 export const documentPayload = v.object({

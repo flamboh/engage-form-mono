@@ -21,7 +21,7 @@
 		| {
 				organizations: Doc<'organizations'>[];
 				purchasers: Doc<'purchasers'>[];
-				eventPresets: Doc<'eventPresets'>[];
+				businessPurposeTemplates: Doc<'businessPurposeTemplates'>[];
 		  }
 		| undefined
 	>(savedQuery.data);
@@ -44,12 +44,12 @@
 	let idFrontFileId = $state<Id<'files'> | null>(null);
 	let idBackFileId = $state<Id<'files'> | null>(null);
 
-	let eventOrgId = $state<Id<'organizations'> | ''>('');
-	let eventId = $state<Id<'eventPresets'> | null>(null);
-	let eventName = $state('');
-	let eventTime = $state('');
-	let eventLocation = $state('');
-	let eventAttendance = $state(50);
+	let templateOrgId = $state<Id<'organizations'> | ''>('');
+	let templateId = $state<Id<'businessPurposeTemplates'> | null>(null);
+	let templateTitle = $state('');
+	let templateText = $state(
+		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.'
+	);
 	let error = $state('');
 
 	function editOrg(org: Doc<'organizations'>) {
@@ -71,13 +71,11 @@
 		idBackFileId = purchaser.idCardBackFileId;
 	}
 
-	function editEvent(eventPreset: Doc<'eventPresets'>) {
-		eventId = eventPreset._id;
-		eventOrgId = eventPreset.organizationId;
-		eventName = eventPreset.name;
-		eventTime = eventPreset.time;
-		eventLocation = eventPreset.location;
-		eventAttendance = eventPreset.estimatedAttendance;
+	function editBusinessPurposeTemplate(template: Doc<'businessPurposeTemplates'>) {
+		templateId = template._id;
+		templateOrgId = template.organizationId;
+		templateTitle = template.title;
+		templateText = template.businessPurposeTemplate;
 	}
 
 	function addBudgetLine() {
@@ -123,8 +121,8 @@
 	}
 
 	async function archiveRecord(
-		table: 'organizations' | 'purchasers' | 'eventPresets',
-		id: Id<'organizations'> | Id<'purchasers'> | Id<'eventPresets'>,
+		table: 'organizations' | 'purchasers' | 'businessPurposeTemplates',
+		id: Id<'organizations'> | Id<'purchasers'> | Id<'businessPurposeTemplates'>,
 		archived: boolean
 	) {
 		error = '';
@@ -167,26 +165,24 @@
 		}
 	}
 
-	async function saveEvent(event: SubmitEvent) {
+	async function saveBusinessPurposeTemplate(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
-		if (!eventOrgId) {
+		if (!templateOrgId) {
 			error = 'Student organization required.';
 			return;
 		}
 		try {
-			await client.mutation(api.authed.purchaseBuilder.upsertEventPreset, {
-				id: eventId,
-				organizationId: eventOrgId,
-				name: eventName,
-				time: eventTime,
-				location: eventLocation,
-				estimatedAttendance: eventAttendance
+			await client.mutation(api.authed.purchaseBuilder.upsertBusinessPurposeTemplate, {
+				id: templateId,
+				organizationId: templateOrgId,
+				title: templateTitle,
+				businessPurposeTemplate: templateText
 			});
-			eventId = null;
-			eventName = '';
-			eventTime = '';
-			eventLocation = '';
+			templateId = null;
+			templateTitle = '';
+			templateText =
+				'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.';
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -364,36 +360,38 @@
 				</section>
 
 				<section class="rounded-lg border border-stone-200 bg-white p-5">
-					<h2 class="text-sm font-semibold">Event Templates</h2>
-					<form class="mt-4 space-y-3" onsubmit={saveEvent}>
-						<select class="field" bind:value={eventOrgId}>
+					<h2 class="text-sm font-semibold">Business Purpose Templates</h2>
+					<form class="mt-4 space-y-3" onsubmit={saveBusinessPurposeTemplate}>
+						<select class="field" bind:value={templateOrgId}>
 							<option value="">Student Organization</option>
 							{#each savedData?.organizations ?? [] as org (org._id)}
 								<option value={org._id}>{org.name}</option>
 							{/each}
 						</select>
-						<input class="field" placeholder="Name" required bind:value={eventName} />
-						<input class="field" placeholder="Time" required bind:value={eventTime} />
-						<input class="field" placeholder="Location" required bind:value={eventLocation} />
-						<input class="field" type="number" min="1" bind:value={eventAttendance} />
-						<button class="button" type="submit">Save event template</button>
+						<input class="field" placeholder="Template title" required bind:value={templateTitle} />
+						<textarea class="field min-h-32" required bind:value={templateText}></textarea>
+						<button class="button" type="submit">Save Business Purpose Template</button>
 					</form>
 					<ul class="mt-5 divide-y divide-stone-200">
-						{#each savedData?.eventPresets ?? [] as eventPreset (eventPreset._id)}
+						{#each savedData?.businessPurposeTemplates ?? [] as template (template._id)}
 							<li class="py-3 text-sm">
-								<p class="font-medium">{eventPreset.name}</p>
-								<p class="text-stone-500">{eventPreset.time} · {eventPreset.location}</p>
+								<p class="font-medium">{template.title}</p>
+								<p class="text-stone-500">{template.businessPurposeTemplate}</p>
 								<div class="mt-2 flex gap-2">
-									<button class="link-button" type="button" onclick={() => editEvent(eventPreset)}>
+									<button
+										class="link-button"
+										type="button"
+										onclick={() => editBusinessPurposeTemplate(template)}
+									>
 										Edit
 									</button>
 									<button
 										class="link-button"
 										type="button"
 										onclick={() =>
-											archiveRecord('eventPresets', eventPreset._id, !eventPreset.archived)}
+											archiveRecord('businessPurposeTemplates', template._id, !template.archived)}
 									>
-										{eventPreset.archived ? 'Unarchive' : 'Archive'}
+										{template.archived ? 'Unarchive' : 'Archive'}
 									</button>
 								</div>
 							</li>

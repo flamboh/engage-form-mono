@@ -16,7 +16,7 @@ First supported case:
 
 ## Product Flow
 
-1. User creates reusable student organization, purchaser, and event template data in the web app.
+1. User creates reusable student organization, purchaser, and Business Purpose Template data in the web app.
 2. User creates a purchase request from those autofill sources.
 3. Web app validates that all required information and documents are present.
 4. Purchase request is marked Ready for Engage.
@@ -43,13 +43,10 @@ Purchaser:
 - Permanent address
 - ID card document or documents
 
-Event Template:
+Business Purpose Template:
 
-- Name
-- Date pattern or weekly schedule
-- Time
-- Location
-- Estimated attendance
+- Title
+- Business Purpose source text
 
 Purchase Request:
 

@@ -4,6 +4,10 @@ import {
 	applyDraftPatch,
 	assemblePurchase,
 	assertReady,
+	businessPurposeTemplateDraftPatch,
+	businessPurposeTemplateFields,
+	businessPurposeTemplateUpdateFields,
+	filterBusinessPurposeTemplates,
 	parseBusinessPurposeText,
 	renderBusinessPurpose,
 	userAsPurchaserDetails
@@ -185,6 +189,128 @@ test('fill payload resolves Business Purpose at read time', async () => {
 	).resolves.toMatchObject({
 		businessPurposeText: 'Reimburse Oliver Boorstein for record.'
 	});
+});
+
+test('Business Purpose Template creation requires a title and valid template source', () => {
+	expect(
+		businessPurposeTemplateFields(
+			'owner',
+			{
+				organizationId: 'org_1' as never,
+				title: '  Weekly gift prize  ',
+				businessPurposeTemplate: 'Reimburse {Purchaser} for {Item Description}.'
+			},
+			10
+		)
+	).toMatchObject({
+		owner: 'owner',
+		organizationId: 'org_1',
+		title: 'Weekly gift prize',
+		businessPurposeTemplate: 'Reimburse {Purchaser} for {Item Description}.',
+		searchText: 'Weekly gift prize Reimburse {Purchaser} for {Item Description}.',
+		archived: false,
+		updatedAt: 10
+	});
+
+	expect(() =>
+		businessPurposeTemplateFields(
+			'owner',
+			{
+				organizationId: 'org_1' as never,
+				title: ' ',
+				businessPurposeTemplate: 'Reimburse {Purchaser}.'
+			},
+			10
+		)
+	).toThrow('Business Purpose Template title missing.');
+
+	expect(() =>
+		businessPurposeTemplateFields(
+			'owner',
+			{
+				organizationId: 'org_1' as never,
+				title: 'Broken',
+				businessPurposeTemplate: 'Reimburse {Unknown}.'
+			},
+			10
+		)
+	).toThrow('Unknown Business Purpose variable: Unknown.');
+});
+
+test('Business Purpose Template updates do not unarchive archived templates', () => {
+	expect(
+		businessPurposeTemplateUpdateFields(
+			{
+				title: 'Updated',
+				businessPurposeTemplate: 'Updated {Purchaser}.'
+			},
+			20
+		)
+	).toEqual({
+		title: 'Updated',
+		businessPurposeTemplate: 'Updated {Purchaser}.',
+		searchText: 'Updated Updated {Purchaser}.',
+		updatedAt: 20
+	});
+});
+
+test('Business Purpose Template search hides archived templates by default', () => {
+	const templates = [
+		{
+			_id: 'template_1',
+			title: 'Weekly prizes',
+			businessPurposeTemplate: 'Reimburse records.',
+			archived: false
+		},
+		{
+			_id: 'template_2',
+			title: 'Old prizes',
+			businessPurposeTemplate: 'Reimburse shirts.',
+			archived: true
+		}
+	];
+
+	expect(
+		filterBusinessPurposeTemplates(templates, 'prizes').map((template) => template._id)
+	).toEqual(['template_1']);
+	expect(
+		filterBusinessPurposeTemplates(templates, 'shirts', { includeArchived: true }).map(
+			(template) => template._id
+		)
+	).toEqual(['template_2']);
+});
+
+test('Draft Business Purpose initialization copies template source', () => {
+	const template = {
+		businessPurposeTemplate: 'Reimburse {Purchaser} for {Item Description}.',
+		archived: false
+	};
+	const initialized = {
+		...request,
+		...businessPurposeTemplateDraftPatch(template)
+	} as Doc<'purchaseRequests'>;
+
+	template.businessPurposeTemplate = 'Changed {Vendor}.';
+	template.archived = true;
+
+	expect(renderBusinessPurpose(initialized)).toBe('Reimburse Oliver Boorstein for record.');
+	expect(initialized.businessPurposeTouched).toBe(true);
+});
+
+test('Ready Purchase Requests keep copied Business Purpose when a template changes', () => {
+	const template = {
+		businessPurposeTemplate: 'Reimburse {Purchaser} for {Item Description}.',
+		archived: false
+	};
+	const readyRequest = {
+		...request,
+		...businessPurposeTemplateDraftPatch(template),
+		status: 'ready'
+	} as Doc<'purchaseRequests'>;
+
+	template.businessPurposeTemplate = 'Changed {Vendor}.';
+
+	expect(renderBusinessPurpose(readyRequest)).toBe('Reimburse Oliver Boorstein for record.');
 });
 
 test('Requester-as-Purchaser uses Requester details without a Purchaser Profile', () => {

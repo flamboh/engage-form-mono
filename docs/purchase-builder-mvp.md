@@ -31,7 +31,7 @@ Out of scope:
 
 - `/app`: dashboard with recent purchase requests and start-new action
 - `/app/purchase/new`: single long-page purchase builder
-- `/app/saved`: one page for student organizations, purchasers, and event templates
+- `/app/saved`: one page for student organizations, purchasers, and Business Purpose Templates
 
 The builder may create autofill sources inline. Autofill sources can also be managed from `/app/saved`.
 
@@ -59,20 +59,18 @@ Purchasers:
 
 Purchasers require ID card documentation at creation.
 
-Event Templates:
+Business Purpose Templates:
 
 - Nested under one student organization
-- Name
-- Time
-- Location
-- Estimated attendance
+- Title
+- Business Purpose template
 - Archived flag
 
-Student organizations, purchasers, and event templates are archived instead of deleted. Archived records are hidden by default, recoverable with a "Show archived" toggle, and unavailable for new purchase requests.
+Student organizations, purchasers, and Business Purpose Templates are archived instead of deleted. Archived records are hidden by default, recoverable with a "Show archived" toggle, and unavailable for new purchase requests.
 
 ## Purchase Requests
 
-Purchase requests record the facts needed for Engage. Student organization, purchaser, requester, and event template data only autofill drafts.
+Purchase requests record the facts needed for Engage. Student organization, purchaser, requester, and Business Purpose Template data only autofill drafts.
 
 Request fields:
 

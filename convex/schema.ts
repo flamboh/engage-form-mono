@@ -155,19 +155,23 @@ export default defineSchema({
 		.index('by_owner_and_organizationId_and_archived', ['owner', 'organizationId', 'archived'])
 		.index('by_owner_and_archived', ['owner', 'archived'])
 		.index('by_owner', ['owner']),
-	eventPresets: defineTable({
+	businessPurposeTemplates: defineTable({
 		owner: v.string(),
 		organizationId: v.id('organizations'),
-		name: v.string(),
-		time: v.string(),
-		location: v.string(),
-		estimatedAttendance: v.number(),
+		title: v.string(),
+		businessPurposeTemplate: v.string(),
+		searchText: v.string(),
 		archived: v.boolean(),
 		updatedAt: v.number()
 	})
 		.index('by_owner_and_organizationId_and_archived', ['owner', 'organizationId', 'archived'])
+		.index('by_owner_and_organizationId', ['owner', 'organizationId'])
 		.index('by_owner_and_archived', ['owner', 'archived'])
-		.index('by_owner', ['owner']),
+		.index('by_owner', ['owner'])
+		.searchIndex('search_text', {
+			searchField: 'searchText',
+			filterFields: ['owner', 'organizationId', 'archived']
+		}),
 	purchaseRequests: defineTable({
 		owner: v.string(),
 		status: v.union(v.literal('draft'), v.literal('ready')),

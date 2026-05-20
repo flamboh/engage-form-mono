@@ -76,8 +76,8 @@ _Avoid_: Gift path, apparel category
 The University of Oregon student group whose funding details may be copied into purchase requests.
 _Avoid_: Organization, account, workspace
 
-**Event Template**:
-A template for event details that usually repeat across the same student organization event series.
+**Business Purpose Template**:
+A reusable Business Purpose source scoped to one Student Organization.
 _Avoid_: Event preset, recurring event record
 
 **Event Details**:
@@ -108,10 +108,10 @@ _Avoid_: ID card image, ID file, card upload
 
 - A **Student Organization** funds one or more **Purchase Requests**
 - A **Student Organization** may provide default details copied into **Draft** purchase requests
-- An **Event Template** may provide default **Event Details**
+- A **Business Purpose Template** may provide a default **Business Purpose**
 - A **Purchaser** may provide default details copied into **Draft** personal reimbursement requests
 - A **Requester** may provide default details copied into **Draft** purchase requests
-- **Event Templates** may initialize or update **Draft** purchase requests
+- **Business Purpose Templates** may initialize or update **Draft** purchase requests
 - **Ready** purchase requests stand on their recorded facts
 - A **Requester** owns one or more purchase requests
 - A **Purchaser** may be the same person as the **Requester**
@@ -143,7 +143,7 @@ _Avoid_: ID card image, ID file, card upload
 > **Dev:** "If Oliver submits the request but Aidan paid for the prize, who is the purchaser?"
 > **Domain expert:** "Oliver is the **Requester**. Aidan is the **Purchaser**. The student who won the prize is the **Recipient**."
 >
-> **Dev:** "If an **Event Template** changes after a request is ready, should the request change too?"
+> **Dev:** "If a **Business Purpose Template** changes after a request is ready, should the request change too?"
 > **Domain expert:** "No. Templates help fill **Draft** purchase requests. **Ready** purchase requests stand on their recorded facts."
 
 ## Flagged Ambiguities
@@ -151,7 +151,7 @@ _Avoid_: ID card image, ID file, card upload
 - "person" was used for requester, purchaser, and recipient; resolved: use the explicit role names **Requester**, **Purchaser**, and **Recipient**.
 - "purchase" was used for both the real-world spending event and the app record; resolved: the app prepares a **Purchase Request**.
 - "organization" can mean a student group or an auth/workspace concept; resolved: use **Student Organization** for the domain term.
-- "event preset" describes implementation storage; resolved: use **Event Template** for reusable autofill data and **Event Details** for the facts recorded on a **Purchase Request**.
+- "event preset" describes removed implementation storage; resolved: use **Business Purpose Template** for reusable Business Purpose source text and **Event Details** for the facts recorded on a **Purchase Request**.
 - Autofill sources provide draft data; resolved: a **Purchase Request** records the facts it needs rather than depending on autofill sources for meaning.
 - "user profile" describes application state; resolved: use **Requester** for the domain source of requester autofill details.
 - "file" describes storage; resolved: use **Document** for evidence attached to a **Purchase Request**.

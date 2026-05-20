@@ -1,4 +1,4 @@
-export const WELCOME_STEPS = ['profile', 'org', 'event', 'done'] as const;
+export const WELCOME_STEPS = ['profile', 'org', 'done'] as const;
 export type WelcomeStep = (typeof WELCOME_STEPS)[number];
 
 export type WelcomeState = {
@@ -19,6 +19,5 @@ export function wizardComplete(state: WelcomeState): boolean {
 export const STEP_LABELS: Record<WelcomeStep, string> = {
 	profile: 'Your profile',
 	org: 'Your student organization',
-	event: 'Event Template',
 	done: 'All set'
 };

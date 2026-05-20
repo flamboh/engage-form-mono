@@ -14,7 +14,7 @@
 	type SavedData = {
 		organizations: Doc<'organizations'>[];
 		purchasers: Doc<'purchasers'>[];
-		eventPresets: Doc<'eventPresets'>[];
+		businessPurposeTemplates: Doc<'businessPurposeTemplates'>[];
 	};
 	type TypeOfPurchase = Doc<'purchaseRequests'>['typeOfPurchase'];
 	type DocumentationCategory = Doc<'purchaseRequests'>['documentationCategories'][number];
@@ -75,7 +75,7 @@
 	let purchaser = $state<PurchaserDetails | null>(null);
 	let typeOfPurchase = $state<TypeOfPurchase>('personal_reimbursement');
 	let documentationCategories = $state<DocumentationCategory[]>([]);
-	let eventTemplateId = $state<Id<'eventPresets'> | null>(null);
+	let businessPurposeTemplateId = $state<Id<'businessPurposeTemplates'> | null>(null);
 	let eventName = $state('');
 	let eventDate = $state('');
 	let eventTime = $state('');
@@ -103,11 +103,6 @@
 
 	const purchasers = $derived(
 		(savedData?.purchasers ?? []).filter((p) => p.organizationId === organizationSourceId)
-	);
-	const eventPresets = $derived(
-		(savedData?.eventPresets ?? []).filter(
-			(eventPreset) => eventPreset.organizationId === organizationSourceId
-		)
 	);
 	const selectedOrg = $derived(
 		(savedData?.organizations ?? []).find((org) => org._id === organizationSourceId)
@@ -265,7 +260,9 @@
 			totalAmount = draft.totalAmount;
 			budgetLineItem = draft.budgetLineItem;
 			businessPurposeText = formatBusinessPurposeSource(draft.businessPurposeSource);
-			businessPurposeTouched = draft.businessPurposeTouched;
+			businessPurposeTouched =
+				draft.businessPurposeTouched ||
+				businessPurposeText !== draft.studentOrganization.businessPurposeTemplate;
 			receiptFileIds = draft.receiptFileIds;
 			secondApprovalFileId = draft.secondApprovalFileId;
 			publicityFileId = draft.publicityFileId;
@@ -474,13 +471,12 @@
 			<SavedSetup
 				session={clerkContext.currentSession}
 				{savedData}
+				{draftId}
 				bind:organizationSourceId
 				bind:purchaserSource
-				bind:eventTemplateId
-				bind:eventName
-				bind:eventTime
-				bind:eventLocation
-				bind:eventEstimatedAttendance
+				bind:businessPurposeTemplateId
+				bind:businessPurposeText
+				bind:businessPurposeTouched
 				onChange={onFieldChange}
 				onSavedChange={loadSaved}
 			/>
@@ -513,6 +509,7 @@
 					class="field min-h-36"
 					bind:value={businessPurposeText}
 					oninput={() => {
+						businessPurposeTemplateId = null;
 						businessPurposeTouched = true;
 						void autosave();
 					}}
@@ -521,6 +518,7 @@
 					class="secondary mt-3"
 					type="button"
 					onclick={() => {
+						businessPurposeTemplateId = null;
 						businessPurposeText = studentOrganization.businessPurposeTemplate;
 						businessPurposeTouched = false;
 						void autosave();
