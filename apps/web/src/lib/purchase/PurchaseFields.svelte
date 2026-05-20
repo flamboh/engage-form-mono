@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { DocumentationCategory, FundLetter } from './builderFlow';
+
 	type TypeOfPurchase =
 		| 'personal_reimbursement'
 		| 'internal_po'
@@ -6,29 +8,16 @@
 		| 'pcard'
 		| 'co_sponsorship_payment'
 		| 'service_agreement_or_purchase_order_for_service';
-	type DocumentationCategory =
-		| 'asuo_funds'
-		| 'food'
-		| 'printing_services'
-		| 'office_supplies_goods'
-		| 'merchandise_apparel'
-		| 'gifts_prizes';
-	type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 	type Props = {
 		typeOfPurchase: TypeOfPurchase;
 		documentationCategories: DocumentationCategory[];
 		fundLetter: FundLetter;
-		eventName: string;
-		eventDate: string;
-		eventTime: string;
-		eventLocation: string;
-		eventEstimatedAttendance: number;
+		requesterName: string;
 		vendor: string;
 		itemDescription: string;
 		totalAmount: number;
 		budgetLineItem: string;
 		budgetLineOptions: string[];
-		officeLocation: string;
 		onChange: () => void;
 	};
 
@@ -56,17 +45,12 @@
 		typeOfPurchase = $bindable(),
 		documentationCategories = $bindable(),
 		fundLetter,
-		eventName = $bindable(),
-		eventDate = $bindable(),
-		eventTime = $bindable(),
-		eventLocation = $bindable(),
-		eventEstimatedAttendance = $bindable(),
+		requesterName,
 		vendor = $bindable(),
 		itemDescription = $bindable(),
 		totalAmount = $bindable(),
 		budgetLineItem = $bindable(),
 		budgetLineOptions,
-		officeLocation = $bindable(),
 		onChange
 	}: Props = $props();
 
@@ -84,80 +68,62 @@
 </script>
 
 <section class="panel">
-	<h2>Purchase Request</h2>
-	<div class="grid gap-4 md:grid-cols-2">
-		<fieldset class="md:col-span-2">
-			<legend>Type of Purchase</legend>
-			<div class="type-grid">
-				{#each typeOfPurchaseOptions as option (option.value)}
-					<label class:disabled={option.disabled}>
-						<input
-							type="radio"
-							value={option.value}
-							disabled={option.disabled}
-							bind:group={typeOfPurchase}
-							onchange={onChange}
-						/>
-						<span>{option.label}</span>
-					</label>
-				{/each}
-			</div>
-		</fieldset>
-		<fieldset class="md:col-span-2">
-			<legend>Documentation Categories</legend>
-			<div class="type-grid">
-				<label class:disabled={asuoFundsImplicit}>
-					<input
-						type="checkbox"
-						checked={asuoFundsChecked}
-						disabled={asuoFundsImplicit}
-						onchange={(event) =>
-							setDocumentationCategory('asuo_funds', event.currentTarget.checked)}
-					/>
-					<span>ASUO Funds</span>
-				</label>
-				{#each documentationCategoryOptions as option (option.value)}
-					<label>
-						<input
-							type="checkbox"
-							checked={documentationCategories.includes(option.value)}
-							onchange={(event) =>
-								setDocumentationCategory(option.value, event.currentTarget.checked)}
-						/>
-						<span>{option.label}</span>
-					</label>
-				{/each}
-			</div>
-		</fieldset>
-		<label>
-			<span>Event name</span>
-			<input class="field" bind:value={eventName} oninput={onChange} />
-		</label>
-		<label>
-			<span>Event date</span>
-			<input class="field" type="date" bind:value={eventDate} oninput={onChange} />
-		</label>
-		<label>
-			<span>Event time</span>
-			<input class="field" bind:value={eventTime} oninput={onChange} />
-		</label>
-		<label>
-			<span>Event location</span>
-			<input class="field" bind:value={eventLocation} oninput={onChange} />
-		</label>
-		<label>
-			<span>Estimated attendance</span>
+	<h2>Type of Purchase</h2>
+	<div class="type-grid">
+		{#each typeOfPurchaseOptions as option (option.value)}
+			<label class:disabled={option.disabled}>
+				<input
+					type="radio"
+					value={option.value}
+					disabled={option.disabled}
+					bind:group={typeOfPurchase}
+					onchange={onChange}
+				/>
+				<span>{option.label}</span>
+			</label>
+		{/each}
+	</div>
+</section>
+
+<section class="panel">
+	<h2>Documentation Categories</h2>
+	<div class="type-grid">
+		<label class:disabled={asuoFundsImplicit}>
 			<input
-				class="field"
-				type="number"
-				min="1"
-				bind:value={eventEstimatedAttendance}
-				oninput={onChange}
+				type="checkbox"
+				checked={asuoFundsChecked}
+				disabled={asuoFundsImplicit}
+				onchange={(event) => setDocumentationCategory('asuo_funds', event.currentTarget.checked)}
 			/>
+			<span>ASUO Funds</span>
+		</label>
+		{#each documentationCategoryOptions as option (option.value)}
+			<label>
+				<input
+					type="checkbox"
+					checked={documentationCategories.includes(option.value)}
+					onchange={(event) => setDocumentationCategory(option.value, event.currentTarget.checked)}
+				/>
+				<span>{option.label}</span>
+			</label>
+		{/each}
+	</div>
+</section>
+
+<section class="panel">
+	<h2>Common Facts</h2>
+	<div class="grid gap-4 md:grid-cols-2">
+		<label>
+			<span>Requester</span>
+			<input class="field" value={requesterName} readonly />
+		</label>
+		<label>
+			<span>Fund Letter</span>
+			<input class="field" value={fundLetter} readonly />
 		</label>
 		<label><span>Vendor</span><input class="field" bind:value={vendor} oninput={onChange} /></label>
 		<label
-			><span>Item</span><input
+			><span>Item Description</span><input
 				class="field"
 				bind:value={itemDescription}
 				oninput={onChange}
@@ -188,12 +154,6 @@
 				<input class="field" bind:value={budgetLineItem} oninput={onChange} />
 			{/if}
 		</label>
-		{#if documentationCategories.includes('office_supplies_goods')}
-			<label>
-				<span>Office location</span>
-				<input class="field" bind:value={officeLocation} oninput={onChange} />
-			</label>
-		{/if}
 	</div>
 </section>
 
@@ -231,12 +191,6 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	fieldset {
-		border: 0;
-		padding: 0;
-	}
-
-	legend,
 	label > span {
 		display: block;
 		margin-bottom: 0.35rem;

@@ -51,7 +51,7 @@
 	let orgIndex = $state('');
 	let orgBudgetLines = $state<string[]>(['Event Expenses']);
 	let orgTemplate = $state(
-		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}. This purchase supported an activity on {Activity Date} at {Activity Time} in {Activity Location} with about {Estimated Attendance} students in attendance.'
+		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.'
 	);
 
 	let purchaserName = $state('');
@@ -221,7 +221,7 @@
 
 <section class="panel">
 	<div class="flex items-center justify-between gap-3">
-		<h2 class="text-sm font-semibold">Setup</h2>
+		<h2 class="text-sm font-semibold">Student Organization</h2>
 		<div class="flex gap-2">
 			<button class="secondary" type="button" onclick={() => (mode = 'org')}>
 				New student organization
@@ -372,37 +372,3 @@
 		</form>
 	{/if}
 </section>
-
-<style>
-	.panel {
-		border: 1px solid rgb(231 229 228);
-		border-radius: 0.5rem;
-		background: white;
-		padding: 1.25rem;
-	}
-
-	.field {
-		width: 100%;
-		border-radius: 0.375rem;
-		border: 1px solid rgb(214 211 209);
-		padding: 0.5rem 0.75rem;
-		font-size: 0.875rem;
-	}
-
-	.secondary {
-		border-radius: 0.375rem;
-		border: 1px solid rgb(214 211 209);
-		padding: 0.45rem 0.7rem;
-		font-size: 0.8125rem;
-		font-weight: 500;
-	}
-
-	.button {
-		border-radius: 0.375rem;
-		background: rgb(28 25 23);
-		padding: 0.5rem 0.75rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: white;
-	}
-</style>
