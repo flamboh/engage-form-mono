@@ -31,6 +31,7 @@ const documentationCategory = v.union(
 
 const fileKind = v.union(
 	v.literal('receipt'),
+	v.literal('id_card'),
 	v.literal('id_front'),
 	v.literal('id_back'),
 	v.literal('second_approval'),
@@ -71,7 +72,7 @@ const requesterDetails = v.object({
 	uo95: v.string(),
 	permanentAddress: v.string(),
 	idCardFrontFileId: v.id('files'),
-	idCardBackFileId: v.id('files')
+	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
 const purchaserDetails = v.object({
@@ -80,7 +81,7 @@ const purchaserDetails = v.object({
 	uo95: v.string(),
 	permanentAddress: v.string(),
 	idCardFrontFileId: v.id('files'),
-	idCardBackFileId: v.id('files')
+	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
 export default defineSchema({
@@ -92,7 +93,7 @@ export default defineSchema({
 		studentEmail: v.string(),
 		phone: v.string(),
 		idCardFrontFileId: v.id('files'),
-		idCardBackFileId: v.id('files'),
+		idCardBackFileId: v.union(v.id('files'), v.null()),
 		updatedAt: v.number()
 	}).index('by_owner', ['owner']),
 	organizations: defineTable({
@@ -123,7 +124,7 @@ export default defineSchema({
 		uo95: v.string(),
 		permanentAddress: v.string(),
 		idCardFrontFileId: v.id('files'),
-		idCardBackFileId: v.id('files'),
+		idCardBackFileId: v.union(v.id('files'), v.null()),
 		archived: v.boolean(),
 		updatedAt: v.number()
 	})

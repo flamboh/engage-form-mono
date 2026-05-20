@@ -132,9 +132,11 @@ export const engageSchema: EngageStepSchema[] = [
 			fileField('UO ID CARD', (purchase) => [
 				documentById(purchase, purchase.purchaser.idCardFrontFileId)
 			]),
-			fileField('UO ID CARD : Optional second upload', (purchase) => [
-				documentById(purchase, purchase.purchaser.idCardBackFileId)
-			]),
+			fileField('UO ID CARD : Optional second upload', (purchase) =>
+				purchase.purchaser.idCardBackFileId === null
+					? []
+					: [documentById(purchase, purchase.purchaser.idCardBackFileId)]
+			),
 			receiptFilesField()
 		]
 	},
@@ -288,10 +290,12 @@ function resolveField(
 	}
 
 	if (field.type === 'file') {
+		const files = field.resolve(purchaseRequest);
+		if (files.length === 0) return [];
 		return {
 			type: 'file',
 			labelIncludes: field.labelIncludes,
-			files: field.resolve(purchaseRequest)
+			files
 		};
 	}
 

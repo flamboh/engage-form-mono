@@ -123,10 +123,14 @@
 		orgBudgetLines = orgBudgetLines.filter((_, index) => index !== i);
 	}
 
-	async function uploadId(kind: 'id_front' | 'id_back', input: HTMLInputElement) {
+	async function uploadId(kind: 'id_card' | 'id_front' | 'id_back', input: HTMLInputElement) {
 		const file = input.files?.[0];
 		if (!file) return;
 		const fileId = await uploadFile(session, kind, file);
+		if (kind === 'id_card') {
+			idFrontFileId = fileId;
+			idBackFileId = null;
+		}
 		if (kind === 'id_front') idFrontFileId = fileId;
 		if (kind === 'id_back') idBackFileId = fileId;
 	}
@@ -156,8 +160,8 @@
 	async function createPurchaser(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
-		if (organizationSourceId === null || idFrontFileId === null || idBackFileId === null) {
-			error = 'Student organization and ID card documents required.';
+		if (organizationSourceId === null || idFrontFileId === null) {
+			error = 'Student organization and ID card document required.';
 			return;
 		}
 		try {
@@ -270,7 +274,7 @@
 					name="purchaser-mode"
 					checked={purchaserSource.kind === 'purchaser'}
 					onchange={() => setPurchaserMode('other')}
-					disabled={organizationSourceId === null}
+					disabled={organizationSourceId === null || purchasers.length === 0}
 				/>
 				Someone else
 			</label>
@@ -322,13 +326,18 @@
 			/>
 			<div class="grid gap-3 md:grid-cols-2">
 				<FilePicker
+					label="Combined ID card document"
+					status={idFrontFileId && idBackFileId === null ? 'Uploaded' : 'Optional'}
+					onFiles={(input) => uploadId('id_card', input)}
+				/>
+				<FilePicker
 					label="ID card front document"
 					status={idFrontFileId ? 'Uploaded' : 'Required'}
 					onFiles={(input) => uploadId('id_front', input)}
 				/>
 				<FilePicker
 					label="ID card back document"
-					status={idBackFileId ? 'Uploaded' : 'Required'}
+					status={idBackFileId ? 'Uploaded' : 'Optional'}
 					onFiles={(input) => uploadId('id_back', input)}
 				/>
 			</div>

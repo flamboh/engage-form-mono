@@ -4,7 +4,8 @@ import {
 	applyDraftPatch,
 	assemblePurchase,
 	assertReady,
-	renderBusinessPurpose
+	renderBusinessPurpose,
+	userAsPurchaserDetails
 } from '../convex/purchaseModel';
 import { evaluatePurchaseReadiness } from '../convex/purchaseReadiness';
 
@@ -108,12 +109,115 @@ test('renders optional recipient tokens without unresolved placeholders when abs
 	);
 });
 
+test('Requester-as-Purchaser uses Requester details without a Purchaser Profile', () => {
+	const user = {
+		_id: 'user_1',
+		_creationTime: 1,
+		owner: 'owner',
+		name: 'Oliver Boorstein',
+		uo95: '952043159',
+		permanentAddress: '11337 Our Rd',
+		studentEmail: 'obo@uoregon.edu',
+		phone: '9073104429',
+		idCardFrontFileId: 'file_front',
+		idCardBackFileId: 'file_back',
+		updatedAt: 1
+	} as Doc<'users'>;
+
+	expect(userAsPurchaserDetails(user)).toEqual({
+		id: user._id,
+		name: user.name,
+		uo95: user.uo95,
+		permanentAddress: user.permanentAddress,
+		idCardFrontFileId: user.idCardFrontFileId,
+		idCardBackFileId: user.idCardBackFileId
+	});
+});
+
 test('reports a complete Personal Reimbursement purchase request as Ready', async () => {
 	await expect(
 		evaluatePurchaseReadiness({ ...request, businessPurposeText: renderBusinessPurpose(request) })
 	).resolves.toEqual({
 		ready: true,
 		sections: []
+	});
+});
+
+test('accepts one combined ID Card Document for Personal Reimbursement', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			purchaser: {
+				...request.purchaser,
+				idCardFrontFileId: 'file_id_card',
+				idCardBackFileId: null as never
+			},
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: true,
+		sections: []
+	});
+});
+
+test('requires one to three Receipts for Personal Reimbursement', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			receiptFileIds: [],
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [{ section: 'Files', reasons: ['Receipt document missing.'] }]
+	});
+
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			receiptFileIds: ['file_receipt_1', 'file_receipt_2', 'file_receipt_3'],
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: true,
+		sections: []
+	});
+
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			receiptFileIds: ['file_receipt_1', 'file_receipt_2', 'file_receipt_3', 'file_receipt_4'],
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [{ section: 'Files', reasons: ['Receipt documents are limited to three.'] }]
+	});
+});
+
+test('Someone-else purchaser readiness uses a Purchaser Profile scoped to the selected Student Organization', async () => {
+	await expect(
+		evaluatePurchaseReadiness(
+			{
+				...request,
+				organizationSourceId: 'org_1',
+				purchaserSource: { kind: 'purchaser', purchaserId: 'purchaser_1' },
+				purchaser: { ...request.purchaser, id: 'purchaser_1' },
+				secondApprovalFileId: null,
+				businessPurposeText: renderBusinessPurpose(request)
+			},
+			{
+				purchaserBelongsToOrganization: async () => false
+			}
+		)
+	).resolves.toEqual({
+		ready: false,
+		sections: [
+			{
+				section: 'Purchaser',
+				reasons: ['Purchaser profile must belong to selected student organization.']
+			}
+		]
 	});
 });
 
@@ -391,8 +495,7 @@ test('reports blocked Draft reasons grouped by section', async () => {
 					'Purchaser name missing.',
 					'Purchaser UO 95 missing.',
 					'Purchaser address missing.',
-					'ID card front document missing.',
-					'ID card back document missing.'
+					'ID card document missing.'
 				]
 			},
 			{
