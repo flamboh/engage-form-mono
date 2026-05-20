@@ -11,6 +11,30 @@ test('sample purchase request is ready', () => {
 	expect(validatePurchaseReadiness(samplePurchaseRequest)).toEqual([]);
 });
 
+test('blocks unsupported types of purchase', () => {
+	expect(
+		validatePurchaseReadiness({
+			...samplePurchaseRequest,
+			typeOfPurchase: 'internal_po'
+		})
+	).toContainEqual({
+		field: 'typeOfPurchase',
+		message: 'Type of Purchase is not supported yet.'
+	});
+});
+
+test('does not require a user-entered reimbursement reason', () => {
+	expect(
+		validatePurchaseReadiness({
+			...samplePurchaseRequest,
+			reimbursementReason: ''
+		})
+	).not.toContainEqual({
+		field: 'reimbursementReason',
+		message: 'Reimbursement reason missing.'
+	});
+});
+
 test('generates business purpose for the observed flow', () => {
 	expect(generateBusinessPurpose(samplePurchaseRequest)).toContain(
 		'Album Listening Club wishes to reimburse Oliver Boorstein'

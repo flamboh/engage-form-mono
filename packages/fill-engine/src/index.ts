@@ -1,6 +1,7 @@
 import {
 	budgetLineText,
 	documentById,
+	fixedPersonalReimbursementReason,
 	generateBusinessPurpose,
 	recipientIdText,
 	recipientValueText,
@@ -121,7 +122,7 @@ export const engageSchema: EngageStepSchema[] = [
 		fields: [
 			textField(
 				'Why did you use the reimbursement process',
-				(purchase) => purchase.reimbursementReason
+				() => fixedPersonalReimbursementReason
 			),
 			selectField('submitter of this form', () => 'Myself'),
 			textField('name and UO 95 ID', reimbursementRecipientText),

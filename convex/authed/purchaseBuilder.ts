@@ -319,6 +319,7 @@ export const createDraft = authedMutation({
 		return await ctx.db.insert('purchaseRequests', {
 			owner,
 			status: 'draft',
+			typeOfPurchase: 'personal_reimbursement',
 			organizationSourceId: null,
 			purchaserSource: { kind: 'self' },
 			studentOrganization: {
@@ -339,7 +340,7 @@ export const createDraft = authedMutation({
 			itemDescription: '',
 			totalAmount: 0,
 			budgetLineItem: '',
-			reimbursementReason: '',
+			reimbursementReason: 'Other processes are too slow.',
 			businessPurposeText: '',
 			businessPurposeTouched: false,
 			receiptFileIds: [],

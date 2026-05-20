@@ -16,6 +16,7 @@
 		purchasers: Doc<'purchasers'>[];
 		eventPresets: Doc<'eventPresets'>[];
 	};
+	type TypeOfPurchase = Doc<'purchaseRequests'>['typeOfPurchase'];
 	type FundLetter = Doc<'organizations'>['fundLetter'];
 	type StudentOrganizationDetails = {
 		name: string;
@@ -66,6 +67,7 @@
 	});
 	let requester = $state<RequesterDetails | null>(null);
 	let purchaser = $state<PurchaserDetails | null>(null);
+	let typeOfPurchase = $state<TypeOfPurchase>('personal_reimbursement');
 	let eventTemplateId = $state<Id<'eventPresets'> | null>(null);
 	let eventName = $state('');
 	let eventDate = $state('');
@@ -76,7 +78,6 @@
 	let itemDescription = $state('');
 	let totalAmount = $state(0);
 	let budgetLineItem = $state('');
-	let reimbursementReason = $state('');
 	let businessPurposeText = $state('');
 	let businessPurposeTouched = $state(false);
 	let recipients = $state<Recipient[]>([]);
@@ -212,6 +213,7 @@
 			studentOrganization = draft.studentOrganization;
 			requester = draft.requester;
 			purchaser = draft.purchaser;
+			typeOfPurchase = draft.typeOfPurchase;
 			eventName = draft.eventName;
 			eventDate = draft.eventDate;
 			eventTime = draft.eventTime;
@@ -221,7 +223,6 @@
 			itemDescription = draft.itemDescription;
 			totalAmount = draft.totalAmount;
 			budgetLineItem = draft.budgetLineItem;
-			reimbursementReason = draft.reimbursementReason;
 			businessPurposeText = draft.businessPurposeText;
 			businessPurposeTouched = draft.businessPurposeTouched;
 			receiptFileIds = draft.receiptFileIds;
@@ -243,6 +244,7 @@
 			studentOrganization,
 			...(requester === null ? {} : { requester }),
 			...(purchaser === null ? {} : { purchaser }),
+			typeOfPurchase,
 			eventName,
 			eventDate,
 			eventTime,
@@ -252,7 +254,6 @@
 			itemDescription,
 			totalAmount,
 			budgetLineItem,
-			reimbursementReason,
 			businessPurposeText,
 			businessPurposeTouched,
 			receiptFileIds,
@@ -438,6 +439,7 @@
 			/>
 
 			<PurchaseFields
+				bind:typeOfPurchase
 				bind:eventName
 				bind:eventDate
 				bind:eventTime
@@ -447,7 +449,6 @@
 				bind:itemDescription
 				bind:totalAmount
 				bind:budgetLineItem
-				bind:reimbursementReason
 				budgetLineOptions={studentOrganization.budgetLines}
 				onChange={onFieldChange}
 			/>

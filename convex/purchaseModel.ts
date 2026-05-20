@@ -4,6 +4,13 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
 export type Recipient = { name: string; uo95: string; reason: string; value: number };
 
 export type PurchaserRef = { kind: 'self' } | { kind: 'purchaser'; purchaserId: Id<'purchasers'> };
+export type TypeOfPurchase =
+	| 'personal_reimbursement'
+	| 'internal_po'
+	| 'external_po'
+	| 'pcard'
+	| 'co_sponsorship_payment'
+	| 'service_agreement_or_purchase_order_for_service';
 export type StudentOrganizationDetails = {
 	name: string;
 	indexNumber: string;
@@ -33,6 +40,7 @@ export type PurchaserDetails = {
 type Ctx = QueryCtx | MutationCtx;
 
 export type DraftPatch = Partial<{
+	typeOfPurchase: TypeOfPurchase;
 	organizationSourceId: Id<'organizations'> | null;
 	purchaserSource: PurchaserRef;
 	studentOrganization: StudentOrganizationDetails;
@@ -55,6 +63,8 @@ export type DraftPatch = Partial<{
 	publicityFileId: Id<'files'> | null;
 	recipients: Recipient[];
 }>;
+
+const fixedPersonalReimbursementReason = 'Other processes are too slow.';
 
 export function ownerFromIdentity(identity: { tokenIdentifier: string }) {
 	return identity.tokenIdentifier;
@@ -98,7 +108,10 @@ export function applyDraftPatch(
 	purchase: Doc<'purchaseRequests'>,
 	patch: DraftPatch
 ): Partial<Doc<'purchaseRequests'>> {
+	const typeOfPurchase =
+		patch.typeOfPurchase !== undefined ? patch.typeOfPurchase : purchase.typeOfPurchase;
 	return {
+		typeOfPurchase,
 		organizationSourceId:
 			patch.organizationSourceId !== undefined
 				? patch.organizationSourceId
@@ -126,10 +139,7 @@ export function applyDraftPatch(
 			patch.totalAmount !== undefined ? numberInput(patch.totalAmount) : purchase.totalAmount,
 		budgetLineItem:
 			patch.budgetLineItem !== undefined ? patch.budgetLineItem : purchase.budgetLineItem,
-		reimbursementReason:
-			patch.reimbursementReason !== undefined
-				? patch.reimbursementReason
-				: purchase.reimbursementReason,
+		reimbursementReason: reimbursementReasonFor(typeOfPurchase),
 		businessPurposeText:
 			patch.businessPurposeText !== undefined
 				? patch.businessPurposeText
@@ -203,6 +213,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 	return {
 		id: request._id,
 		status: request.status,
+		typeOfPurchase: request.typeOfPurchase,
 		organization: orgPayload(request),
 		requester: request.requester,
 		purchaser: request.purchaser,
@@ -211,7 +222,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
 		budgetLineItem: request.budgetLineItem,
-		reimbursementReason: request.reimbursementReason,
+		reimbursementReason: reimbursementReasonFor(request.typeOfPurchase),
 		businessPurposeText: request.businessPurposeText,
 		requesterIsPurchaser: purchaserIsSelf,
 		receiptFileIds: request.receiptFileIds,
@@ -223,6 +234,9 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 
 export async function assertReady(ctx: Ctx, request: Doc<'purchaseRequests'>) {
 	const purchaseRequest = await assemblePurchase(ctx, request);
+	if (purchaseRequest.typeOfPurchase !== 'personal_reimbursement') {
+		throw new Error('Type of Purchase is not supported yet.');
+	}
 	requireText(purchaseRequest.organization.name, 'Student organization name missing.');
 	requireText(purchaseRequest.organization.indexNumber, 'Index number missing.');
 	if (purchaseRequest.organization.budgetLines.length === 0)
@@ -339,4 +353,8 @@ function numberInput(value: number | null) {
 
 function formatMoney(value: number) {
 	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+function reimbursementReasonFor(typeOfPurchase: TypeOfPurchase) {
+	return typeOfPurchase === 'personal_reimbursement' ? fixedPersonalReimbursementReason : '';
 }
