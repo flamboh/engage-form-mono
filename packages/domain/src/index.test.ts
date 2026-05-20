@@ -64,6 +64,66 @@ test('does not require recipients', () => {
 	).not.toContainEqual({ field: 'recipients', message: 'Recipient missing.' });
 });
 
+test('Merchandise/Apparel and Gifts/Prizes require recipient name, UO 95, and value', () => {
+	for (const category of ['merchandise_apparel', 'gifts_prizes'] as const) {
+		expect(
+			validatePurchaseReadiness({
+				...samplePurchaseRequest,
+				documentationCategories: [category],
+				recipients: [],
+				businessPurposeText: 'Album Listening Club wishes to reimburse Oliver Boorstein.'
+			})
+		).toContainEqual({ field: 'recipients', message: 'Recipient missing.' });
+
+		expect(
+			validatePurchaseReadiness({
+				...samplePurchaseRequest,
+				documentationCategories: [category],
+				recipients: [
+					{
+						name: '',
+						uo95: '',
+						reason: '',
+						itemDescription: 'Sticker',
+						value: 0
+					}
+				]
+			})
+		).toEqual(
+			expect.arrayContaining([
+				{ field: 'recipient.name', message: 'Recipient name missing.' },
+				{ field: 'recipient.uo95', message: 'Recipient UO 95 missing.' },
+				{ field: 'recipient.value', message: 'Recipient value missing.' }
+			])
+		);
+	}
+});
+
+test('recipient reason, dollar limits, and total matching do not block Ready', () => {
+	expect(
+		validatePurchaseReadiness({
+			...samplePurchaseRequest,
+			documentationCategories: ['gifts_prizes'],
+			totalAmount: 10,
+			recipients: [
+				{
+					name: 'Prize recipient',
+					uo95: '950000001',
+					reason: '',
+					itemDescription: 'Prize',
+					value: 75
+				}
+			]
+		})
+	).not.toEqual(
+		expect.arrayContaining([
+			{ field: 'recipient.reason', message: 'Recipient reason missing.' },
+			{ field: 'recipient.value', message: 'Gift value must be under $50.' },
+			{ field: 'recipients', message: 'Recipient values must equal total amount.' }
+		])
+	);
+});
+
 test('does not enforce recipient details or value limits', () => {
 	expect(
 		validatePurchaseReadiness({

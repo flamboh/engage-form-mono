@@ -24,7 +24,9 @@ export type DocumentationCategory =
 	| 'asuo_funds'
 	| 'food'
 	| 'printing_services'
-	| 'office_supplies_goods';
+	| 'office_supplies_goods'
+	| 'merchandise_apparel'
+	| 'gifts_prizes';
 export type StudentOrganizationDetails = {
 	name: string;
 	indexNumber: string;
@@ -78,6 +80,7 @@ export type DraftPatch = Partial<{
 	publicityFileId: Id<'files'> | null;
 	cateringWaiverFileId: Id<'files'> | null;
 	printingInvoiceFileId: Id<'files'> | null;
+	brandApprovalFileId: Id<'files'> | null;
 	officeLocation: string;
 	buildingManagerApprovalFileId: Id<'files'> | null;
 	computerPriceQuoteFileId: Id<'files'> | null;
@@ -188,6 +191,10 @@ export function applyDraftPatch(
 			patch.printingInvoiceFileId !== undefined
 				? patch.printingInvoiceFileId
 				: purchase.printingInvoiceFileId,
+		brandApprovalFileId:
+			patch.brandApprovalFileId !== undefined
+				? patch.brandApprovalFileId
+				: purchase.brandApprovalFileId,
 		officeLocation:
 			patch.officeLocation !== undefined ? patch.officeLocation : purchase.officeLocation,
 		buildingManagerApprovalFileId:
@@ -248,6 +255,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		asuoFunds ? request.publicityFileId : null,
 		documentationCategories.includes('food') ? request.cateringWaiverFileId : null,
 		documentationCategories.includes('printing_services') ? request.printingInvoiceFileId : null,
+		documentationCategories.includes('merchandise_apparel') ? request.brandApprovalFileId : null,
 		request.buildingManagerApprovalFileId,
 		request.computerPriceQuoteFileId,
 		request.secondApprovalFileId,
@@ -275,6 +283,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		secondApprovalFileId: purchaserIsSelf ? request.secondApprovalFileId : null,
 		cateringWaiverFileId: request.cateringWaiverFileId,
 		printingInvoiceFileId: request.printingInvoiceFileId,
+		brandApprovalFileId: request.brandApprovalFileId,
 		officeLocation: request.officeLocation,
 		buildingManagerApprovalFileId: request.buildingManagerApprovalFileId,
 		computerPriceQuoteFileId: request.computerPriceQuoteFileId,

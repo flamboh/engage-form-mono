@@ -23,7 +23,9 @@ export const documentationCategory = v.union(
 	v.literal('asuo_funds'),
 	v.literal('food'),
 	v.literal('printing_services'),
-	v.literal('office_supplies_goods')
+	v.literal('office_supplies_goods'),
+	v.literal('merchandise_apparel'),
+	v.literal('gifts_prizes')
 );
 
 export const fileKind = v.union(
@@ -105,6 +107,7 @@ export const draftPatch = v.object({
 	publicityFileId: v.optional(v.union(v.id('files'), v.null())),
 	cateringWaiverFileId: v.optional(v.union(v.id('files'), v.null())),
 	printingInvoiceFileId: v.optional(v.union(v.id('files'), v.null())),
+	brandApprovalFileId: v.optional(v.union(v.id('files'), v.null())),
 	officeLocation: v.optional(v.string()),
 	buildingManagerApprovalFileId: v.optional(v.union(v.id('files'), v.null())),
 	computerPriceQuoteFileId: v.optional(v.union(v.id('files'), v.null())),
@@ -210,6 +213,7 @@ export const purchaseRequestDoc = v.object({
 	publicityFileId: v.union(v.id('files'), v.null()),
 	cateringWaiverFileId: v.union(v.id('files'), v.null()),
 	printingInvoiceFileId: v.union(v.id('files'), v.null()),
+	brandApprovalFileId: v.union(v.id('files'), v.null()),
 	officeLocation: v.string(),
 	buildingManagerApprovalFileId: v.union(v.id('files'), v.null()),
 	computerPriceQuoteFileId: v.union(v.id('files'), v.null()),
@@ -284,6 +288,7 @@ export const assembledPurchase = v.object({
 	secondApprovalFileId: v.union(v.id('files'), v.null()),
 	cateringWaiverFileId: v.union(v.id('files'), v.null()),
 	printingInvoiceFileId: v.union(v.id('files'), v.null()),
+	brandApprovalFileId: v.union(v.id('files'), v.null()),
 	officeLocation: v.string(),
 	buildingManagerApprovalFileId: v.union(v.id('files'), v.null()),
 	computerPriceQuoteFileId: v.union(v.id('files'), v.null()),

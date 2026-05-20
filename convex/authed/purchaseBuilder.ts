@@ -349,6 +349,7 @@ export const createDraft = authedMutation({
 			publicityFileId: null,
 			cateringWaiverFileId: null,
 			printingInvoiceFileId: null,
+			brandApprovalFileId: null,
 			officeLocation: '',
 			buildingManagerApprovalFileId: null,
 			computerPriceQuoteFileId: null,
@@ -419,6 +420,7 @@ export const discardDraft = authedMutation({
 			request.publicityFileId,
 			request.cateringWaiverFileId,
 			request.printingInvoiceFileId,
+			request.brandApprovalFileId,
 			request.buildingManagerApprovalFileId,
 			request.computerPriceQuoteFileId
 		].filter((id): id is Id<'files'> => id !== null);

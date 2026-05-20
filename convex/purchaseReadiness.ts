@@ -87,6 +87,15 @@ export async function evaluatePurchaseReadiness(
 	if (officeSuppliesGoods) {
 		requireSectionText('Purchase details', request.officeLocation, 'Office location missing.');
 	}
+	const categories = effectiveDocumentationCategories(request);
+	if (requiresRecipients(categories)) {
+		if (request.recipients.length === 0) add('Recipients', 'Recipient missing.');
+		for (const recipient of request.recipients) {
+			requireSectionText('Recipients', recipient.name, 'Recipient name missing.');
+			requireSectionText('Recipients', recipient.uo95, 'Recipient UO 95 missing.');
+			if (recipient.value <= 0) add('Recipients', 'Recipient value missing.');
+		}
+	}
 	if (request.totalAmount <= 0) {
 		add('Purchase details', 'Total amount must be greater than zero.');
 	}
@@ -199,4 +208,8 @@ async function requireOwnedDocument(
 ) {
 	if (id.trim() === '') return;
 	if (!(await documentExists(id))) add(section, reason);
+}
+
+function requiresRecipients(categories: string[]) {
+	return categories.includes('merchandise_apparel') || categories.includes('gifts_prizes');
 }
