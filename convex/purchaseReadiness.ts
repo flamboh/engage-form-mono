@@ -1,5 +1,7 @@
 import type { Doc, Id } from './_generated/dataModel';
+import type { BusinessPurposeSource } from './businessPurpose';
 import { effectiveDocumentationCategories } from './purchaseCategories';
+import { resolveBusinessPurpose } from './businessPurpose';
 
 export type ReadinessSection = {
 	section: string;
@@ -11,6 +13,11 @@ export type PurchaseReadiness = {
 	sections: ReadinessSection[];
 };
 
+type PurchaseRequest = Doc<'purchaseRequests'> & {
+	businessPurposeSource?: BusinessPurposeSource;
+	businessPurposeText?: string;
+};
+
 type DocumentExists = (id: Id<'files'>) => Promise<boolean>;
 type PurchaserBelongsToOrganization = (
 	purchaserId: Id<'purchasers'>,
@@ -18,7 +25,7 @@ type PurchaserBelongsToOrganization = (
 ) => Promise<boolean>;
 
 export async function evaluatePurchaseReadiness(
-	request: Doc<'purchaseRequests'>,
+	request: PurchaseRequest,
 	options: {
 		documentExists?: DocumentExists;
 		purchaserBelongsToOrganization?: PurchaserBelongsToOrganization;
@@ -98,8 +105,9 @@ export async function evaluatePurchaseReadiness(
 		add('Purchase details', 'Total amount must be greater than zero.');
 	}
 
-	requireSectionText('Business purpose', request.businessPurposeText, 'Business purpose missing.');
-	if (unresolvedToken(request.businessPurposeText)) {
+	const businessPurpose = businessPurposeReadiness(request);
+	requireSectionText('Business purpose', businessPurpose.text, 'Business purpose missing.');
+	if (businessPurpose.unresolved) {
 		add('Business purpose', 'Business purpose has unresolved variables.');
 	}
 
@@ -197,6 +205,15 @@ export async function evaluatePurchaseReadiness(
 	}
 
 	return { ready: sections.length === 0, sections };
+}
+
+function businessPurposeReadiness(request: PurchaseRequest) {
+	if (request.businessPurposeSource !== undefined) {
+		const resolved = resolveBusinessPurpose(request.businessPurposeSource, request);
+		return { text: resolved.text, unresolved: resolved.unresolved.length > 0 };
+	}
+	const text = request.businessPurposeText ?? '';
+	return { text, unresolved: unresolvedToken(text) };
 }
 
 export function formatReadinessBlockers(readiness: PurchaseReadiness) {

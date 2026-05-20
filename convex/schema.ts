@@ -56,6 +56,30 @@ const purchaserRef = v.union(
 	v.object({ kind: v.literal('purchaser'), purchaserId: v.id('purchasers') })
 );
 
+const businessPurposeVariable = v.union(
+	v.literal('studentOrganization'),
+	v.literal('purchaser'),
+	v.literal('vendor'),
+	v.literal('itemDescription'),
+	v.literal('totalAmount'),
+	v.literal('recipients'),
+	v.literal('recipientUo95Ids'),
+	v.literal('activityDate'),
+	v.literal('activityTime'),
+	v.literal('activityLocation'),
+	v.literal('estimatedAttendance'),
+	v.literal('officeLocation')
+);
+
+const businessPurposeSource = v.object({
+	parts: v.array(
+		v.union(
+			v.object({ kind: v.literal('text'), text: v.string() }),
+			v.object({ kind: v.literal('variable'), variable: businessPurposeVariable })
+		)
+	)
+});
+
 const studentOrganizationDetails = v.object({
 	name: v.string(),
 	indexNumber: v.string(),
@@ -164,7 +188,7 @@ export default defineSchema({
 		totalAmount: v.number(),
 		budgetLineItem: v.string(),
 		reimbursementReason: v.string(),
-		businessPurposeText: v.string(),
+		businessPurposeSource,
 		businessPurposeTouched: v.boolean(),
 		receiptFileIds: v.array(v.id('files')),
 		secondApprovalFileId: v.union(v.id('files'), v.null()),

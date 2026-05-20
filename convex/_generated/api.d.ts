@@ -12,6 +12,7 @@ import type * as authed_demo from "../authed/demo.js";
 import type * as authed_extension from "../authed/extension.js";
 import type * as authed_helpers from "../authed/helpers.js";
 import type * as authed_purchaseBuilder from "../authed/purchaseBuilder.js";
+import type * as businessPurpose from "../businessPurpose.js";
 import type * as internal_purchaseAutosave from "../internal/purchaseAutosave.js";
 import type * as purchaseCategories from "../purchaseCategories.js";
 import type * as purchaseModel from "../purchaseModel.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   "authed/extension": typeof authed_extension;
   "authed/helpers": typeof authed_helpers;
   "authed/purchaseBuilder": typeof authed_purchaseBuilder;
+  businessPurpose: typeof businessPurpose;
   "internal/purchaseAutosave": typeof internal_purchaseAutosave;
   purchaseCategories: typeof purchaseCategories;
   purchaseModel: typeof purchaseModel;

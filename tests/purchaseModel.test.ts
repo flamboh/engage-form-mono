@@ -4,6 +4,7 @@ import {
 	applyDraftPatch,
 	assemblePurchase,
 	assertReady,
+	parseBusinessPurposeText,
 	renderBusinessPurpose,
 	userAsPurchaserDetails
 } from '../convex/purchaseModel';
@@ -107,6 +108,83 @@ test('renders optional recipient tokens without unresolved placeholders when abs
 	expect(renderBusinessPurpose({ ...request, recipients: [] })).toBe(
 		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 at Listening party on 2026-05-22 with 50 students. Recipient: N/A (N/A) for N/A.'
 	);
+});
+
+test('rejects unknown Business Purpose variables', () => {
+	expect(() => parseBusinessPurposeText('Reimburse {Purchaser} for {Bad Variable}.')).toThrow(
+		'Unknown Business Purpose variable: Bad Variable.'
+	);
+});
+
+test('resolves structured Business Purpose source with plural recipient variables', () => {
+	const purchase = {
+		...request,
+		businessPurposeSource: parseBusinessPurposeText(
+			'{Student Organization} reimburses {Purchaser} for {Item Description} from {Vendor} for {Total Amount}. Recipients: {Recipients}. UO 95 IDs: {Recipient UO 95 IDs}. Activity: {Activity Date} at {Activity Time} in {Activity Location} for {Estimated Attendance} students.'
+		),
+		recipients: [
+			{ name: 'Aidan', uo95: '951951840', reason: 'winning trivia', value: 12 },
+			{ name: 'Maya', uo95: '950000002', reason: 'winning trivia', value: 10.98 }
+		]
+	} as Doc<'purchaseRequests'>;
+
+	expect(renderBusinessPurpose(purchase)).toBe(
+		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98. Recipients: Aidan, Maya. UO 95 IDs: 951951840, 950000002. Activity: 2026-05-22 at 6:30 PM in EMU for 50 students.'
+	);
+});
+
+test('Ready blocks unresolved Business Purpose variables from source', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			businessPurposeSource: parseBusinessPurposeText('Move supplies to {Office Location}.'),
+			officeLocation: ''
+		} as Doc<'purchaseRequests'>)
+	).resolves.toEqual({
+		ready: false,
+		sections: [
+			{ section: 'Business purpose', reasons: ['Business purpose has unresolved variables.'] }
+		]
+	});
+});
+
+test('freeform Business Purpose text stays allowed', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			businessPurposeSource: parseBusinessPurposeText('Reimburse Oliver for records.'),
+			businessPurposeText: ''
+		} as Doc<'purchaseRequests'>)
+	).resolves.toEqual({
+		ready: true,
+		sections: []
+	});
+});
+
+test('draft patch stores Business Purpose source instead of resolved text', () => {
+	expect(
+		applyDraftPatch(request, {
+			businessPurposeText: 'Reimburse {Purchaser}.',
+			businessPurposeTouched: true
+		})
+	).toMatchObject({
+		businessPurposeSource: parseBusinessPurposeText('Reimburse {Purchaser}.'),
+		businessPurposeTouched: true
+	});
+});
+
+test('fill payload resolves Business Purpose at read time', async () => {
+	await expect(
+		assemblePurchase(fileCtx(), {
+			...request,
+			businessPurposeSource: parseBusinessPurposeText(
+				'Reimburse {Purchaser} for {Item Description}.'
+			),
+			businessPurposeText: ''
+		} as Doc<'purchaseRequests'>)
+	).resolves.toMatchObject({
+		businessPurposeText: 'Reimburse Oliver Boorstein for record.'
+	});
 });
 
 test('Requester-as-Purchaser uses Requester details without a Purchaser Profile', () => {

@@ -19,6 +19,11 @@
 	type TypeOfPurchase = Doc<'purchaseRequests'>['typeOfPurchase'];
 	type DocumentationCategory = Doc<'purchaseRequests'>['documentationCategories'][number];
 	type FundLetter = Doc<'organizations'>['fundLetter'];
+	type BusinessPurposeSource = Doc<'purchaseRequests'>['businessPurposeSource'];
+	type BusinessPurposeVariable = Extract<
+		BusinessPurposeSource['parts'][number],
+		{ kind: 'variable' }
+	>['variable'];
 	type StudentOrganizationDetails = {
 		name: string;
 		indexNumber: string;
@@ -127,7 +132,20 @@
 	const recipientCategoryApplies = $derived(
 		merchandiseApparelApplies || documentationCategories.includes('gifts_prizes')
 	);
-	const purchaserName = $derived(purchaser?.name ?? '{purchaser}');
+	const businessPurposeVariableLabels: Record<BusinessPurposeVariable, string> = {
+		studentOrganization: 'Student Organization',
+		purchaser: 'Purchaser',
+		vendor: 'Vendor',
+		itemDescription: 'Item Description',
+		totalAmount: 'Total Amount',
+		recipients: 'Recipients',
+		recipientUo95Ids: 'Recipient UO 95 IDs',
+		activityDate: 'Activity Date',
+		activityTime: 'Activity Time',
+		activityLocation: 'Activity Location',
+		estimatedAttendance: 'Estimated Attendance',
+		officeLocation: 'Office Location'
+	};
 	let lastOrganizationId = $state<Id<'organizations'> | null>(null);
 	let lastPurchaserKey = $state('');
 
@@ -246,7 +264,7 @@
 			itemDescription = draft.itemDescription;
 			totalAmount = draft.totalAmount;
 			budgetLineItem = draft.budgetLineItem;
-			businessPurposeText = draft.businessPurposeText;
+			businessPurposeText = formatBusinessPurposeSource(draft.businessPurposeSource);
 			businessPurposeTouched = draft.businessPurposeTouched;
 			receiptFileIds = draft.receiptFileIds;
 			secondApprovalFileId = draft.secondApprovalFileId;
@@ -311,33 +329,8 @@
 	}
 
 	function onFieldChange() {
-		if (!businessPurposeTouched) businessPurposeText = renderBusinessPurpose();
+		if (!businessPurposeTouched) businessPurposeText = studentOrganization.businessPurposeTemplate;
 		void autosave();
-	}
-
-	function renderBusinessPurpose() {
-		const firstRecipient = recipients[0];
-		const values: Record<string, string> = {
-			org: studentOrganization.name || '{org}',
-			requester: requester?.name ?? '{requester}',
-			purchaser: purchaserName,
-			vendor: vendor || '{vendor}',
-			item: itemDescription || '{item}',
-			amount: totalAmount > 0 ? money(totalAmount) : '{amount}',
-			recipient: firstRecipient?.name || 'N/A',
-			recipientUo95: firstRecipient?.uo95 || 'N/A',
-			recipientReason: firstRecipient?.reason || 'N/A',
-			eventName: eventName || '{eventName}',
-			eventDate: eventDate || '{eventDate}',
-			eventTime: eventTime || '{eventTime}',
-			eventLocation: eventLocation || '{eventLocation}',
-			attendance:
-				eventEstimatedAttendance > 0 ? eventEstimatedAttendance.toString() : '{attendance}'
-		};
-		return Object.entries(values).reduce(
-			(text, [key, value]) => text.replaceAll(`{${key}}`, value),
-			studentOrganization.businessPurposeTemplate
-		);
 	}
 
 	async function uploadRequestFile(
@@ -394,8 +387,13 @@
 		location.href = '/app';
 	}
 
-	function money(value: number) {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+	function formatBusinessPurposeSource(source: BusinessPurposeSource) {
+		return source.parts
+			.map((part) => {
+				if (part.kind === 'text') return part.text;
+				return `{${businessPurposeVariableLabels[part.variable]}}`;
+			})
+			.join('');
 	}
 
 	function userAsRequester(user: Doc<'users'>): RequesterDetails {
@@ -523,7 +521,7 @@
 					class="secondary mt-3"
 					type="button"
 					onclick={() => {
-						businessPurposeText = renderBusinessPurpose();
+						businessPurposeText = studentOrganization.businessPurposeTemplate;
 						businessPurposeTouched = false;
 						void autosave();
 					}}

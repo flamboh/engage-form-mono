@@ -6,11 +6,26 @@ import {
 	unresolvedToken
 } from './purchaseReadiness';
 import { effectiveDocumentationCategories } from './purchaseCategories';
+import {
+	parseBusinessPurposeText,
+	resolveBusinessPurpose,
+	type BusinessPurposeSource
+} from './businessPurpose';
+export {
+	formatBusinessPurposeSource,
+	parseBusinessPurposeText,
+	resolveBusinessPurpose,
+	validateBusinessPurposeSource
+} from './businessPurpose';
 
 export { evaluatePurchaseReadiness, unresolvedToken } from './purchaseReadiness';
 export { effectiveDocumentationCategories } from './purchaseCategories';
 
 export type Recipient = { name: string; uo95: string; reason: string; value: number };
+type BusinessPurposeRequest = Doc<'purchaseRequests'> & {
+	businessPurposeSource?: BusinessPurposeSource;
+	businessPurposeText?: string;
+};
 
 export type PurchaserRef = { kind: 'self' } | { kind: 'purchaser'; purchaserId: Id<'purchasers'> };
 export type TypeOfPurchase =
@@ -73,6 +88,7 @@ export type DraftPatch = Partial<{
 	totalAmount: number | null;
 	budgetLineItem: string;
 	reimbursementReason: string;
+	businessPurposeSource: BusinessPurposeSource;
 	businessPurposeText: string;
 	businessPurposeTouched: boolean;
 	receiptFileIds: Id<'files'>[];
@@ -167,10 +183,11 @@ export function applyDraftPatch(
 		budgetLineItem:
 			patch.budgetLineItem !== undefined ? patch.budgetLineItem : purchase.budgetLineItem,
 		reimbursementReason: reimbursementReasonFor(typeOfPurchase),
-		businessPurposeText:
-			patch.businessPurposeText !== undefined
-				? patch.businessPurposeText
-				: purchase.businessPurposeText,
+		businessPurposeSource:
+			patch.businessPurposeSource ??
+			(patch.businessPurposeText !== undefined
+				? parseBusinessPurposeText(patch.businessPurposeText)
+				: purchase.businessPurposeSource),
 		businessPurposeTouched:
 			patch.businessPurposeTouched !== undefined
 				? patch.businessPurposeTouched
@@ -210,7 +227,10 @@ export function applyDraftPatch(
 	};
 }
 
-export function renderBusinessPurpose(request: Doc<'purchaseRequests'>) {
+export function renderBusinessPurpose(request: BusinessPurposeRequest) {
+	if (request.businessPurposeSource !== undefined) {
+		return resolveBusinessPurpose(request.businessPurposeSource, request).text;
+	}
 	const firstRecipient = request.recipients[0];
 	const values: Record<string, string> = {
 		org: request.studentOrganization.name || '{org}',
@@ -277,7 +297,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		totalAmount: request.totalAmount,
 		budgetLineItem: request.budgetLineItem,
 		reimbursementReason: reimbursementReasonFor(request.typeOfPurchase),
-		businessPurposeText: request.businessPurposeText,
+		businessPurposeText: renderBusinessPurpose(request),
 		requesterIsPurchaser: purchaserIsSelf,
 		receiptFileIds: request.receiptFileIds,
 		secondApprovalFileId: purchaserIsSelf ? request.secondApprovalFileId : null,

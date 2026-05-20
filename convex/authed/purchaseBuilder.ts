@@ -10,11 +10,10 @@ import {
 	assertReady,
 	getUserProfile,
 	ownerFromIdentity,
-	renderBusinessPurpose,
+	parseBusinessPurposeText,
 	requireOwnedDoc,
 	requireUserProfile,
 	requireText,
-	unresolvedToken,
 	userAsPurchaserDetails,
 	userAsRequesterDetails,
 	type DraftPatch
@@ -206,6 +205,7 @@ export const upsertOrganization = authedMutation({
 		requireText(args.name, 'Organization name missing.');
 		requireText(args.indexNumber, 'Index number missing.');
 		requireText(args.businessPurposeTemplate, 'Business purpose template missing.');
+		parseBusinessPurposeText(args.businessPurposeTemplate);
 		const budgetLines = args.budgetLines.map((line) => line.trim()).filter((line) => line !== '');
 		if (budgetLines.length === 0) throw new Error('Add at least one budget line.');
 		const fields = {
@@ -346,7 +346,7 @@ export const createDraft = authedMutation({
 			totalAmount: 0,
 			budgetLineItem: '',
 			reimbursementReason: 'Other processes are too slow.',
-			businessPurposeText: '',
+			businessPurposeSource: { parts: [] },
 			businessPurposeTouched: false,
 			receiptFileIds: [],
 			secondApprovalFileId: null,
@@ -396,13 +396,6 @@ export const markReady = authedMutation({
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
 		const patch =
 			args.patch !== undefined ? applyDraftPatch(request, args.patch as DraftPatch) : {};
-		const nextRequest = { ...request, ...patch };
-		if (unresolvedToken(nextRequest.businessPurposeText)) {
-			patch.businessPurposeText = renderBusinessPurpose(nextRequest);
-			patch.businessPurposeTouched = false;
-			nextRequest.businessPurposeText = patch.businessPurposeText;
-			nextRequest.businessPurposeTouched = false;
-		}
 		if (Object.keys(patch).length > 0) await ctx.db.patch(args.id, patch);
 		const updated = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
 		await assertReady(ctx, updated);
