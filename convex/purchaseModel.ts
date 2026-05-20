@@ -1,5 +1,12 @@
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
+import {
+	evaluatePurchaseReadiness,
+	formatReadinessBlockers,
+	unresolvedToken
+} from './purchaseReadiness';
+
+export { evaluatePurchaseReadiness, unresolvedToken } from './purchaseReadiness';
 
 export type Recipient = { name: string; uo95: string; reason: string; value: number };
 
@@ -161,10 +168,6 @@ export function applyDraftPatch(
 	};
 }
 
-export function unresolvedToken(value: string) {
-	return /\{[A-Za-z][A-Za-z0-9]*\}/.test(value);
-}
-
 export function renderBusinessPurpose(request: Doc<'purchaseRequests'>) {
 	const firstRecipient = request.recipients[0];
 	const values: Record<string, string> = {
@@ -233,39 +236,13 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 }
 
 export async function assertReady(ctx: Ctx, request: Doc<'purchaseRequests'>) {
-	const purchaseRequest = await assemblePurchase(ctx, request);
-	if (purchaseRequest.typeOfPurchase !== 'personal_reimbursement') {
-		throw new Error('Type of Purchase is not supported yet.');
-	}
-	requireText(purchaseRequest.organization.name, 'Student organization name missing.');
-	requireText(purchaseRequest.organization.indexNumber, 'Index number missing.');
-	if (purchaseRequest.organization.budgetLines.length === 0)
-		throw new Error('Budget line missing.');
-	requireText(purchaseRequest.requester.name, 'Requester name missing.');
-	requireText(purchaseRequest.requester.email, 'Requester email missing.');
-	requireText(purchaseRequest.requester.phone, 'Requester phone missing.');
-	requireText(purchaseRequest.purchaser.name, 'Purchaser name missing.');
-	requireText(purchaseRequest.purchaser.uo95, 'Purchaser UO 95 missing.');
-	requireText(purchaseRequest.purchaser.permanentAddress, 'Purchaser address missing.');
-	requireText(purchaseRequest.eventDetails.name, 'Event name missing.');
-	requireText(purchaseRequest.eventDetails.date, 'Event date missing.');
-	requireText(purchaseRequest.eventDetails.time, 'Event time missing.');
-	requireText(purchaseRequest.eventDetails.location, 'Event location missing.');
-	if (purchaseRequest.eventDetails.estimatedAttendance <= 0) {
-		throw new Error('Estimated attendance missing.');
-	}
-	requireText(purchaseRequest.vendor, 'Vendor missing.');
-	requireText(purchaseRequest.itemDescription, 'Item description missing.');
-	requireText(purchaseRequest.budgetLineItem, 'Budget line item missing.');
-	requireText(purchaseRequest.reimbursementReason, 'Reimbursement reason missing.');
-	requireText(purchaseRequest.businessPurposeText, 'Business purpose missing.');
-	if (unresolvedToken(purchaseRequest.businessPurposeText)) {
-		throw new Error('Business purpose has unresolved variables.');
-	}
-	if (purchaseRequest.totalAmount <= 0) throw new Error('Total amount must be greater than zero.');
-	if (purchaseRequest.receiptFileIds.length === 0) throw new Error('Receipt document missing.');
-	if (purchaseRequest.receiptFileIds.length > 3)
-		throw new Error('Receipt documents are limited to three.');
+	const readiness = await evaluatePurchaseReadiness(request, {
+		documentExists: async (id) => {
+			const doc = await ctx.db.get(id);
+			return doc !== null && doc.owner === request.owner;
+		}
+	});
+	if (!readiness.ready) throw new Error(formatReadinessBlockers(readiness));
 }
 
 async function documentPayload(ctx: Ctx, id: Id<'files'>, owner: string) {

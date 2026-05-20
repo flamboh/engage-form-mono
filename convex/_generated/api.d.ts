@@ -14,6 +14,7 @@ import type * as authed_helpers from "../authed/helpers.js";
 import type * as authed_purchaseBuilder from "../authed/purchaseBuilder.js";
 import type * as internal_purchaseAutosave from "../internal/purchaseAutosave.js";
 import type * as purchaseModel from "../purchaseModel.js";
+import type * as purchaseReadiness from "../purchaseReadiness.js";
 import type * as purchaseValidators from "../purchaseValidators.js";
 
 import type {
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   "authed/purchaseBuilder": typeof authed_purchaseBuilder;
   "internal/purchaseAutosave": typeof internal_purchaseAutosave;
   purchaseModel: typeof purchaseModel;
+  purchaseReadiness: typeof purchaseReadiness;
   purchaseValidators: typeof purchaseValidators;
 }>;
 
