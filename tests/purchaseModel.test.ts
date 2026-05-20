@@ -1,6 +1,11 @@
 import { expect, test } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
-import { applyDraftPatch, assertReady, renderBusinessPurpose } from '../convex/purchaseModel';
+import {
+	applyDraftPatch,
+	assemblePurchase,
+	assertReady,
+	renderBusinessPurpose
+} from '../convex/purchaseModel';
 import { evaluatePurchaseReadiness } from '../convex/purchaseReadiness';
 
 const request = {
@@ -9,6 +14,7 @@ const request = {
 	owner: 'owner',
 	status: 'draft',
 	typeOfPurchase: 'personal_reimbursement',
+	documentationCategories: [],
 	organizationSourceId: null,
 	purchaserSource: { kind: 'self' },
 	studentOrganization: {
@@ -102,6 +108,54 @@ test('reports a complete Personal Reimbursement purchase request as Ready', asyn
 	).resolves.toEqual({
 		ready: true,
 		sections: []
+	});
+});
+
+test('does not require Publicity Proof when ASUO Funds does not apply', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			documentationCategories: [],
+			studentOrganization: { ...request.studentOrganization, fundLetter: 'E' },
+			publicityFileId: null,
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: true,
+		sections: []
+	});
+});
+
+test('Fund Letter I applies ASUO Funds in the fill payload', async () => {
+	await expect(assemblePurchase(fileCtx(), request)).resolves.toMatchObject({
+		documentationCategories: ['asuo_funds']
+	});
+});
+
+test('non-I Fund Letters can select ASUO Funds for the fill payload', async () => {
+	await expect(
+		assemblePurchase(fileCtx(), {
+			...request,
+			documentationCategories: ['asuo_funds'],
+			studentOrganization: { ...request.studentOrganization, fundLetter: 'E' }
+		})
+	).resolves.toMatchObject({
+		documentationCategories: ['asuo_funds']
+	});
+});
+
+test('manual ASUO Funds selection requires Publicity Proof', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			documentationCategories: ['asuo_funds'],
+			studentOrganization: { ...request.studentOrganization, fundLetter: 'E' },
+			publicityFileId: null,
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [{ section: 'Files', reasons: ['Publicity proof missing.'] }]
 	});
 });
 
@@ -237,3 +291,23 @@ test('Ready gate rejects document ids that are not owned records', async () => {
 		['Purchase request is not ready.', 'Files: Receipt document missing.'].join('\n')
 	);
 });
+
+function fileCtx() {
+	return {
+		db: {
+			get: async (id: string) => ({
+				_id: id,
+				owner: request.owner,
+				kind: 'receipt',
+				filename: `${id}.pdf`,
+				contentType: 'application/pdf',
+				size: 1,
+				storageId: `storage_${id}`,
+				createdAt: 1
+			})
+		},
+		storage: {
+			getUrl: async (storageId: string) => `https://files.example/${storageId}`
+		}
+	} as never;
+}

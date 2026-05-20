@@ -6,8 +6,12 @@
 		| 'pcard'
 		| 'co_sponsorship_payment'
 		| 'service_agreement_or_purchase_order_for_service';
+	type DocumentationCategory = 'asuo_funds';
+	type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 	type Props = {
 		typeOfPurchase: TypeOfPurchase;
+		documentationCategories: DocumentationCategory[];
+		fundLetter: FundLetter;
 		eventName: string;
 		eventDate: string;
 		eventTime: string;
@@ -36,6 +40,8 @@
 
 	let {
 		typeOfPurchase = $bindable(),
+		documentationCategories = $bindable(),
+		fundLetter,
 		eventName = $bindable(),
 		eventDate = $bindable(),
 		eventTime = $bindable(),
@@ -48,6 +54,18 @@
 		budgetLineOptions,
 		onChange
 	}: Props = $props();
+
+	const asuoFundsImplicit = $derived(fundLetter === 'I');
+	const asuoFundsChecked = $derived(
+		asuoFundsImplicit || documentationCategories.includes('asuo_funds')
+	);
+
+	function setDocumentationCategory(category: DocumentationCategory, checked: boolean) {
+		documentationCategories = checked
+			? [...documentationCategories.filter((item) => item !== category), category]
+			: documentationCategories.filter((item) => item !== category);
+		onChange();
+	}
 </script>
 
 <section class="panel">
@@ -68,6 +86,21 @@
 						<span>{option.label}</span>
 					</label>
 				{/each}
+			</div>
+		</fieldset>
+		<fieldset class="md:col-span-2">
+			<legend>Documentation Categories</legend>
+			<div class="type-grid">
+				<label class:disabled={asuoFundsImplicit}>
+					<input
+						type="checkbox"
+						checked={asuoFundsChecked}
+						disabled={asuoFundsImplicit}
+						onchange={(event) =>
+							setDocumentationCategory('asuo_funds', event.currentTarget.checked)}
+					/>
+					<span>ASUO Funds</span>
+				</label>
 			</div>
 		</fieldset>
 		<label>

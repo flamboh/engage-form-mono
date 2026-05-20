@@ -1,4 +1,5 @@
 import type { Doc, Id } from './_generated/dataModel';
+import { effectiveDocumentationCategories } from './purchaseCategories';
 
 export type ReadinessSection = {
 	section: string;
@@ -94,7 +95,8 @@ export async function evaluatePurchaseReadiness(
 	if (request.receiptFileIds.length > 3) {
 		add('Files', 'Receipt documents are limited to three.');
 	}
-	if (request.publicityFileId === null) add('Files', 'Publicity proof missing.');
+	const asuoFunds = effectiveDocumentationCategories(request).includes('asuo_funds');
+	if (asuoFunds && request.publicityFileId === null) add('Files', 'Publicity proof missing.');
 	if (request.purchaserSource.kind === 'self' && request.secondApprovalFileId === null) {
 		add('Files', 'Second approval missing.');
 	}
@@ -125,7 +127,7 @@ export async function evaluatePurchaseReadiness(
 				);
 			}
 		}
-		if (request.publicityFileId !== null) {
+		if (asuoFunds && request.publicityFileId !== null) {
 			await requireOwnedDocument(
 				add,
 				options.documentExists,

@@ -5,8 +5,10 @@ import {
 	formatReadinessBlockers,
 	unresolvedToken
 } from './purchaseReadiness';
+import { effectiveDocumentationCategories } from './purchaseCategories';
 
 export { evaluatePurchaseReadiness, unresolvedToken } from './purchaseReadiness';
+export { effectiveDocumentationCategories } from './purchaseCategories';
 
 export type Recipient = { name: string; uo95: string; reason: string; value: number };
 
@@ -18,6 +20,7 @@ export type TypeOfPurchase =
 	| 'pcard'
 	| 'co_sponsorship_payment'
 	| 'service_agreement_or_purchase_order_for_service';
+export type DocumentationCategory = 'asuo_funds';
 export type StudentOrganizationDetails = {
 	name: string;
 	indexNumber: string;
@@ -48,6 +51,7 @@ type Ctx = QueryCtx | MutationCtx;
 
 export type DraftPatch = Partial<{
 	typeOfPurchase: TypeOfPurchase;
+	documentationCategories: DocumentationCategory[];
 	organizationSourceId: Id<'organizations'> | null;
 	purchaserSource: PurchaserRef;
 	studentOrganization: StudentOrganizationDetails;
@@ -119,6 +123,10 @@ export function applyDraftPatch(
 		patch.typeOfPurchase !== undefined ? patch.typeOfPurchase : purchase.typeOfPurchase;
 	return {
 		typeOfPurchase,
+		documentationCategories:
+			patch.documentationCategories !== undefined
+				? patch.documentationCategories
+				: purchase.documentationCategories,
 		organizationSourceId:
 			patch.organizationSourceId !== undefined
 				? patch.organizationSourceId
@@ -196,7 +204,10 @@ export function renderBusinessPurpose(request: Doc<'purchaseRequests'>) {
 }
 
 export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'>) {
-	if (request.publicityFileId === null) throw new Error('Publicity proof missing.');
+	const documentationCategories = effectiveDocumentationCategories(request);
+	const asuoFunds = documentationCategories.includes('asuo_funds');
+
+	if (asuoFunds && request.publicityFileId === null) throw new Error('Publicity proof missing.');
 
 	const purchaserIsSelf = request.purchaserSource.kind === 'self';
 
@@ -207,7 +218,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 	const fileIds = [
 		request.purchaser.idCardFrontFileId,
 		request.purchaser.idCardBackFileId,
-		request.publicityFileId,
+		asuoFunds ? request.publicityFileId : null,
 		request.secondApprovalFileId,
 		...request.receiptFileIds
 	].filter((id): id is Id<'files'> => id !== null);
@@ -217,6 +228,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		id: request._id,
 		status: request.status,
 		typeOfPurchase: request.typeOfPurchase,
+		documentationCategories,
 		organization: orgPayload(request),
 		requester: request.requester,
 		purchaser: request.purchaser,
@@ -313,7 +325,10 @@ function orgPayload(request: Doc<'purchaseRequests'>) {
 	};
 }
 
-function eventDetailsPayload(request: Doc<'purchaseRequests'>, publicityFileId: Id<'files'>) {
+function eventDetailsPayload(
+	request: Doc<'purchaseRequests'>,
+	publicityFileId: Id<'files'> | null
+) {
 	return {
 		name: request.eventName,
 		date: request.eventDate,

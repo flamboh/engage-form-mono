@@ -320,6 +320,7 @@ export const createDraft = authedMutation({
 			owner,
 			status: 'draft',
 			typeOfPurchase: 'personal_reimbursement',
+			documentationCategories: [],
 			organizationSourceId: null,
 			purchaserSource: { kind: 'self' },
 			studentOrganization: {
