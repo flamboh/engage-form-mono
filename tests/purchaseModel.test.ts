@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
-import { applyDraftPatch, renderBusinessPurpose } from '../convex/purchaseModel';
+import { applyDraftPatch, assertReady, renderBusinessPurpose } from '../convex/purchaseModel';
+import { evaluatePurchaseReadiness } from '../convex/purchaseReadiness';
 
 const request = {
 	_id: 'purchase_1',
@@ -92,5 +93,147 @@ test('renders business purpose from current recorded facts', () => {
 test('renders optional recipient tokens without unresolved placeholders when absent', () => {
 	expect(renderBusinessPurpose({ ...request, recipients: [] })).toBe(
 		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 at Listening party on 2026-05-22 with 50 students. Recipient: N/A (N/A) for N/A.'
+	);
+});
+
+test('reports a complete Personal Reimbursement purchase request as Ready', async () => {
+	await expect(
+		evaluatePurchaseReadiness({ ...request, businessPurposeText: renderBusinessPurpose(request) })
+	).resolves.toEqual({
+		ready: true,
+		sections: []
+	});
+});
+
+test('reports blocked Draft reasons grouped by section', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			studentOrganization: {
+				...request.studentOrganization,
+				name: '',
+				indexNumber: '',
+				budgetLines: []
+			},
+			requester: { ...request.requester, name: '', email: '', phone: '' },
+			purchaser: {
+				...request.purchaser,
+				name: '',
+				uo95: '',
+				permanentAddress: '',
+				idCardFrontFileId: '' as never,
+				idCardBackFileId: '' as never
+			},
+			eventName: '',
+			eventDate: '',
+			eventTime: '',
+			eventLocation: '',
+			eventEstimatedAttendance: 0,
+			vendor: '',
+			itemDescription: '',
+			totalAmount: 0,
+			budgetLineItem: '',
+			businessPurposeText: 'Reimburse {purchaser}.',
+			receiptFileIds: [],
+			secondApprovalFileId: null,
+			publicityFileId: null
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [
+			{
+				section: 'Student organization',
+				reasons: [
+					'Student organization name missing.',
+					'Index number missing.',
+					'Budget line missing.'
+				]
+			},
+			{
+				section: 'Requester',
+				reasons: ['Requester name missing.', 'Requester email missing.', 'Requester phone missing.']
+			},
+			{
+				section: 'Purchaser',
+				reasons: [
+					'Purchaser name missing.',
+					'Purchaser UO 95 missing.',
+					'Purchaser address missing.',
+					'ID card front document missing.',
+					'ID card back document missing.'
+				]
+			},
+			{
+				section: 'Event details',
+				reasons: [
+					'Event name missing.',
+					'Event date missing.',
+					'Event time missing.',
+					'Event location missing.',
+					'Estimated attendance missing.'
+				]
+			},
+			{
+				section: 'Purchase details',
+				reasons: [
+					'Vendor missing.',
+					'Item description missing.',
+					'Budget line item missing.',
+					'Total amount must be greater than zero.'
+				]
+			},
+			{
+				section: 'Business purpose',
+				reasons: ['Business purpose has unresolved variables.']
+			},
+			{
+				section: 'Files',
+				reasons: [
+					'Receipt document missing.',
+					'Publicity proof missing.',
+					'Second approval missing.'
+				]
+			}
+		]
+	});
+});
+
+test('Ready gate rejects blocked Drafts with sectioned reasons', async () => {
+	const ctx = {
+		db: {
+			get: async () => ({ owner: request.owner })
+		}
+	};
+
+	await expect(
+		assertReady(ctx as never, {
+			...request,
+			businessPurposeText: 'Reimburse {purchaser}.',
+			receiptFileIds: [],
+			publicityFileId: null
+		})
+	).rejects.toThrow(
+		[
+			'Purchase request is not ready.',
+			'Business purpose: Business purpose has unresolved variables.',
+			'Files: Receipt document missing. Publicity proof missing.'
+		].join('\n')
+	);
+});
+
+test('Ready gate rejects document ids that are not owned records', async () => {
+	const ctx = {
+		db: {
+			get: async (id: string) => (id === 'file_receipt' ? null : { owner: request.owner })
+		}
+	};
+
+	await expect(
+		assertReady(ctx as never, {
+			...request,
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).rejects.toThrow(
+		['Purchase request is not ready.', 'Files: Receipt document missing.'].join('\n')
 	);
 });
