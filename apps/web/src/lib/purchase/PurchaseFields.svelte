@@ -1,5 +1,13 @@
 <script lang="ts">
+	type TypeOfPurchase =
+		| 'personal_reimbursement'
+		| 'internal_po'
+		| 'external_po'
+		| 'pcard'
+		| 'co_sponsorship_payment'
+		| 'service_agreement_or_purchase_order_for_service';
 	type Props = {
+		typeOfPurchase: TypeOfPurchase;
 		eventName: string;
 		eventDate: string;
 		eventTime: string;
@@ -9,12 +17,25 @@
 		itemDescription: string;
 		totalAmount: number;
 		budgetLineItem: string;
-		reimbursementReason: string;
 		budgetLineOptions: string[];
 		onChange: () => void;
 	};
 
+	const typeOfPurchaseOptions: { value: TypeOfPurchase; label: string; disabled: boolean }[] = [
+		{ value: 'personal_reimbursement', label: 'Personal Reimbursement', disabled: false },
+		{ value: 'internal_po', label: 'Internal PO', disabled: true },
+		{ value: 'external_po', label: 'External PO', disabled: true },
+		{ value: 'pcard', label: 'PCARD', disabled: true },
+		{ value: 'co_sponsorship_payment', label: 'Co-Sponsorship Payment', disabled: true },
+		{
+			value: 'service_agreement_or_purchase_order_for_service',
+			label: 'Service Agreement or Purchase Order for Service',
+			disabled: true
+		}
+	];
+
 	let {
+		typeOfPurchase = $bindable(),
 		eventName = $bindable(),
 		eventDate = $bindable(),
 		eventTime = $bindable(),
@@ -24,7 +45,6 @@
 		itemDescription = $bindable(),
 		totalAmount = $bindable(),
 		budgetLineItem = $bindable(),
-		reimbursementReason = $bindable(),
 		budgetLineOptions,
 		onChange
 	}: Props = $props();
@@ -33,6 +53,23 @@
 <section class="panel">
 	<h2>Purchase Request</h2>
 	<div class="grid gap-4 md:grid-cols-2">
+		<fieldset class="md:col-span-2">
+			<legend>Type of Purchase</legend>
+			<div class="type-grid">
+				{#each typeOfPurchaseOptions as option (option.value)}
+					<label class:disabled={option.disabled}>
+						<input
+							type="radio"
+							value={option.value}
+							disabled={option.disabled}
+							bind:group={typeOfPurchase}
+							onchange={onChange}
+						/>
+						<span>{option.label}</span>
+					</label>
+				{/each}
+			</div>
+		</fieldset>
 		<label>
 			<span>Event name</span>
 			<input class="field" bind:value={eventName} oninput={onChange} />
@@ -92,10 +129,6 @@
 				<input class="field" bind:value={budgetLineItem} oninput={onChange} />
 			{/if}
 		</label>
-		<label class="md:col-span-2">
-			<span>Why reimbursement was used</span>
-			<input class="field" bind:value={reimbursementReason} oninput={onChange} />
-		</label>
 	</div>
 </section>
 
@@ -131,5 +164,48 @@
 	.currency-field .field {
 		padding-left: 1.45rem;
 		font-variant-numeric: tabular-nums;
+	}
+
+	fieldset {
+		border: 0;
+		padding: 0;
+	}
+
+	legend,
+	label > span {
+		display: block;
+		margin-bottom: 0.35rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: rgb(87 83 78);
+	}
+
+	.type-grid {
+		display: grid;
+		gap: 0.5rem;
+	}
+
+	.type-grid label {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		border: 1px solid rgb(214 211 209);
+		border-radius: 0.375rem;
+		padding: 0.55rem 0.7rem;
+		font-size: 0.875rem;
+	}
+
+	.type-grid label > span {
+		margin: 0;
+		color: rgb(28 25 23);
+	}
+
+	.type-grid .disabled {
+		background: rgb(250 250 249);
+		color: rgb(120 113 108);
+	}
+
+	.type-grid .disabled > span {
+		color: rgb(120 113 108);
 	}
 </style>

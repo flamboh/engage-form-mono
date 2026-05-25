@@ -10,6 +10,15 @@ export type DocumentKind =
 	| 'recipient_list';
 
 export type PurchaseStatus = 'draft' | 'ready';
+export type TypeOfPurchase =
+	| 'personal_reimbursement'
+	| 'internal_po'
+	| 'external_po'
+	| 'pcard'
+	| 'co_sponsorship_payment'
+	| 'service_agreement_or_purchase_order_for_service';
+
+export const fixedPersonalReimbursementReason = 'Other processes are too slow.';
 
 export type StudentOrganization = {
 	id: string;
@@ -63,6 +72,7 @@ export type Recipient = {
 export type PurchaseRequest = {
 	id: string;
 	status: PurchaseStatus;
+	typeOfPurchase: TypeOfPurchase;
 	organization: StudentOrganization;
 	requester: Requester;
 	purchaser: Purchaser;
@@ -88,6 +98,7 @@ export type ReadinessIssue = {
 export const samplePurchaseRequest: PurchaseRequest = {
 	id: 'purchase_mort_garson',
 	status: 'ready',
+	typeOfPurchase: 'personal_reimbursement',
 	organization: {
 		id: 'org_alc',
 		name: 'Album Listening Club',
@@ -127,7 +138,7 @@ export const samplePurchaseRequest: PurchaseRequest = {
 	itemDescription: 'Mort Garson music vinyl',
 	totalAmount: 22.98,
 	budgetLineItem: 'Event Expenses',
-	reimbursementReason: 'Other processes are too slow.',
+	reimbursementReason: fixedPersonalReimbursementReason,
 	businessPurposeText:
 		"Album Listening Club wishes to reimburse Oliver Boorstein because they purchased a Mort Garson music vinyl from Amazon for $22.98. This Mort Garson music vinyl was given as a gift to Aidan O'Donnell (951951840) for winning the Kahoot! Trivia during Album Listening Club weekly event which took place on 04/21 at 6:30pm in McKenzie 240A with about 50 students in attendance.",
 	requesterIsPurchaser: true,
@@ -192,6 +203,13 @@ export function generateBusinessPurpose(purchaseRequest: PurchaseRequest) {
 
 export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 	const issues: ReadinessIssue[] = [];
+
+	if (purchaseRequest.typeOfPurchase !== 'personal_reimbursement') {
+		issues.push({
+			field: 'typeOfPurchase',
+			message: 'Type of Purchase is not supported yet.'
+		});
+	}
 
 	requireText(
 		issues,
@@ -262,12 +280,6 @@ export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 		'itemDescription',
 		purchaseRequest.itemDescription,
 		'Item description missing.'
-	);
-	requireText(
-		issues,
-		'reimbursementReason',
-		purchaseRequest.reimbursementReason,
-		'Reimbursement reason missing.'
 	);
 	requireText(
 		issues,

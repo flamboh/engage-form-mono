@@ -82,6 +82,19 @@ test('uses purchaser data for reimbursement fields', () => {
 	});
 });
 
+test('fills the fixed Personal Reimbursement reason', () => {
+	const plan = createFillPlan('reimbursement', {
+		...samplePurchaseRequest,
+		reimbursementReason: 'Because I typed something else.'
+	});
+
+	expect(plan.actions).toContainEqual({
+		type: 'text',
+		labelIncludes: 'Why did you use the reimbursement process',
+		value: 'Other processes are too slow.'
+	});
+});
+
 test('creates upload fill plans', () => {
 	const reimbursement = createFillPlan('reimbursement', samplePurchaseRequest);
 	expect(reimbursement.actions).toContainEqual({

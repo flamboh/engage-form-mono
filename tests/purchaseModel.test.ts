@@ -7,6 +7,7 @@ const request = {
 	_creationTime: 1,
 	owner: 'owner',
 	status: 'draft',
+	typeOfPurchase: 'personal_reimbursement',
 	organizationSourceId: null,
 	purchaserSource: { kind: 'self' },
 	studentOrganization: {
@@ -62,6 +63,23 @@ test('coerces cleared numeric draft fields to zero', () => {
 	).toMatchObject({
 		eventEstimatedAttendance: 0,
 		totalAmount: 0
+	});
+});
+
+test('records Type of Purchase draft changes', () => {
+	expect(applyDraftPatch(request, { typeOfPurchase: 'personal_reimbursement' })).toMatchObject({
+		typeOfPurchase: 'personal_reimbursement'
+	});
+});
+
+test('uses the fixed Personal Reimbursement reason for draft patches', () => {
+	expect(
+		applyDraftPatch(request, {
+			typeOfPurchase: 'personal_reimbursement',
+			reimbursementReason: 'Custom reason'
+		})
+	).toMatchObject({
+		reimbursementReason: 'Other processes are too slow.'
 	});
 });
 

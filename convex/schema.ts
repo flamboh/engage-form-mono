@@ -11,6 +11,15 @@ const fundLetter = v.union(
 	v.literal('T')
 );
 
+const typeOfPurchase = v.union(
+	v.literal('personal_reimbursement'),
+	v.literal('internal_po'),
+	v.literal('external_po'),
+	v.literal('pcard'),
+	v.literal('co_sponsorship_payment'),
+	v.literal('service_agreement_or_purchase_order_for_service')
+);
+
 const fileKind = v.union(
 	v.literal('receipt'),
 	v.literal('id_front'),
@@ -124,6 +133,7 @@ export default defineSchema({
 	purchaseRequests: defineTable({
 		owner: v.string(),
 		status: v.union(v.literal('draft'), v.literal('ready')),
+		typeOfPurchase,
 		organizationSourceId: v.union(v.id('organizations'), v.null()),
 		purchaserSource: purchaserRef,
 		studentOrganization: studentOrganizationDetails,
