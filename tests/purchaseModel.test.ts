@@ -58,6 +58,11 @@ const request = {
 	receiptFileIds: ['file_receipt'],
 	secondApprovalFileId: 'file_approval',
 	publicityFileId: 'file_publicity',
+	cateringWaiverFileId: null,
+	printingInvoiceFileId: null,
+	officeLocation: '',
+	buildingManagerApprovalFileId: null,
+	computerPriceQuoteFileId: null,
 	recipients: [{ name: 'Aidan', uo95: '951951840', reason: 'winning trivia', value: 22.98 }],
 	createdAt: 1,
 	updatedAt: 1,
@@ -157,6 +162,114 @@ test('manual ASUO Funds selection requires Publicity Proof', async () => {
 		ready: false,
 		sections: [{ section: 'Files', reasons: ['Publicity proof missing.'] }]
 	});
+});
+
+test('Food requires Catering Waiver', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			documentationCategories: ['food'],
+			cateringWaiverFileId: null,
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [{ section: 'Files', reasons: ['Catering waiver missing.'] }]
+	});
+});
+
+test('Printing Services requires Printing Invoice', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			documentationCategories: ['printing_services'],
+			printingInvoiceFileId: null,
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [{ section: 'Files', reasons: ['Printing invoice missing.'] }]
+	});
+});
+
+test('Office Supplies/Goods requires Office Location', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			documentationCategories: ['office_supplies_goods'],
+			officeLocation: '',
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [{ section: 'Purchase details', reasons: ['Office location missing.'] }]
+	});
+});
+
+test('Office Supplies/Goods optional documents do not block Ready', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			documentationCategories: ['office_supplies_goods'],
+			officeLocation: 'EMU 123',
+			buildingManagerApprovalFileId: null,
+			computerPriceQuoteFileId: null,
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: true,
+		sections: []
+	});
+});
+
+test('category requirements are additive', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			documentationCategories: ['food', 'printing_services', 'office_supplies_goods'],
+			cateringWaiverFileId: null,
+			printingInvoiceFileId: null,
+			officeLocation: '',
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [
+			{ section: 'Purchase details', reasons: ['Office location missing.'] },
+			{
+				section: 'Files',
+				reasons: ['Catering waiver missing.', 'Printing invoice missing.']
+			}
+		]
+	});
+});
+
+test('assembled purchase includes category requirement documents and office details', async () => {
+	const purchase = await assemblePurchase(fileCtx(), {
+		...request,
+		documentationCategories: ['food', 'printing_services', 'office_supplies_goods'],
+		cateringWaiverFileId: 'file_catering_waiver',
+		printingInvoiceFileId: 'file_printing_invoice',
+		officeLocation: 'EMU 123',
+		buildingManagerApprovalFileId: 'file_building_manager',
+		computerPriceQuoteFileId: 'file_computer_quote'
+	});
+
+	expect(purchase).toMatchObject({
+		cateringWaiverFileId: 'file_catering_waiver',
+		printingInvoiceFileId: 'file_printing_invoice',
+		officeLocation: 'EMU 123',
+		buildingManagerApprovalFileId: 'file_building_manager',
+		computerPriceQuoteFileId: 'file_computer_quote'
+	});
+	expect(purchase.documents.map((document) => document.id)).toEqual(
+		expect.arrayContaining([
+			'file_catering_waiver',
+			'file_printing_invoice',
+			'file_building_manager',
+			'file_computer_quote'
+		])
+	);
 });
 
 test('reports blocked Draft reasons grouped by section', async () => {

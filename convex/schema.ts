@@ -20,7 +20,12 @@ const typeOfPurchase = v.union(
 	v.literal('service_agreement_or_purchase_order_for_service')
 );
 
-const documentationCategory = v.union(v.literal('asuo_funds'));
+const documentationCategory = v.union(
+	v.literal('asuo_funds'),
+	v.literal('food'),
+	v.literal('printing_services'),
+	v.literal('office_supplies_goods')
+);
 
 const fileKind = v.union(
 	v.literal('receipt'),
@@ -28,6 +33,10 @@ const fileKind = v.union(
 	v.literal('id_back'),
 	v.literal('second_approval'),
 	v.literal('publicity'),
+	v.literal('catering_waiver'),
+	v.literal('printing_invoice'),
+	v.literal('building_manager_approval'),
+	v.literal('computer_price_quote'),
 	v.literal('brand_approval'),
 	v.literal('recipient_list')
 );
@@ -157,6 +166,11 @@ export default defineSchema({
 		receiptFileIds: v.array(v.id('files')),
 		secondApprovalFileId: v.union(v.id('files'), v.null()),
 		publicityFileId: v.union(v.id('files'), v.null()),
+		cateringWaiverFileId: v.union(v.id('files'), v.null()),
+		printingInvoiceFileId: v.union(v.id('files'), v.null()),
+		officeLocation: v.string(),
+		buildingManagerApprovalFileId: v.union(v.id('files'), v.null()),
+		computerPriceQuoteFileId: v.union(v.id('files'), v.null()),
 		recipients: v.array(recipient),
 		createdAt: v.number(),
 		updatedAt: v.number(),

@@ -8,6 +8,10 @@ type Kind =
 	| 'id_back'
 	| 'second_approval'
 	| 'publicity'
+	| 'catering_waiver'
+	| 'printing_invoice'
+	| 'building_manager_approval'
+	| 'computer_price_quote'
 	| 'brand_approval'
 	| 'recipient_list';
 

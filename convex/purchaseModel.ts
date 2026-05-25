@@ -20,7 +20,11 @@ export type TypeOfPurchase =
 	| 'pcard'
 	| 'co_sponsorship_payment'
 	| 'service_agreement_or_purchase_order_for_service';
-export type DocumentationCategory = 'asuo_funds';
+export type DocumentationCategory =
+	| 'asuo_funds'
+	| 'food'
+	| 'printing_services'
+	| 'office_supplies_goods';
 export type StudentOrganizationDetails = {
 	name: string;
 	indexNumber: string;
@@ -72,6 +76,11 @@ export type DraftPatch = Partial<{
 	receiptFileIds: Id<'files'>[];
 	secondApprovalFileId: Id<'files'> | null;
 	publicityFileId: Id<'files'> | null;
+	cateringWaiverFileId: Id<'files'> | null;
+	printingInvoiceFileId: Id<'files'> | null;
+	officeLocation: string;
+	buildingManagerApprovalFileId: Id<'files'> | null;
+	computerPriceQuoteFileId: Id<'files'> | null;
 	recipients: Recipient[];
 }>;
 
@@ -171,6 +180,24 @@ export function applyDraftPatch(
 				: purchase.secondApprovalFileId,
 		publicityFileId:
 			patch.publicityFileId !== undefined ? patch.publicityFileId : purchase.publicityFileId,
+		cateringWaiverFileId:
+			patch.cateringWaiverFileId !== undefined
+				? patch.cateringWaiverFileId
+				: purchase.cateringWaiverFileId,
+		printingInvoiceFileId:
+			patch.printingInvoiceFileId !== undefined
+				? patch.printingInvoiceFileId
+				: purchase.printingInvoiceFileId,
+		officeLocation:
+			patch.officeLocation !== undefined ? patch.officeLocation : purchase.officeLocation,
+		buildingManagerApprovalFileId:
+			patch.buildingManagerApprovalFileId !== undefined
+				? patch.buildingManagerApprovalFileId
+				: purchase.buildingManagerApprovalFileId,
+		computerPriceQuoteFileId:
+			patch.computerPriceQuoteFileId !== undefined
+				? patch.computerPriceQuoteFileId
+				: purchase.computerPriceQuoteFileId,
 		recipients: patch.recipients !== undefined ? patch.recipients : purchase.recipients,
 		updatedAt: Date.now()
 	};
@@ -219,6 +246,10 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		request.purchaser.idCardFrontFileId,
 		request.purchaser.idCardBackFileId,
 		asuoFunds ? request.publicityFileId : null,
+		documentationCategories.includes('food') ? request.cateringWaiverFileId : null,
+		documentationCategories.includes('printing_services') ? request.printingInvoiceFileId : null,
+		request.buildingManagerApprovalFileId,
+		request.computerPriceQuoteFileId,
 		request.secondApprovalFileId,
 		...request.receiptFileIds
 	].filter((id): id is Id<'files'> => id !== null);
@@ -242,6 +273,11 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		requesterIsPurchaser: purchaserIsSelf,
 		receiptFileIds: request.receiptFileIds,
 		secondApprovalFileId: purchaserIsSelf ? request.secondApprovalFileId : null,
+		cateringWaiverFileId: request.cateringWaiverFileId,
+		printingInvoiceFileId: request.printingInvoiceFileId,
+		officeLocation: request.officeLocation,
+		buildingManagerApprovalFileId: request.buildingManagerApprovalFileId,
+		computerPriceQuoteFileId: request.computerPriceQuoteFileId,
 		recipients: request.recipients,
 		documents
 	};

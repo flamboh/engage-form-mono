@@ -82,6 +82,11 @@ export async function evaluatePurchaseReadiness(
 		request.reimbursementReason,
 		'Reimbursement reason missing.'
 	);
+	const officeSuppliesGoods =
+		effectiveDocumentationCategories(request).includes('office_supplies_goods');
+	if (officeSuppliesGoods) {
+		requireSectionText('Purchase details', request.officeLocation, 'Office location missing.');
+	}
 	if (request.totalAmount <= 0) {
 		add('Purchase details', 'Total amount must be greater than zero.');
 	}
@@ -97,6 +102,12 @@ export async function evaluatePurchaseReadiness(
 	}
 	const asuoFunds = effectiveDocumentationCategories(request).includes('asuo_funds');
 	if (asuoFunds && request.publicityFileId === null) add('Files', 'Publicity proof missing.');
+	const food = effectiveDocumentationCategories(request).includes('food');
+	if (food && request.cateringWaiverFileId === null) add('Files', 'Catering waiver missing.');
+	const printingServices = effectiveDocumentationCategories(request).includes('printing_services');
+	if (printingServices && request.printingInvoiceFileId === null) {
+		add('Files', 'Printing invoice missing.');
+	}
 	if (request.purchaserSource.kind === 'self' && request.secondApprovalFileId === null) {
 		add('Files', 'Second approval missing.');
 	}
@@ -134,6 +145,24 @@ export async function evaluatePurchaseReadiness(
 				request.publicityFileId,
 				'Files',
 				'Publicity proof missing.'
+			);
+		}
+		if (food && request.cateringWaiverFileId !== null) {
+			await requireOwnedDocument(
+				add,
+				options.documentExists,
+				request.cateringWaiverFileId,
+				'Files',
+				'Catering waiver missing.'
+			);
+		}
+		if (printingServices && request.printingInvoiceFileId !== null) {
+			await requireOwnedDocument(
+				add,
+				options.documentExists,
+				request.printingInvoiceFileId,
+				'Files',
+				'Printing invoice missing.'
 			);
 		}
 		if (request.purchaserSource.kind === 'self' && request.secondApprovalFileId !== null) {
