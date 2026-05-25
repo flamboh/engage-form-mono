@@ -155,6 +155,7 @@ export function applyDraftPatch(
 	const typeOfPurchase =
 		patch.typeOfPurchase !== undefined ? patch.typeOfPurchase : purchase.typeOfPurchase;
 	return {
+		status: 'draft',
 		typeOfPurchase,
 		documentationCategories:
 			patch.documentationCategories !== undefined
