@@ -39,7 +39,7 @@
 				budgetLines,
 				businessPurposeTemplate
 			});
-			await goto('/app/welcome/event');
+			await goto('/app/welcome/done');
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		} finally {

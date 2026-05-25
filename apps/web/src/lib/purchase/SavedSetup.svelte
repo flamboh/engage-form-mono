@@ -9,7 +9,7 @@
 	type SavedData = {
 		organizations: Doc<'organizations'>[];
 		purchasers: Doc<'purchasers'>[];
-		eventPresets: Doc<'eventPresets'>[];
+		businessPurposeTemplates: Doc<'businessPurposeTemplates'>[];
 	};
 
 	export type PurchaserRef =
@@ -19,13 +19,12 @@
 	type Props = {
 		session: ClerkSession;
 		savedData?: SavedData;
+		draftId: Id<'purchaseRequests'> | null;
 		organizationSourceId: Id<'organizations'> | null;
 		purchaserSource: PurchaserRef;
-		eventTemplateId: Id<'eventPresets'> | null;
-		eventName: string;
-		eventTime: string;
-		eventLocation: string;
-		eventEstimatedAttendance: number;
+		businessPurposeTemplateId: Id<'businessPurposeTemplates'> | null;
+		businessPurposeText: string;
+		businessPurposeTouched: boolean;
 		onChange: () => void;
 		onSavedChange: () => Promise<void>;
 	};
@@ -33,20 +32,19 @@
 	let {
 		session,
 		savedData,
+		draftId,
 		organizationSourceId = $bindable(),
 		purchaserSource = $bindable(),
-		eventTemplateId = $bindable(),
-		eventName = $bindable(),
-		eventTime = $bindable(),
-		eventLocation = $bindable(),
-		eventEstimatedAttendance = $bindable(),
+		businessPurposeTemplateId = $bindable(),
+		businessPurposeText = $bindable(),
+		businessPurposeTouched = $bindable(),
 		onChange,
 		onSavedChange
 	}: Props = $props();
 
 	const client = useConvexClient();
 
-	let mode = $state<'none' | 'org' | 'purchaser' | 'event'>('none');
+	let mode = $state<'none' | 'org' | 'purchaser' | 'businessPurposeTemplate'>('none');
 	let error = $state('');
 
 	let orgName = $state('');
@@ -62,25 +60,29 @@
 	let idFrontFileId = $state<Id<'files'> | null>(null);
 	let idBackFileId = $state<Id<'files'> | null>(null);
 
-	let eventTemplateName = $state('');
-	let eventTemplateTime = $state('');
-	let eventTemplateLocation = $state('');
-	let eventTemplateAttendance = $state(50);
+	let businessPurposeTemplateTitle = $state('');
+	let businessPurposeTemplateText = $state(
+		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.'
+	);
+	let businessPurposeTemplateSearch = $state('');
 
 	const organizations = $derived(savedData?.organizations ?? []);
 	const purchasers = $derived(
 		(savedData?.purchasers ?? []).filter((p) => p.organizationId === organizationSourceId)
 	);
-	const eventPresets = $derived(
-		(savedData?.eventPresets ?? []).filter(
-			(eventPreset) => eventPreset.organizationId === organizationSourceId
-		)
+	const businessPurposeTemplates = $derived(
+		(savedData?.businessPurposeTemplates ?? []).filter((template) => {
+			if (template.organizationId !== organizationSourceId) return false;
+			const query = businessPurposeTemplateSearch.trim().toLowerCase();
+			if (query === '') return true;
+			return `${template.title} ${template.businessPurposeTemplate}`.toLowerCase().includes(query);
+		})
 	);
 
 	function selectOrganization(value: string) {
 		organizationSourceId = value === '' ? null : (value as Id<'organizations'>);
 		purchaserSource = { kind: 'self' };
-		eventTemplateId = null;
+		businessPurposeTemplateId = null;
 		onChange();
 	}
 
@@ -103,14 +105,20 @@
 		onChange();
 	}
 
-	function selectEvent(value: string) {
-		eventTemplateId = value === '' ? null : (value as Id<'eventPresets'>);
-		const template = eventPresets.find((eventPreset) => eventPreset._id === eventTemplateId);
+	async function selectBusinessPurposeTemplate(value: string) {
+		businessPurposeTemplateId = value === '' ? null : (value as Id<'businessPurposeTemplates'>);
+		const template = businessPurposeTemplates.find(
+			(item) => item._id === businessPurposeTemplateId
+		);
 		if (template !== undefined) {
-			eventName = template.name;
-			eventTime = template.time;
-			eventLocation = template.location;
-			eventEstimatedAttendance = template.estimatedAttendance;
+			businessPurposeText = template.businessPurposeTemplate;
+			businessPurposeTouched = true;
+			if (draftId !== null) {
+				await client.mutation(api.authed.purchaseBuilder.applyBusinessPurposeTemplate, {
+					draftId,
+					templateId: template._id
+				});
+			}
 		}
 		onChange();
 	}
@@ -148,7 +156,7 @@
 				businessPurposeTemplate: orgTemplate
 			});
 			purchaserSource = { kind: 'self' };
-			eventTemplateId = null;
+			businessPurposeTemplateId = null;
 			mode = 'none';
 			await onSavedChange();
 			onChange();
@@ -183,7 +191,7 @@
 		}
 	}
 
-	async function createEvent(event: SubmitEvent) {
+	async function createBusinessPurposeTemplate(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
 		if (organizationSourceId === null) {
@@ -191,18 +199,17 @@
 			return;
 		}
 		try {
-			eventTemplateId = await client.mutation(api.authed.purchaseBuilder.upsertEventPreset, {
-				id: null,
-				organizationId: organizationSourceId,
-				name: eventTemplateName,
-				time: eventTemplateTime,
-				location: eventTemplateLocation,
-				estimatedAttendance: eventTemplateAttendance
-			});
-			eventName = eventTemplateName;
-			eventTime = eventTemplateTime;
-			eventLocation = eventTemplateLocation;
-			eventEstimatedAttendance = eventTemplateAttendance;
+			businessPurposeTemplateId = await client.mutation(
+				api.authed.purchaseBuilder.upsertBusinessPurposeTemplate,
+				{
+					id: null,
+					organizationId: organizationSourceId,
+					title: businessPurposeTemplateTitle,
+					businessPurposeTemplate: businessPurposeTemplateText
+				}
+			);
+			businessPurposeText = businessPurposeTemplateText;
+			businessPurposeTouched = true;
 			mode = 'none';
 			await onSavedChange();
 			onChange();
@@ -222,8 +229,8 @@
 			<button class="secondary" type="button" onclick={() => (mode = 'purchaser')}>
 				New purchaser
 			</button>
-			<button class="secondary" type="button" onclick={() => (mode = 'event')}>
-				New event template
+			<button class="secondary" type="button" onclick={() => (mode = 'businessPurposeTemplate')}>
+				New Business Purpose Template
 			</button>
 		</div>
 	</div>
@@ -241,16 +248,22 @@
 			</select>
 		</label>
 		<label>
-			<span>Event Template</span>
+			<span>Business Purpose Template</span>
+			<input
+				class="field mb-2"
+				placeholder="Search"
+				disabled={organizationSourceId === null}
+				bind:value={businessPurposeTemplateSearch}
+			/>
 			<select
 				class="field"
-				value={eventTemplateId ?? ''}
-				onchange={(e) => selectEvent(e.currentTarget.value)}
+				value={businessPurposeTemplateId ?? ''}
+				onchange={(e) => selectBusinessPurposeTemplate(e.currentTarget.value)}
 				disabled={organizationSourceId === null}
 			>
 				<option value="">Select</option>
-				{#each eventPresets as eventPreset (eventPreset._id)}
-					<option value={eventPreset._id}>{eventPreset.name}</option>
+				{#each businessPurposeTemplates as template (template._id)}
+					<option value={template._id}>{template.title}</option>
 				{/each}
 			</select>
 		</label>
@@ -343,13 +356,19 @@
 			</div>
 			<button class="button" type="submit">Create purchaser</button>
 		</form>
-	{:else if mode === 'event'}
-		<form class="mt-4 grid gap-3 rounded-md border border-stone-200 p-3" onsubmit={createEvent}>
-			<input class="field" placeholder="Event name" required bind:value={eventTemplateName} />
-			<input class="field" placeholder="Time" required bind:value={eventTemplateTime} />
-			<input class="field" placeholder="Location" required bind:value={eventTemplateLocation} />
-			<input class="field" type="number" min="1" bind:value={eventTemplateAttendance} />
-			<button class="button" type="submit">Create event template</button>
+	{:else if mode === 'businessPurposeTemplate'}
+		<form
+			class="mt-4 grid gap-3 rounded-md border border-stone-200 p-3"
+			onsubmit={createBusinessPurposeTemplate}
+		>
+			<input
+				class="field"
+				placeholder="Business Purpose Template title"
+				required
+				bind:value={businessPurposeTemplateTitle}
+			/>
+			<textarea class="field min-h-24" required bind:value={businessPurposeTemplateText}></textarea>
+			<button class="button" type="submit">Create Business Purpose Template</button>
 		</form>
 	{/if}
 </section>

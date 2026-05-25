@@ -49,6 +49,11 @@ export type StudentOrganizationDetails = {
 	budgetLines: string[];
 	businessPurposeTemplate: string;
 };
+export type BusinessPurposeTemplateInput = {
+	organizationId: Id<'organizations'>;
+	title: string;
+	businessPurposeTemplate: string;
+};
 export type RequesterDetails = {
 	id: Id<'users'>;
 	name: string;
@@ -117,9 +122,9 @@ export async function requireOwnedDoc<
 	Table extends
 		| 'users'
 		| 'organizations'
+		| 'businessPurposeTemplates'
 		| 'files'
 		| 'purchasers'
-		| 'eventPresets'
 		| 'purchaseRequests'
 >(ctx: Ctx, table: Table, id: Id<Table & string>, owner: string) {
 	void table;
@@ -225,6 +230,61 @@ export function applyDraftPatch(
 		recipients: patch.recipients !== undefined ? patch.recipients : purchase.recipients,
 		updatedAt: Date.now()
 	};
+}
+
+export function businessPurposeTemplateFields(
+	owner: string,
+	input: BusinessPurposeTemplateInput,
+	updatedAt = Date.now()
+) {
+	return {
+		...businessPurposeTemplateUpdateFields(input, updatedAt),
+		owner,
+		organizationId: input.organizationId,
+		archived: false
+	};
+}
+
+export function businessPurposeTemplateUpdateFields(
+	input: Pick<BusinessPurposeTemplateInput, 'title' | 'businessPurposeTemplate'>,
+	updatedAt = Date.now()
+) {
+	const title = input.title.trim();
+	requireText(title, 'Business Purpose Template title missing.');
+	requireText(input.businessPurposeTemplate, 'Business Purpose Template missing.');
+	parseBusinessPurposeText(input.businessPurposeTemplate);
+	return {
+		title,
+		businessPurposeTemplate: input.businessPurposeTemplate,
+		searchText: businessPurposeTemplateSearchText(title, input.businessPurposeTemplate),
+		updatedAt
+	};
+}
+
+export function businessPurposeTemplateDraftPatch(
+	template: Pick<Doc<'businessPurposeTemplates'>, 'businessPurposeTemplate'>
+): Partial<Doc<'purchaseRequests'>> {
+	return {
+		businessPurposeSource: parseBusinessPurposeText(template.businessPurposeTemplate),
+		businessPurposeTouched: true,
+		updatedAt: Date.now()
+	};
+}
+
+export function filterBusinessPurposeTemplates<
+	Template extends Pick<
+		Doc<'businessPurposeTemplates'>,
+		'title' | 'businessPurposeTemplate' | 'archived'
+	>
+>(templates: Template[], query: string, options: { includeArchived?: boolean } = {}) {
+	const normalizedQuery = normalizeSearch(query);
+	return templates.filter((template) => {
+		if (!options.includeArchived && template.archived) return false;
+		if (normalizedQuery === '') return true;
+		return normalizeSearch(
+			businessPurposeTemplateSearchText(template.title, template.businessPurposeTemplate)
+		).includes(normalizedQuery);
+	});
 }
 
 export function renderBusinessPurpose(request: BusinessPurposeRequest) {
@@ -418,4 +478,12 @@ function formatMoney(value: number) {
 
 function reimbursementReasonFor(typeOfPurchase: TypeOfPurchase) {
 	return typeOfPurchase === 'personal_reimbursement' ? fixedPersonalReimbursementReason : '';
+}
+
+function businessPurposeTemplateSearchText(title: string, businessPurposeTemplate: string) {
+	return `${title} ${businessPurposeTemplate}`;
+}
+
+function normalizeSearch(value: string) {
+	return value.trim().toLowerCase();
 }

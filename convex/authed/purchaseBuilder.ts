@@ -8,6 +8,9 @@ import { authedMutation, authedQuery } from './helpers';
 import {
 	applyDraftPatch,
 	assertReady,
+	businessPurposeTemplateDraftPatch,
+	businessPurposeTemplateFields,
+	businessPurposeTemplateUpdateFields,
 	getUserProfile,
 	ownerFromIdentity,
 	parseBusinessPurposeText,
@@ -20,6 +23,7 @@ import {
 } from '../purchaseModel';
 import {
 	draftPatch,
+	businessPurposeTemplateDoc,
 	fileKind,
 	fundLetter,
 	purchaseRequestDoc,
@@ -124,20 +128,20 @@ export const listSaved = authedQuery({
 					.query('purchasers')
 					.withIndex('by_owner_and_archived', (q) => q.eq('owner', owner).eq('archived', false))
 					.take(200);
-		const eventPresets = args.includeArchived
+		const businessPurposeTemplates = args.includeArchived
 			? await ctx.db
-					.query('eventPresets')
+					.query('businessPurposeTemplates')
 					.withIndex('by_owner', (q) => q.eq('owner', owner))
 					.take(200)
 			: await ctx.db
-					.query('eventPresets')
+					.query('businessPurposeTemplates')
 					.withIndex('by_owner_and_archived', (q) => q.eq('owner', owner).eq('archived', false))
 					.take(200);
 
 		return {
 			organizations,
 			purchasers,
-			eventPresets
+			businessPurposeTemplates
 		};
 	}
 });
@@ -264,44 +268,109 @@ export const upsertPurchaser = authedMutation({
 	}
 });
 
-export const upsertEventPreset = authedMutation({
+export const searchBusinessPurposeTemplates = authedQuery({
 	args: {
-		id: v.union(v.id('eventPresets'), v.null()),
 		organizationId: v.id('organizations'),
-		name: v.string(),
-		time: v.string(),
-		location: v.string(),
-		estimatedAttendance: v.number()
+		query: v.string(),
+		includeArchived: v.optional(v.boolean())
 	},
-	returns: v.id('eventPresets'),
+	returns: v.array(businessPurposeTemplateDoc),
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
-		requireText(args.name, 'Event name missing.');
-		requireText(args.time, 'Event time missing.');
-		requireText(args.location, 'Event location missing.');
-		if (args.estimatedAttendance <= 0) throw new Error('Estimated attendance missing.');
-		const fields = {
-			owner,
-			organizationId: args.organizationId,
-			name: args.name,
-			time: args.time,
-			location: args.location,
-			estimatedAttendance: args.estimatedAttendance,
-			archived: false,
-			updatedAt: Date.now()
-		};
-		if (args.id === null) return await ctx.db.insert('eventPresets', fields);
-		await requireOwnedDoc(ctx, 'eventPresets', args.id, owner);
-		await ctx.db.patch(args.id, fields);
+		const includeArchived = args.includeArchived ?? false;
+		const query = args.query.trim();
+		if (query === '') {
+			if (includeArchived) {
+				return await ctx.db
+					.query('businessPurposeTemplates')
+					.withIndex('by_owner_and_organizationId', (q) =>
+						q.eq('owner', owner).eq('organizationId', args.organizationId)
+					)
+					.take(50);
+			}
+			return await ctx.db
+				.query('businessPurposeTemplates')
+				.withIndex('by_owner_and_organizationId_and_archived', (q) =>
+					q.eq('owner', owner).eq('organizationId', args.organizationId).eq('archived', false)
+				)
+				.take(50);
+		}
+		if (includeArchived) {
+			return await ctx.db
+				.query('businessPurposeTemplates')
+				.withSearchIndex('search_text', (q) =>
+					q.search('searchText', query).eq('owner', owner).eq('organizationId', args.organizationId)
+				)
+				.take(50);
+		}
+		return await ctx.db
+			.query('businessPurposeTemplates')
+			.withSearchIndex('search_text', (q) =>
+				q
+					.search('searchText', query)
+					.eq('owner', owner)
+					.eq('organizationId', args.organizationId)
+					.eq('archived', false)
+			)
+			.take(50);
+	}
+});
+
+export const upsertBusinessPurposeTemplate = authedMutation({
+	args: {
+		id: v.union(v.id('businessPurposeTemplates'), v.null()),
+		organizationId: v.id('organizations'),
+		title: v.string(),
+		businessPurposeTemplate: v.string()
+	},
+	returns: v.id('businessPurposeTemplates'),
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
+		if (args.id === null) {
+			return await ctx.db.insert(
+				'businessPurposeTemplates',
+				businessPurposeTemplateFields(owner, args)
+			);
+		}
+		await requireOwnedDoc(ctx, 'businessPurposeTemplates', args.id, owner);
+		await ctx.db.patch(args.id, businessPurposeTemplateUpdateFields(args));
 		return args.id;
+	}
+});
+
+export const applyBusinessPurposeTemplate = authedMutation({
+	args: {
+		draftId: v.id('purchaseRequests'),
+		templateId: v.id('businessPurposeTemplates')
+	},
+	returns: purchaseRequestDoc,
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		const draft = await requireOwnedDoc(ctx, 'purchaseRequests', args.draftId, owner);
+		if (draft.status !== 'draft') throw new Error('Only draft requests can use templates.');
+		const template = await requireOwnedDoc(ctx, 'businessPurposeTemplates', args.templateId, owner);
+		if (template.archived) throw new Error('Business Purpose Template archived.');
+		if (
+			draft.organizationSourceId !== null &&
+			template.organizationId !== draft.organizationSourceId
+		) {
+			throw new Error('Business Purpose Template belongs to another Student Organization.');
+		}
+		await ctx.db.patch(args.draftId, businessPurposeTemplateDraftPatch(template));
+		return await requireOwnedDoc(ctx, 'purchaseRequests', args.draftId, owner);
 	}
 });
 
 export const setArchived = authedMutation({
 	args: {
-		table: v.union(v.literal('organizations'), v.literal('purchasers'), v.literal('eventPresets')),
-		id: v.union(v.id('organizations'), v.id('purchasers'), v.id('eventPresets')),
+		table: v.union(
+			v.literal('organizations'),
+			v.literal('purchasers'),
+			v.literal('businessPurposeTemplates')
+		),
+		id: v.union(v.id('organizations'), v.id('purchasers'), v.id('businessPurposeTemplates')),
 		archived: v.boolean()
 	},
 	returns: v.null(),

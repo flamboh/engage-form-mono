@@ -73,8 +73,7 @@ Route: `/app/welcome/[step]`. Steps in order:
 
 1. `profile` — Create `users` row. Fields above. ID card documents uploaded inline. No skip.
 2. `org` — Create first student organization with `budgetLines` as a repeatable list of strings. Business purpose template prefilled with a sensible default. No skip.
-3. `event` — Optional event template. "Skip for now" button advances to next step without creating a row.
-4. `done` — Success screen with the primary CTA: **Build your first request** → `/app/purchase/new`.
+3. `done` — Success screen with the primary CTA: **Build your first request** → `/app/purchase/new`.
 
 ### Gating
 
@@ -84,7 +83,7 @@ Route: `/app/welcome/[step]`. Steps in order:
 2. No `organizations` rows → redirect to `/app/welcome/org`.
 3. Otherwise allow through.
 
-Event template is optional and never gates. The extension signs in directly with Clerk and never gates onboarding. The `done` step is informational; once gates 1–2 pass, `/app` becomes reachable.
+The extension signs in directly with Clerk and never gates onboarding. The `done` step is informational; once gates 1–2 pass, `/app` becomes reachable.
 
 A user who bails mid-wizard and returns later lands on the first incomplete step automatically.
 
