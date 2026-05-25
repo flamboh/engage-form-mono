@@ -33,7 +33,7 @@
 	let orgFund = $state<Fund>('I');
 	let orgBudgetLines = $state<string[]>(['Event Expenses']);
 	let orgTemplate = $state(
-		'{org} wishes to reimburse {purchaser} because they purchased {item} from {vendor} for {amount}. This {item} was given to {recipient} ({recipientUo95}) during {eventName} which took place on {eventDate} at {eventTime} in {eventLocation} with about {attendance} students in attendance.'
+		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}. This purchase supported an activity on {Activity Date} at {Activity Time} in {Activity Location} with about {Estimated Attendance} students in attendance.'
 	);
 
 	let purchaserOrgId = $state<Id<'organizations'> | ''>('');
