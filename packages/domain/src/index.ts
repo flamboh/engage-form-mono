@@ -2,7 +2,6 @@ export type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 
 export type DocumentKind =
 	| 'receipt'
-	| 'id_card'
 	| 'id_front'
 	| 'id_back'
 	| 'second_approval'

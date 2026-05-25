@@ -20,7 +20,7 @@
 	let idCardFrontFileId = $state<Id<'files'> | null>(null);
 	let idCardBackFileId = $state<Id<'files'> | null>(null);
 	let idFrontStatus = $state('Required');
-	let idBackStatus = $state('Required');
+	let idBackStatus = $state('Optional');
 	let saving = $state(false);
 	let error = $state('');
 
@@ -38,7 +38,7 @@
 		idBackStatus = user.idCardBackFileId === null ? 'Optional' : 'Uploaded';
 	});
 
-	async function handleUpload(kind: 'id_card' | 'id_front' | 'id_back', input: HTMLInputElement) {
+	async function handleUpload(kind: 'id_front' | 'id_back', input: HTMLInputElement) {
 		const session = clerkContext.currentSession;
 		const file = input.files?.[0];
 		if (!session || !file) return;
@@ -46,12 +46,7 @@
 			if (kind === 'id_back') idBackStatus = 'Uploading...';
 			else idFrontStatus = 'Uploading...';
 			const fileId = await uploadFile(session, kind, file);
-			if (kind === 'id_card') {
-				idCardFrontFileId = fileId;
-				idCardBackFileId = null;
-				idFrontStatus = 'Uploaded';
-				idBackStatus = 'Optional';
-			} else if (kind === 'id_front') {
+			if (kind === 'id_front') {
 				idCardFrontFileId = fileId;
 				idFrontStatus = 'Uploaded';
 			} else {
@@ -96,7 +91,7 @@
 	<header>
 		<h2 class="text-lg font-semibold">Your profile</h2>
 		<p class="mt-1 text-sm text-stone-500">
-			You're the requester on every form Engage Form fills. Add the details and ID card documents
+			You're the requester on every form Engage Form fills. Add the details and ID card document
 			SOFS needs once.
 		</p>
 	</header>
@@ -137,17 +132,7 @@
 
 	<div class="grid gap-3 md:grid-cols-2">
 		<label class="block text-sm">
-			<span class="font-medium">Combined ID card document</span>
-			<input
-				class="mt-1 block text-sm"
-				type="file"
-				accept="image/*,application/pdf"
-				onchange={(e) => handleUpload('id_card', e.currentTarget)}
-			/>
-			<p class="mt-1 text-xs text-stone-500">{idFrontStatus}</p>
-		</label>
-		<label class="block text-sm">
-			<span class="font-medium">ID card front document</span>
+			<span class="font-medium">ID card document</span>
 			<input
 				class="mt-1 block text-sm"
 				type="file"
@@ -157,7 +142,7 @@
 			<p class="mt-1 text-xs text-stone-500">{idFrontStatus}</p>
 		</label>
 		<label class="block text-sm">
-			<span class="font-medium">ID card back document</span>
+			<span class="font-medium">Second ID card document</span>
 			<input
 				class="mt-1 block text-sm"
 				type="file"

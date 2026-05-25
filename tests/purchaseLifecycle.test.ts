@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
 import { getReadyPurchaseForFill, listReadyPurchases } from '../convex/authed/extension';
+import { getDraft } from '../convex/authed/purchaseBuilder';
 import { saveDraftPatch } from '../convex/internal/purchaseAutosave';
 import { parseBusinessPurposeText } from '../convex/purchaseModel';
 
@@ -64,6 +65,17 @@ const readyRequest = {
 	updatedAt: 1,
 	lastFilledAt: null
 } as Doc<'purchaseRequests'>;
+
+test('Ready Purchase Requests can be opened in the editor', async () => {
+	await expect(
+		getDraft._handler(editorCtx(readyRequest) as never, {
+			id: readyRequest._id
+		})
+	).resolves.toMatchObject({
+		_id: readyRequest._id,
+		status: 'ready'
+	});
+});
 
 test('fact edits return Ready Purchase Requests to Draft', async () => {
 	const patches: Partial<Doc<'purchaseRequests'>>[] = [];
@@ -143,6 +155,15 @@ function saveCtx(request: Doc<'purchaseRequests'>, patches: Partial<Doc<'purchas
 			patch: async (_id: string, patch: Partial<Doc<'purchaseRequests'>>) => {
 				patches.push(patch);
 			}
+		}
+	};
+}
+
+function editorCtx(request: Doc<'purchaseRequests'>) {
+	return {
+		auth: { getUserIdentity: async () => ({ tokenIdentifier: 'owner' }) },
+		db: {
+			get: async () => request
 		}
 	};
 }

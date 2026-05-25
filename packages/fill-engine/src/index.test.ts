@@ -6,6 +6,7 @@ test('detects Engage steps by heading', () => {
 	expect(detectStep('SOFS Request Organization Representation')).toBe('organizationRepresentation');
 	expect(detectStep('Purpose, Instructions, and Authority to Spend')).toBe('purposeInstructions');
 	expect(detectStep('SOFS Request Type of purchase')).toBe('purchaseType');
+	expect(detectStep('SOFS Request Catering Waiver')).toBe('cateringWaiver');
 	expect(detectStep('Engage - Review Submission')).toBe('review');
 	expect(detectStep('SOFS Request to Purchase Goods or Services 2025-26')).toBe('formStart');
 });
@@ -21,6 +22,7 @@ test('defines expected Engage steps', () => {
 		'selfApproval',
 		'documentation',
 		'publicity',
+		'cateringWaiver',
 		'gifts',
 		'thankYou',
 		'review',
@@ -71,6 +73,11 @@ test('uses purchaser data for reimbursement fields', () => {
 	const plan = createFillPlan('reimbursement', purchase);
 
 	expect(plan.actions).toContainEqual({
+		type: 'select',
+		labelIncludes: 'submitter of this form',
+		valueIncludes: 'Another student'
+	});
+	expect(plan.actions).toContainEqual({
 		type: 'text',
 		labelIncludes: 'name and UO 95 ID',
 		value: 'Different Buyer, 950000001'
@@ -92,6 +99,16 @@ test('fills the fixed Personal Reimbursement reason', () => {
 		type: 'text',
 		labelIncludes: 'Why did you use the reimbursement process',
 		value: 'Other processes are too slow.'
+	});
+});
+
+test('selects Myself when requester is purchaser', () => {
+	const plan = createFillPlan('reimbursement', samplePurchaseRequest);
+
+	expect(plan.actions).toContainEqual({
+		type: 'select',
+		labelIncludes: 'submitter of this form',
+		valueIncludes: 'Myself'
 	});
 });
 
@@ -157,25 +174,46 @@ test('creates upload fill plans', () => {
 			]
 		}
 	]);
+
+	const cateringWaiver = {
+		...samplePurchaseRequest.documents[0],
+		id: 'file_catering_waiver',
+		kind: 'catering_waiver' as const,
+		filename: 'catering-waiver.pdf',
+		storageKey: 'storage_catering_waiver'
+	};
+	expect(
+		createFillPlan('cateringWaiver', {
+			...samplePurchaseRequest,
+			cateringWaiverFileId: cateringWaiver.id,
+			documents: [...samplePurchaseRequest.documents, cateringWaiver]
+		}).actions
+	).toEqual([
+		{
+			type: 'file',
+			labelIncludes: 'upload',
+			files: [cateringWaiver]
+		}
+	]);
 });
 
-test('skips optional second ID card upload for one combined ID card document', () => {
+test('skips optional second ID card upload when only one ID card document exists', () => {
 	const plan = createFillPlan('reimbursement', {
 		...samplePurchaseRequest,
 		purchaser: {
 			...samplePurchaseRequest.purchaser,
-			idCardFrontFileId: 'file_id_card',
+			idCardFrontFileId: 'file_id_document',
 			idCardBackFileId: null
 		},
 		documents: [
 			...samplePurchaseRequest.documents,
 			{
-				id: 'file_id_card',
-				kind: 'id_card',
+				id: 'file_id_document',
+				kind: 'id_front',
 				filename: 'id-card.pdf',
 				contentType: 'application/pdf',
 				size: 1,
-				storageKey: 'storage_id_card',
+				storageKey: 'storage_id_document',
 				url: 'https://files.example/id-card.pdf'
 			}
 		]
@@ -186,8 +224,8 @@ test('skips optional second ID card upload for one combined ID card document', (
 		labelIncludes: 'UO ID CARD',
 		files: [
 			expect.objectContaining({
-				id: 'file_id_card',
-				kind: 'id_card'
+				id: 'file_id_document',
+				kind: 'id_front'
 			})
 		]
 	});
@@ -296,10 +334,18 @@ test('skips self approval upload when requester is not purchaser', () => {
 	expect(
 		createFillPlan('selfApproval', {
 			...samplePurchaseRequest,
-			requesterIsPurchaser: false,
-			secondApprovalFileId: null
+			requesterIsPurchaser: false
 		}).actions
 	).toEqual([
+		{
+			type: 'stop',
+			message: 'No document required for this purchase request.'
+		}
+	]);
+});
+
+test('skips catering waiver upload when no catering waiver is required', () => {
+	expect(createFillPlan('cateringWaiver', samplePurchaseRequest).actions).toEqual([
 		{
 			type: 'stop',
 			message: 'No document required for this purchase request.'

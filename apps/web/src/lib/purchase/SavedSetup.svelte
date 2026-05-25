@@ -131,14 +131,10 @@
 		orgBudgetLines = orgBudgetLines.filter((_, index) => index !== i);
 	}
 
-	async function uploadId(kind: 'id_card' | 'id_front' | 'id_back', input: HTMLInputElement) {
+	async function uploadId(kind: 'id_front' | 'id_back', input: HTMLInputElement) {
 		const file = input.files?.[0];
 		if (!file) return;
 		const fileId = await uploadFile(session, kind, file);
-		if (kind === 'id_card') {
-			idFrontFileId = fileId;
-			idBackFileId = null;
-		}
 		if (kind === 'id_front') idFrontFileId = fileId;
 		if (kind === 'id_back') idBackFileId = fileId;
 	}
@@ -339,17 +335,12 @@
 			/>
 			<div class="grid gap-3 md:grid-cols-2">
 				<FilePicker
-					label="Combined ID card document"
-					status={idFrontFileId && idBackFileId === null ? 'Uploaded' : 'Optional'}
-					onFiles={(input) => uploadId('id_card', input)}
-				/>
-				<FilePicker
-					label="ID card front document"
+					label="ID card document"
 					status={idFrontFileId ? 'Uploaded' : 'Required'}
 					onFiles={(input) => uploadId('id_front', input)}
 				/>
 				<FilePicker
-					label="ID card back document"
+					label="Second ID card document"
 					status={idBackFileId ? 'Uploaded' : 'Optional'}
 					onFiles={(input) => uploadId('id_back', input)}
 				/>

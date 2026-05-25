@@ -28,13 +28,13 @@ test('final common facts do not require event details', () => {
 	).toEqual([]);
 });
 
-test('accepts one combined ID Card Document', () => {
+test('accepts one ID Card Document', () => {
 	expect(
 		validatePurchaseReadiness({
 			...samplePurchaseRequest,
 			purchaser: {
 				...samplePurchaseRequest.purchaser,
-				idCardFrontFileId: 'file_id_card',
+				idCardFrontFileId: 'file_id_document',
 				idCardBackFileId: null as never
 			}
 		})

@@ -30,7 +30,6 @@ export const documentationCategory = v.union(
 
 export const fileKind = v.union(
 	v.literal('receipt'),
-	v.literal('id_card'),
 	v.literal('id_front'),
 	v.literal('id_back'),
 	v.literal('second_approval'),

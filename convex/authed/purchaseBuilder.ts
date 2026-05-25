@@ -164,9 +164,7 @@ export const getDraft = authedQuery({
 	returns: purchaseRequestDoc,
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
-		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		if (request.status !== 'draft') throw new Error('Only draft requests can be edited.');
-		return request;
+		return await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
 	}
 });
 

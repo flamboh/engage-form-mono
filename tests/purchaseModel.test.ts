@@ -367,13 +367,13 @@ test('final common facts do not require event details for Ready', async () => {
 	});
 });
 
-test('accepts one combined ID Card Document for Personal Reimbursement', async () => {
+test('accepts one ID Card Document for Personal Reimbursement', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
 			purchaser: {
 				...request.purchaser,
-				idCardFrontFileId: 'file_id_card',
+				idCardFrontFileId: 'file_id_document',
 				idCardBackFileId: null as never
 			},
 			businessPurposeText: renderBusinessPurpose(request)

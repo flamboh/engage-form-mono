@@ -144,7 +144,7 @@ export async function evaluatePurchaseReadiness(
 				options.documentExists,
 				request.purchaser.idCardBackFileId,
 				'Purchaser',
-				'ID card back document missing.'
+				'Second ID card document missing.'
 			);
 		}
 		if (request.receiptFileIds.length > 0) {
