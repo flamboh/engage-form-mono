@@ -11,6 +11,45 @@ test('sample purchase request is ready', () => {
 	expect(validatePurchaseReadiness(samplePurchaseRequest)).toEqual([]);
 });
 
+test('accepts one combined ID Card Document', () => {
+	expect(
+		validatePurchaseReadiness({
+			...samplePurchaseRequest,
+			purchaser: {
+				...samplePurchaseRequest.purchaser,
+				idCardFrontFileId: 'file_id_card',
+				idCardBackFileId: null as never
+			}
+		})
+	).toEqual([]);
+});
+
+test('requires one to three Receipts', () => {
+	expect(
+		validatePurchaseReadiness({ ...samplePurchaseRequest, receiptFileIds: [] })
+	).toContainEqual({
+		field: 'receiptFileIds',
+		message: 'Receipt document missing.'
+	});
+
+	expect(
+		validatePurchaseReadiness({
+			...samplePurchaseRequest,
+			receiptFileIds: ['file_receipt_1', 'file_receipt_2', 'file_receipt_3']
+		})
+	).toEqual([]);
+
+	expect(
+		validatePurchaseReadiness({
+			...samplePurchaseRequest,
+			receiptFileIds: ['file_receipt_1', 'file_receipt_2', 'file_receipt_3', 'file_receipt_4']
+		})
+	).toContainEqual({
+		field: 'receiptFileIds',
+		message: 'Receipt documents are limited to three.'
+	});
+});
+
 test('blocks unsupported types of purchase', () => {
 	expect(
 		validatePurchaseReadiness({

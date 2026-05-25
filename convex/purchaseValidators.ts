@@ -30,6 +30,7 @@ export const documentationCategory = v.union(
 
 export const fileKind = v.union(
 	v.literal('receipt'),
+	v.literal('id_card'),
 	v.literal('id_front'),
 	v.literal('id_back'),
 	v.literal('second_approval'),
@@ -70,7 +71,7 @@ const requesterDetails = v.object({
 	uo95: v.string(),
 	permanentAddress: v.string(),
 	idCardFrontFileId: v.id('files'),
-	idCardBackFileId: v.id('files')
+	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
 const purchaserDetails = v.object({
@@ -79,7 +80,7 @@ const purchaserDetails = v.object({
 	uo95: v.string(),
 	permanentAddress: v.string(),
 	idCardFrontFileId: v.id('files'),
-	idCardBackFileId: v.id('files')
+	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
 export const draftPatch = v.object({
@@ -129,7 +130,7 @@ export const userDoc = v.object({
 	studentEmail: v.string(),
 	phone: v.string(),
 	idCardFrontFileId: v.id('files'),
-	idCardBackFileId: v.id('files'),
+	idCardBackFileId: v.union(v.id('files'), v.null()),
 	updatedAt: v.number()
 });
 
@@ -167,7 +168,7 @@ export const purchaserDoc = v.object({
 	uo95: v.string(),
 	permanentAddress: v.string(),
 	idCardFrontFileId: v.id('files'),
-	idCardBackFileId: v.id('files'),
+	idCardBackFileId: v.union(v.id('files'), v.null()),
 	archived: v.boolean(),
 	updatedAt: v.number()
 });
@@ -259,7 +260,7 @@ export const assembledPurchase = v.object({
 		uo95: v.string(),
 		permanentAddress: v.string(),
 		idCardFrontFileId: v.id('files'),
-		idCardBackFileId: v.id('files')
+		idCardBackFileId: v.union(v.id('files'), v.null())
 	}),
 	purchaser: v.object({
 		id: v.union(v.id('users'), v.id('purchasers')),
@@ -267,7 +268,7 @@ export const assembledPurchase = v.object({
 		uo95: v.string(),
 		permanentAddress: v.string(),
 		idCardFrontFileId: v.id('files'),
-		idCardBackFileId: v.id('files')
+		idCardBackFileId: v.union(v.id('files'), v.null())
 	}),
 	eventDetails: v.object({
 		name: v.string(),

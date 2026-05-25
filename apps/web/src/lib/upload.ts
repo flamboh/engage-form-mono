@@ -4,6 +4,7 @@ import { convexMutation, type ClerkSession } from '$lib/convex-http';
 
 type Kind =
 	| 'receipt'
+	| 'id_card'
 	| 'id_front'
 	| 'id_back'
 	| 'second_approval'

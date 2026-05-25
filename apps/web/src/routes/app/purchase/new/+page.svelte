@@ -34,7 +34,7 @@
 		uo95: string;
 		permanentAddress: string;
 		idCardFrontFileId: Id<'files'>;
-		idCardBackFileId: Id<'files'>;
+		idCardBackFileId: Id<'files'> | null;
 	};
 	type PurchaserDetails = {
 		id: Id<'users'> | Id<'purchasers'>;
@@ -42,7 +42,7 @@
 		uo95: string;
 		permanentAddress: string;
 		idCardFrontFileId: Id<'files'>;
-		idCardBackFileId: Id<'files'>;
+		idCardBackFileId: Id<'files'> | null;
 	};
 
 	const clerkContext = getClerkContext();

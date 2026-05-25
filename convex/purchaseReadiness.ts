@@ -12,10 +12,17 @@ export type PurchaseReadiness = {
 };
 
 type DocumentExists = (id: Id<'files'>) => Promise<boolean>;
+type PurchaserBelongsToOrganization = (
+	purchaserId: Id<'purchasers'>,
+	organizationId: Id<'organizations'> | null
+) => Promise<boolean>;
 
 export async function evaluatePurchaseReadiness(
 	request: Doc<'purchaseRequests'>,
-	options: { documentExists?: DocumentExists } = {}
+	options: {
+		documentExists?: DocumentExists;
+		purchaserBelongsToOrganization?: PurchaserBelongsToOrganization;
+	} = {}
 ): Promise<PurchaseReadiness> {
 	const sections: ReadinessSection[] = [];
 	const add = (section: string, reason: string) => {
@@ -55,16 +62,7 @@ export async function evaluatePurchaseReadiness(
 	requireSectionText('Purchaser', request.purchaser.name, 'Purchaser name missing.');
 	requireSectionText('Purchaser', request.purchaser.uo95, 'Purchaser UO 95 missing.');
 	requireSectionText('Purchaser', request.purchaser.permanentAddress, 'Purchaser address missing.');
-	requireSectionText(
-		'Purchaser',
-		request.purchaser.idCardFrontFileId,
-		'ID card front document missing.'
-	);
-	requireSectionText(
-		'Purchaser',
-		request.purchaser.idCardBackFileId,
-		'ID card back document missing.'
-	);
+	requireSectionText('Purchaser', request.purchaser.idCardFrontFileId, 'ID card document missing.');
 
 	requireSectionText('Event details', request.eventName, 'Event name missing.');
 	requireSectionText('Event details', request.eventDate, 'Event date missing.');
@@ -121,21 +119,34 @@ export async function evaluatePurchaseReadiness(
 		add('Files', 'Second approval missing.');
 	}
 
+	if (
+		request.purchaserSource.kind === 'purchaser' &&
+		options.purchaserBelongsToOrganization !== undefined &&
+		!(await options.purchaserBelongsToOrganization(
+			request.purchaserSource.purchaserId,
+			request.organizationSourceId
+		))
+	) {
+		add('Purchaser', 'Purchaser profile must belong to selected student organization.');
+	}
+
 	if (options.documentExists !== undefined) {
 		await requireOwnedDocument(
 			add,
 			options.documentExists,
 			request.purchaser.idCardFrontFileId,
 			'Purchaser',
-			'ID card front document missing.'
+			'ID card document missing.'
 		);
-		await requireOwnedDocument(
-			add,
-			options.documentExists,
-			request.purchaser.idCardBackFileId,
-			'Purchaser',
-			'ID card back document missing.'
-		);
+		if (request.purchaser.idCardBackFileId !== null) {
+			await requireOwnedDocument(
+				add,
+				options.documentExists,
+				request.purchaser.idCardBackFileId,
+				'Purchaser',
+				'ID card back document missing.'
+			);
+		}
 		if (request.receiptFileIds.length > 0) {
 			for (const id of request.receiptFileIds) {
 				await requireOwnedDocument(

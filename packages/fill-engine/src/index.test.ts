@@ -148,6 +148,45 @@ test('creates upload fill plans', () => {
 	]);
 });
 
+test('skips optional second ID card upload for one combined ID card document', () => {
+	const plan = createFillPlan('reimbursement', {
+		...samplePurchaseRequest,
+		purchaser: {
+			...samplePurchaseRequest.purchaser,
+			idCardFrontFileId: 'file_id_card',
+			idCardBackFileId: null
+		},
+		documents: [
+			...samplePurchaseRequest.documents,
+			{
+				id: 'file_id_card',
+				kind: 'id_card',
+				filename: 'id-card.pdf',
+				contentType: 'application/pdf',
+				size: 1,
+				storageKey: 'storage_id_card',
+				url: 'https://files.example/id-card.pdf'
+			}
+		]
+	});
+
+	expect(plan.actions).toContainEqual({
+		type: 'file',
+		labelIncludes: 'UO ID CARD',
+		files: [
+			expect.objectContaining({
+				id: 'file_id_card',
+				kind: 'id_card'
+			})
+		]
+	});
+	expect(plan.actions).not.toContainEqual({
+		type: 'file',
+		labelIncludes: 'UO ID CARD : Optional second upload',
+		files: expect.any(Array)
+	});
+});
+
 test('fills Documentation inquiry from effective categories without None of the above', () => {
 	const plan = createFillPlan('documentation', {
 		...samplePurchaseRequest,

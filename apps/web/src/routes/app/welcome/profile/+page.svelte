@@ -35,18 +35,23 @@
 		idCardFrontFileId = user.idCardFrontFileId;
 		idCardBackFileId = user.idCardBackFileId;
 		idFrontStatus = 'Uploaded';
-		idBackStatus = 'Uploaded';
+		idBackStatus = user.idCardBackFileId === null ? 'Optional' : 'Uploaded';
 	});
 
-	async function handleUpload(kind: 'id_front' | 'id_back', input: HTMLInputElement) {
+	async function handleUpload(kind: 'id_card' | 'id_front' | 'id_back', input: HTMLInputElement) {
 		const session = clerkContext.currentSession;
 		const file = input.files?.[0];
 		if (!session || !file) return;
 		try {
-			if (kind === 'id_front') idFrontStatus = 'Uploading...';
-			else idBackStatus = 'Uploading...';
+			if (kind === 'id_back') idBackStatus = 'Uploading...';
+			else idFrontStatus = 'Uploading...';
 			const fileId = await uploadFile(session, kind, file);
-			if (kind === 'id_front') {
+			if (kind === 'id_card') {
+				idCardFrontFileId = fileId;
+				idCardBackFileId = null;
+				idFrontStatus = 'Uploaded';
+				idBackStatus = 'Optional';
+			} else if (kind === 'id_front') {
 				idCardFrontFileId = fileId;
 				idFrontStatus = 'Uploaded';
 			} else {
@@ -62,8 +67,8 @@
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
-		if (idCardFrontFileId === null || idCardBackFileId === null) {
-			error = 'Upload ID card documents to continue.';
+		if (idCardFrontFileId === null) {
+			error = 'Upload an ID card document to continue.';
 			return;
 		}
 		error = '';
@@ -131,6 +136,16 @@
 	</label>
 
 	<div class="grid gap-3 md:grid-cols-2">
+		<label class="block text-sm">
+			<span class="font-medium">Combined ID card document</span>
+			<input
+				class="mt-1 block text-sm"
+				type="file"
+				accept="image/*,application/pdf"
+				onchange={(e) => handleUpload('id_card', e.currentTarget)}
+			/>
+			<p class="mt-1 text-xs text-stone-500">{idFrontStatus}</p>
+		</label>
 		<label class="block text-sm">
 			<span class="font-medium">ID card front document</span>
 			<input

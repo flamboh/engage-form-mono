@@ -88,11 +88,15 @@
 		orgBudgetLines = orgBudgetLines.filter((_, index) => index !== i);
 	}
 
-	async function upload(kind: 'id_front' | 'id_back', input: HTMLInputElement) {
+	async function upload(kind: 'id_card' | 'id_front' | 'id_back', input: HTMLInputElement) {
 		const session = clerkContext.currentSession;
 		const file = input.files?.[0];
 		if (!session || !file) return;
 		const fileId = await uploadFile(session, kind, file);
+		if (kind === 'id_card') {
+			idFrontFileId = fileId;
+			idBackFileId = null;
+		}
 		if (kind === 'id_front') idFrontFileId = fileId;
 		if (kind === 'id_back') idBackFileId = fileId;
 	}
@@ -138,8 +142,8 @@
 	async function savePurchaser(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
-		if (!purchaserOrgId || idFrontFileId === null || idBackFileId === null) {
-			error = 'Student organization and ID card documents required.';
+		if (!purchaserOrgId || idFrontFileId === null) {
+			error = 'Student organization and ID card document required.';
 			return;
 		}
 		try {
@@ -307,6 +311,14 @@
 							required
 							bind:value={purchaserAddress}
 						/>
+						<label class="block text-xs font-medium text-stone-500">
+							Combined ID card document
+							<input
+								class="mt-1 block text-sm"
+								type="file"
+								onchange={(e) => upload('id_card', e.currentTarget)}
+							/>
+						</label>
 						<label class="block text-xs font-medium text-stone-500">
 							ID card front document
 							<input

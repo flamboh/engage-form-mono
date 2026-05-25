@@ -2,6 +2,7 @@ export type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 
 export type DocumentKind =
 	| 'receipt'
+	| 'id_card'
 	| 'id_front'
 	| 'id_back'
 	| 'second_approval'
@@ -45,7 +46,7 @@ export type Requester = {
 	uo95: string;
 	permanentAddress: string;
 	idCardFrontFileId: string;
-	idCardBackFileId: string;
+	idCardBackFileId: string | null;
 	email?: string;
 	phone?: string;
 };
@@ -332,18 +333,15 @@ export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 	if (purchaseRequest.receiptFileIds.length === 0) {
 		issues.push({ field: 'receiptFileIds', message: 'Receipt document missing.' });
 	}
+	if (purchaseRequest.receiptFileIds.length > 3) {
+		issues.push({ field: 'receiptFileIds', message: 'Receipt documents are limited to three.' });
+	}
 
 	requireText(
 		issues,
 		'purchaser.idCardFrontFileId',
 		purchaseRequest.purchaser.idCardFrontFileId,
-		'ID card front document missing.'
-	);
-	requireText(
-		issues,
-		'purchaser.idCardBackFileId',
-		purchaseRequest.purchaser.idCardBackFileId,
-		'ID card back document missing.'
+		'ID card document missing.'
 	);
 	const documentationCategories = effectiveDocumentationCategories(purchaseRequest);
 	if (documentationCategories.includes('asuo_funds')) {

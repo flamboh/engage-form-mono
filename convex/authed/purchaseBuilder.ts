@@ -70,7 +70,7 @@ export const upsertUserProfile = authedMutation({
 		studentEmail: v.string(),
 		phone: v.string(),
 		idCardFrontFileId: v.id('files'),
-		idCardBackFileId: v.id('files')
+		idCardBackFileId: v.union(v.id('files'), v.null())
 	},
 	returns: v.id('users'),
 	handler: async (ctx, args) => {
@@ -81,7 +81,9 @@ export const upsertUserProfile = authedMutation({
 		requireText(args.studentEmail, 'Student email missing.');
 		requireText(args.phone, 'Phone missing.');
 		await requireOwnedDoc(ctx, 'files', args.idCardFrontFileId, owner);
-		await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
+		if (args.idCardBackFileId !== null) {
+			await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
+		}
 		const fields = {
 			owner,
 			name: args.name,
@@ -231,14 +233,16 @@ export const upsertPurchaser = authedMutation({
 		uo95: v.string(),
 		permanentAddress: v.string(),
 		idCardFrontFileId: v.id('files'),
-		idCardBackFileId: v.id('files')
+		idCardBackFileId: v.union(v.id('files'), v.null())
 	},
 	returns: v.id('purchasers'),
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
 		await requireOwnedDoc(ctx, 'files', args.idCardFrontFileId, owner);
-		await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
+		if (args.idCardBackFileId !== null) {
+			await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
+		}
 		requireText(args.name, 'Purchaser name missing.');
 		requireText(args.uo95, 'UO 95 missing.');
 		requireText(args.permanentAddress, 'Permanent address missing.');

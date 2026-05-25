@@ -42,7 +42,7 @@ export type RequesterDetails = {
 	uo95: string;
 	permanentAddress: string;
 	idCardFrontFileId: Id<'files'>;
-	idCardBackFileId: Id<'files'>;
+	idCardBackFileId: Id<'files'> | null;
 };
 export type PurchaserDetails = {
 	id: Id<'users'> | Id<'purchasers'>;
@@ -50,7 +50,7 @@ export type PurchaserDetails = {
 	uo95: string;
 	permanentAddress: string;
 	idCardFrontFileId: Id<'files'>;
-	idCardBackFileId: Id<'files'>;
+	idCardBackFileId: Id<'files'> | null;
 };
 
 type Ctx = QueryCtx | MutationCtx;
@@ -297,6 +297,10 @@ export async function assertReady(ctx: Ctx, request: Doc<'purchaseRequests'>) {
 		documentExists: async (id) => {
 			const doc = await ctx.db.get(id);
 			return doc !== null && doc.owner === request.owner;
+		},
+		purchaserBelongsToOrganization: async (id, organizationId) => {
+			const doc = await ctx.db.get(id);
+			return doc !== null && doc.owner === request.owner && doc.organizationId === organizationId;
 		}
 	});
 	if (!readiness.ready) throw new Error(formatReadinessBlockers(readiness));
