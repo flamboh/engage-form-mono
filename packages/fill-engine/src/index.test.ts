@@ -214,6 +214,34 @@ test('fills selected additive Documentation Categories', () => {
 	});
 });
 
+test('maps either Merchandise/Apparel or Gifts/Prizes to the Engage combined checkbox', () => {
+	for (const category of ['merchandise_apparel', 'gifts_prizes'] as const) {
+		const plan = createFillPlan('documentation', {
+			...samplePurchaseRequest,
+			documentationCategories: [category],
+			organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
+		});
+
+		expect(plan.actions).toContainEqual({
+			type: 'checkbox',
+			labelIncludes: 'merchandise/apparel or gifts',
+			checked: true
+		});
+	}
+
+	const plan = createFillPlan('documentation', {
+		...samplePurchaseRequest,
+		documentationCategories: [],
+		organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
+	});
+
+	expect(plan.actions).toContainEqual({
+		type: 'checkbox',
+		labelIncludes: 'merchandise/apparel or gifts',
+		checked: false
+	});
+});
+
 test('skips self approval upload when requester is not purchaser', () => {
 	expect(
 		createFillPlan('selfApproval', {

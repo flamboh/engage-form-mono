@@ -10,7 +10,9 @@
 		| 'asuo_funds'
 		| 'food'
 		| 'printing_services'
-		| 'office_supplies_goods';
+		| 'office_supplies_goods'
+		| 'merchandise_apparel'
+		| 'gifts_prizes';
 	type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 	type Props = {
 		typeOfPurchase: TypeOfPurchase;
@@ -45,7 +47,9 @@
 	const documentationCategoryOptions: { value: DocumentationCategory; label: string }[] = [
 		{ value: 'food', label: 'Food' },
 		{ value: 'printing_services', label: 'Printing Services' },
-		{ value: 'office_supplies_goods', label: 'Office Supplies/Goods' }
+		{ value: 'office_supplies_goods', label: 'Office Supplies/Goods' },
+		{ value: 'merchandise_apparel', label: 'Merchandise/Apparel' },
+		{ value: 'gifts_prizes', label: 'Gifts/Prizes' }
 	];
 
 	let {

@@ -24,7 +24,9 @@ const documentationCategory = v.union(
 	v.literal('asuo_funds'),
 	v.literal('food'),
 	v.literal('printing_services'),
-	v.literal('office_supplies_goods')
+	v.literal('office_supplies_goods'),
+	v.literal('merchandise_apparel'),
+	v.literal('gifts_prizes')
 );
 
 const fileKind = v.union(
@@ -168,6 +170,7 @@ export default defineSchema({
 		publicityFileId: v.union(v.id('files'), v.null()),
 		cateringWaiverFileId: v.union(v.id('files'), v.null()),
 		printingInvoiceFileId: v.union(v.id('files'), v.null()),
+		brandApprovalFileId: v.union(v.id('files'), v.null()),
 		officeLocation: v.string(),
 		buildingManagerApprovalFileId: v.union(v.id('files'), v.null()),
 		computerPriceQuoteFileId: v.union(v.id('files'), v.null()),

@@ -88,6 +88,7 @@
 	let publicityFileId = $state<Id<'files'> | null>(null);
 	let cateringWaiverFileId = $state<Id<'files'> | null>(null);
 	let printingInvoiceFileId = $state<Id<'files'> | null>(null);
+	let brandApprovalFileId = $state<Id<'files'> | null>(null);
 	let officeLocation = $state('');
 	let buildingManagerApprovalFileId = $state<Id<'files'> | null>(null);
 	let computerPriceQuoteFileId = $state<Id<'files'> | null>(null);
@@ -119,6 +120,12 @@
 	const printingServicesApplies = $derived(documentationCategories.includes('printing_services'));
 	const officeSuppliesGoodsApplies = $derived(
 		documentationCategories.includes('office_supplies_goods')
+	);
+	const merchandiseApparelApplies = $derived(
+		documentationCategories.includes('merchandise_apparel')
+	);
+	const recipientCategoryApplies = $derived(
+		merchandiseApparelApplies || documentationCategories.includes('gifts_prizes')
 	);
 	const purchaserName = $derived(purchaser?.name ?? '{purchaser}');
 	let lastOrganizationId = $state<Id<'organizations'> | null>(null);
@@ -246,6 +253,7 @@
 			publicityFileId = draft.publicityFileId;
 			cateringWaiverFileId = draft.cateringWaiverFileId;
 			printingInvoiceFileId = draft.printingInvoiceFileId;
+			brandApprovalFileId = draft.brandApprovalFileId;
 			officeLocation = draft.officeLocation;
 			buildingManagerApprovalFileId = draft.buildingManagerApprovalFileId;
 			computerPriceQuoteFileId = draft.computerPriceQuoteFileId;
@@ -283,6 +291,7 @@
 			publicityFileId,
 			cateringWaiverFileId,
 			printingInvoiceFileId,
+			brandApprovalFileId,
 			officeLocation,
 			buildingManagerApprovalFileId,
 			computerPriceQuoteFileId,
@@ -338,6 +347,7 @@
 			| 'publicity'
 			| 'catering_waiver'
 			| 'printing_invoice'
+			| 'brand_approval'
 			| 'building_manager_approval'
 			| 'computer_price_quote',
 		input: HTMLInputElement
@@ -354,6 +364,7 @@
 		if (kind === 'publicity') publicityFileId = ids[0] ?? null;
 		if (kind === 'catering_waiver') cateringWaiverFileId = ids[0] ?? null;
 		if (kind === 'printing_invoice') printingInvoiceFileId = ids[0] ?? null;
+		if (kind === 'brand_approval') brandApprovalFileId = ids[0] ?? null;
 		if (kind === 'building_manager_approval') buildingManagerApprovalFileId = ids[0] ?? null;
 		if (kind === 'computer_price_quote') computerPriceQuoteFileId = ids[0] ?? null;
 		await autosave();
@@ -494,7 +505,9 @@
 				onChange={onFieldChange}
 			/>
 
-			<RecipientRows bind:recipients onChange={onFieldChange} />
+			{#if recipientCategoryApplies}
+				<RecipientRows bind:recipients onChange={onFieldChange} />
+			{/if}
 
 			<section class="panel">
 				<h2>Business purpose</h2>
@@ -545,6 +558,13 @@
 							label="Printing invoice"
 							status={printingInvoiceFileId ? 'Uploaded' : 'Required'}
 							onFiles={(input) => uploadRequestFile('printing_invoice', input)}
+						/>
+					{/if}
+					{#if merchandiseApparelApplies}
+						<FilePicker
+							label="Brand approval"
+							status={brandApprovalFileId ? 'Uploaded' : 'Optional'}
+							onFiles={(input) => uploadRequestFile('brand_approval', input)}
 						/>
 					{/if}
 					{#if officeSuppliesGoodsApplies}

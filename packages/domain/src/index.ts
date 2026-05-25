@@ -25,7 +25,9 @@ export type DocumentationCategory =
 	| 'asuo_funds'
 	| 'food'
 	| 'printing_services'
-	| 'office_supplies_goods';
+	| 'office_supplies_goods'
+	| 'merchandise_apparel'
+	| 'gifts_prizes';
 
 export const fixedPersonalReimbursementReason = 'Other processes are too slow.';
 
@@ -98,6 +100,7 @@ export type PurchaseRequest = {
 	secondApprovalFileId: string | null;
 	cateringWaiverFileId: string | null;
 	printingInvoiceFileId: string | null;
+	brandApprovalFileId: string | null;
 	officeLocation: string;
 	buildingManagerApprovalFileId: string | null;
 	computerPriceQuoteFileId: string | null;
@@ -162,6 +165,7 @@ export const samplePurchaseRequest: PurchaseRequest = {
 	secondApprovalFileId: 'file_approval',
 	cateringWaiverFileId: null,
 	printingInvoiceFileId: null,
+	brandApprovalFileId: null,
 	officeLocation: '',
 	buildingManagerApprovalFileId: null,
 	computerPriceQuoteFileId: null,
@@ -374,6 +378,18 @@ export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 			'Office location missing.'
 		);
 	}
+	if (requiresRecipients(documentationCategories)) {
+		if (purchaseRequest.recipients.length === 0) {
+			issues.push({ field: 'recipients', message: 'Recipient missing.' });
+		}
+		for (const recipient of purchaseRequest.recipients) {
+			requireText(issues, 'recipient.name', recipient.name, 'Recipient name missing.');
+			requireText(issues, 'recipient.uo95', recipient.uo95, 'Recipient UO 95 missing.');
+			if (recipient.value <= 0) {
+				issues.push({ field: 'recipient.value', message: 'Recipient value missing.' });
+			}
+		}
+	}
 
 	if (purchaseRequest.requesterIsPurchaser) {
 		requireText(
@@ -393,13 +409,14 @@ export function effectiveDocumentationCategories(purchaseRequest: PurchaseReques
 	return [...categories];
 }
 
+function requiresRecipients(categories: DocumentationCategory[]) {
+	return categories.includes('merchandise_apparel') || categories.includes('gifts_prizes');
+}
+
 function enteredRecipients(purchaseRequest: PurchaseRequest) {
 	return purchaseRequest.recipients.filter(
 		(recipient) =>
-			recipient.name.trim() !== '' ||
-			recipient.uo95.trim() !== '' ||
-			recipient.reason.trim() !== '' ||
-			recipient.value > 0
+			recipient.name.trim() !== '' || recipient.uo95.trim() !== '' || recipient.value > 0
 	);
 }
 

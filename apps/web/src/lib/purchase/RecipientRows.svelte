@@ -26,15 +26,9 @@
 	</div>
 	<div class="mt-4 space-y-3">
 		{#each recipients as recipient, index (index)}
-			<div class="grid gap-3 rounded-md border border-stone-200 p-3 md:grid-cols-4">
+			<div class="grid gap-3 rounded-md border border-stone-200 p-3 md:grid-cols-3">
 				<input class="field" placeholder="Name" bind:value={recipient.name} oninput={onChange} />
 				<input class="field" placeholder="UO 95" bind:value={recipient.uo95} oninput={onChange} />
-				<input
-					class="field"
-					placeholder="Reason"
-					bind:value={recipient.reason}
-					oninput={onChange}
-				/>
 				<div class="recipient-value">
 					<div class="currency-field">
 						<span>$</span>

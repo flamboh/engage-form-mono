@@ -60,6 +60,7 @@ const request = {
 	publicityFileId: 'file_publicity',
 	cateringWaiverFileId: null,
 	printingInvoiceFileId: null,
+	brandApprovalFileId: null,
 	officeLocation: '',
 	buildingManagerApprovalFileId: null,
 	computerPriceQuoteFileId: null,
@@ -220,6 +221,70 @@ test('Office Supplies/Goods optional documents do not block Ready', async () => 
 		ready: true,
 		sections: []
 	});
+});
+
+test('Merchandise/Apparel and Gifts/Prizes require recipients', async () => {
+	for (const category of ['merchandise_apparel', 'gifts_prizes'] as const) {
+		await expect(
+			evaluatePurchaseReadiness({
+				...request,
+				documentationCategories: [category],
+				recipients: [],
+				businessPurposeText: renderBusinessPurpose(request)
+			})
+		).resolves.toEqual({
+			ready: false,
+			sections: [{ section: 'Recipients', reasons: ['Recipient missing.'] }]
+		});
+
+		await expect(
+			evaluatePurchaseReadiness({
+				...request,
+				documentationCategories: [category],
+				recipients: [{ name: '', uo95: '', reason: '', value: 0 }],
+				businessPurposeText: renderBusinessPurpose(request)
+			})
+		).resolves.toEqual({
+			ready: false,
+			sections: [
+				{
+					section: 'Recipients',
+					reasons: [
+						'Recipient name missing.',
+						'Recipient UO 95 missing.',
+						'Recipient value missing.'
+					]
+				}
+			]
+		});
+	}
+});
+
+test('Recipient reason, dollar limits, total matching, and Brand Approval do not block Ready', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			documentationCategories: ['merchandise_apparel'],
+			totalAmount: 10,
+			recipients: [{ name: 'Aidan', uo95: '951951840', reason: '', value: 75 }],
+			businessPurposeText: renderBusinessPurpose(request)
+		})
+	).resolves.toEqual({
+		ready: true,
+		sections: []
+	});
+});
+
+test('assembled Merchandise/Apparel purchase includes optional Brand Approval', async () => {
+	const purchase = await assemblePurchase(fileCtx(), {
+		...request,
+		documentationCategories: ['merchandise_apparel'],
+		brandApprovalFileId: 'file_brand_approval',
+		businessPurposeText: renderBusinessPurpose(request)
+	});
+
+	expect(purchase).toMatchObject({ brandApprovalFileId: 'file_brand_approval' });
+	expect(purchase.documents.map((document) => document.id)).toContain('file_brand_approval');
 });
 
 test('category requirements are additive', async () => {
