@@ -71,14 +71,6 @@ export async function evaluatePurchaseReadiness(
 	requireSectionText('Purchaser', request.purchaser.permanentAddress, 'Purchaser address missing.');
 	requireSectionText('Purchaser', request.purchaser.idCardFrontFileId, 'ID card document missing.');
 
-	requireSectionText('Event details', request.eventName, 'Event name missing.');
-	requireSectionText('Event details', request.eventDate, 'Event date missing.');
-	requireSectionText('Event details', request.eventTime, 'Event time missing.');
-	requireSectionText('Event details', request.eventLocation, 'Event location missing.');
-	if (request.eventEstimatedAttendance <= 0) {
-		add('Event details', 'Estimated attendance missing.');
-	}
-
 	requireSectionText('Purchase details', request.vendor, 'Vendor missing.');
 	requireSectionText('Purchase details', request.itemDescription, 'Item description missing.');
 	requireSectionText('Purchase details', request.budgetLineItem, 'Budget line item missing.');
@@ -152,7 +144,7 @@ export async function evaluatePurchaseReadiness(
 				options.documentExists,
 				request.purchaser.idCardBackFileId,
 				'Purchaser',
-				'ID card back document missing.'
+				'Second ID card document missing.'
 			);
 		}
 		if (request.receiptFileIds.length > 0) {

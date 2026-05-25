@@ -22,6 +22,7 @@ export type EngageStep =
 	| 'selfApproval'
 	| 'documentation'
 	| 'publicity'
+	| 'cateringWaiver'
 	| 'gifts'
 	| 'thankYou'
 	| 'review'
@@ -125,7 +126,9 @@ export const engageSchema: EngageStepSchema[] = [
 				'Why did you use the reimbursement process',
 				() => fixedPersonalReimbursementReason
 			),
-			selectField('submitter of this form', () => 'Myself'),
+			selectField('submitter of this form', (purchase) =>
+				purchase.requesterIsPurchaser ? 'Myself' : 'Another student'
+			),
 			textField('name and UO 95 ID', reimbursementRecipientText),
 			textField('permanent address', (purchase) => purchase.purchaser.permanentAddress),
 			checkboxField('mailing address', true),
@@ -170,6 +173,17 @@ export const engageSchema: EngageStepSchema[] = [
 				purchase.eventDetails.publicityProofFileId === null
 					? []
 					: [documentById(purchase, purchase.eventDetails.publicityProofFileId)]
+			)
+		]
+	},
+	{
+		step: 'cateringWaiver',
+		headingIncludes: ['catering waiver'],
+		fields: [
+			conditionalFileField('upload', (purchase) =>
+				purchase.cateringWaiverFileId === null
+					? []
+					: [documentById(purchase, purchase.cateringWaiverFileId)]
 			)
 		]
 	},
@@ -243,6 +257,8 @@ export function stepLabel(step: EngageStep) {
 			return 'Documentation inquiry';
 		case 'publicity':
 			return 'Event publicity';
+		case 'cateringWaiver':
+			return 'Catering waiver';
 		case 'gifts':
 			return 'Merchandise/apparel/gifts';
 		case 'thankYou':

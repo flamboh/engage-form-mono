@@ -11,13 +11,30 @@ test('sample purchase request is ready', () => {
 	expect(validatePurchaseReadiness(samplePurchaseRequest)).toEqual([]);
 });
 
-test('accepts one combined ID Card Document', () => {
+test('final common facts do not require event details', () => {
+	expect(
+		validatePurchaseReadiness({
+			...samplePurchaseRequest,
+			eventDetails: {
+				name: '',
+				date: '',
+				time: '',
+				location: '',
+				estimatedAttendance: 0,
+				publicityProofFileId: samplePurchaseRequest.eventDetails.publicityProofFileId
+			},
+			businessPurposeText: 'Album Listening Club wishes to reimburse Oliver Boorstein.'
+		})
+	).toEqual([]);
+});
+
+test('accepts one ID Card Document', () => {
 	expect(
 		validatePurchaseReadiness({
 			...samplePurchaseRequest,
 			purchaser: {
 				...samplePurchaseRequest.purchaser,
-				idCardFrontFileId: 'file_id_card',
+				idCardFrontFileId: 'file_id_document',
 				idCardBackFileId: null as never
 			}
 		})

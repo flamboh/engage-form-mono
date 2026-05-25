@@ -33,7 +33,7 @@
 	let orgFund = $state<Fund>('I');
 	let orgBudgetLines = $state<string[]>(['Event Expenses']);
 	let orgTemplate = $state(
-		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}. This purchase supported an activity on {Activity Date} at {Activity Time} in {Activity Location} with about {Estimated Attendance} students in attendance.'
+		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.'
 	);
 
 	let purchaserOrgId = $state<Id<'organizations'> | ''>('');
@@ -86,15 +86,11 @@
 		orgBudgetLines = orgBudgetLines.filter((_, index) => index !== i);
 	}
 
-	async function upload(kind: 'id_card' | 'id_front' | 'id_back', input: HTMLInputElement) {
+	async function upload(kind: 'id_front' | 'id_back', input: HTMLInputElement) {
 		const session = clerkContext.currentSession;
 		const file = input.files?.[0];
 		if (!session || !file) return;
 		const fileId = await uploadFile(session, kind, file);
-		if (kind === 'id_card') {
-			idFrontFileId = fileId;
-			idBackFileId = null;
-		}
 		if (kind === 'id_front') idFrontFileId = fileId;
 		if (kind === 'id_back') idBackFileId = fileId;
 	}
@@ -308,15 +304,7 @@
 							bind:value={purchaserAddress}
 						/>
 						<label class="block text-xs font-medium text-stone-500">
-							Combined ID card document
-							<input
-								class="mt-1 block text-sm"
-								type="file"
-								onchange={(e) => upload('id_card', e.currentTarget)}
-							/>
-						</label>
-						<label class="block text-xs font-medium text-stone-500">
-							ID card front document
+							ID card document
 							<input
 								class="mt-1 block text-sm"
 								type="file"
@@ -324,7 +312,7 @@
 							/>
 						</label>
 						<label class="block text-xs font-medium text-stone-500">
-							ID card back document
+							Second ID card document
 							<input
 								class="mt-1 block text-sm"
 								type="file"

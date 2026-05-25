@@ -2,53 +2,28 @@
 	import { browser } from '$app/environment';
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import FilePicker from '$lib/purchase/FilePicker.svelte';
+	import BuilderHeader from '$lib/purchase/BuilderHeader.svelte';
+	import BusinessPurposePanel from '$lib/purchase/BusinessPurposePanel.svelte';
 	import PurchaseFields from '$lib/purchase/PurchaseFields.svelte';
-	import RecipientRows from '$lib/purchase/RecipientRows.svelte';
+	import ReadyPanels from '$lib/purchase/ReadyPanels.svelte';
+	import RequirementPanels from '$lib/purchase/RequirementPanels.svelte';
 	import SavedSetup, { type PurchaserRef } from '$lib/purchase/SavedSetup.svelte';
+	import {
+		formatBusinessPurposeSource,
+		savedPurchaserDetails,
+		userAsPurchaser,
+		userAsRequester,
+		type DocumentationCategory,
+		type PurchaserDetails,
+		type Recipient,
+		type RequesterDetails,
+		type SavedData,
+		type StudentOrganizationDetails,
+		type TypeOfPurchase
+	} from '$lib/purchase/draftDetails';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
 	import { uploadFile } from '$lib/upload';
 	import { useConvexClient, useQuery } from 'convex-svelte';
-
-	type Recipient = { name: string; uo95: string; reason: string; value: number };
-	type SavedData = {
-		organizations: Doc<'organizations'>[];
-		purchasers: Doc<'purchasers'>[];
-		businessPurposeTemplates: Doc<'businessPurposeTemplates'>[];
-	};
-	type TypeOfPurchase = Doc<'purchaseRequests'>['typeOfPurchase'];
-	type DocumentationCategory = Doc<'purchaseRequests'>['documentationCategories'][number];
-	type FundLetter = Doc<'organizations'>['fundLetter'];
-	type BusinessPurposeSource = Doc<'purchaseRequests'>['businessPurposeSource'];
-	type BusinessPurposeVariable = Extract<
-		BusinessPurposeSource['parts'][number],
-		{ kind: 'variable' }
-	>['variable'];
-	type StudentOrganizationDetails = {
-		name: string;
-		indexNumber: string;
-		fundLetter: FundLetter;
-		budgetLines: string[];
-		businessPurposeTemplate: string;
-	};
-	type RequesterDetails = {
-		id: Id<'users'>;
-		name: string;
-		email: string;
-		phone: string;
-		uo95: string;
-		permanentAddress: string;
-		idCardFrontFileId: Id<'files'>;
-		idCardBackFileId: Id<'files'> | null;
-	};
-	type PurchaserDetails = {
-		id: Id<'users'> | Id<'purchasers'>;
-		name: string;
-		uo95: string;
-		permanentAddress: string;
-		idCardFrontFileId: Id<'files'>;
-		idCardBackFileId: Id<'files'> | null;
-	};
 
 	const clerkContext = getClerkContext();
 	const client = useConvexClient();
@@ -76,11 +51,6 @@
 	let typeOfPurchase = $state<TypeOfPurchase>('personal_reimbursement');
 	let documentationCategories = $state<DocumentationCategory[]>([]);
 	let businessPurposeTemplateId = $state<Id<'businessPurposeTemplates'> | null>(null);
-	let eventName = $state('');
-	let eventDate = $state('');
-	let eventTime = $state('');
-	let eventLocation = $state('');
-	let eventEstimatedAttendance = $state(0);
 	let vendor = $state('');
 	let itemDescription = $state('');
 	let totalAmount = $state(0);
@@ -113,34 +83,6 @@
 		return purchasers.find((p) => p._id === id);
 	});
 	const purchaserIsSelf = $derived(purchaserSource.kind === 'self');
-	const asuoFundsApplies = $derived(
-		studentOrganization.fundLetter === 'I' || documentationCategories.includes('asuo_funds')
-	);
-	const foodApplies = $derived(documentationCategories.includes('food'));
-	const printingServicesApplies = $derived(documentationCategories.includes('printing_services'));
-	const officeSuppliesGoodsApplies = $derived(
-		documentationCategories.includes('office_supplies_goods')
-	);
-	const merchandiseApparelApplies = $derived(
-		documentationCategories.includes('merchandise_apparel')
-	);
-	const recipientCategoryApplies = $derived(
-		merchandiseApparelApplies || documentationCategories.includes('gifts_prizes')
-	);
-	const businessPurposeVariableLabels: Record<BusinessPurposeVariable, string> = {
-		studentOrganization: 'Student Organization',
-		purchaser: 'Purchaser',
-		vendor: 'Vendor',
-		itemDescription: 'Item Description',
-		totalAmount: 'Total Amount',
-		recipients: 'Recipients',
-		recipientUo95Ids: 'Recipient UO 95 IDs',
-		activityDate: 'Activity Date',
-		activityTime: 'Activity Time',
-		activityLocation: 'Activity Location',
-		estimatedAttendance: 'Estimated Attendance',
-		officeLocation: 'Office Location'
-	};
 	let lastOrganizationId = $state<Id<'organizations'> | null>(null);
 	let lastPurchaserKey = $state('');
 
@@ -250,11 +192,6 @@
 			purchaser = draft.purchaser;
 			typeOfPurchase = draft.typeOfPurchase;
 			documentationCategories = draft.documentationCategories;
-			eventName = draft.eventName;
-			eventDate = draft.eventDate;
-			eventTime = draft.eventTime;
-			eventLocation = draft.eventLocation;
-			eventEstimatedAttendance = draft.eventEstimatedAttendance;
 			vendor = draft.vendor;
 			itemDescription = draft.itemDescription;
 			totalAmount = draft.totalAmount;
@@ -290,11 +227,6 @@
 			...(purchaser === null ? {} : { purchaser }),
 			typeOfPurchase,
 			documentationCategories,
-			eventName,
-			eventDate,
-			eventTime,
-			eventLocation,
-			eventEstimatedAttendance,
 			vendor,
 			itemDescription,
 			totalAmount,
@@ -383,50 +315,6 @@
 		});
 		location.href = '/app';
 	}
-
-	function formatBusinessPurposeSource(source: BusinessPurposeSource) {
-		return source.parts
-			.map((part) => {
-				if (part.kind === 'text') return part.text;
-				return `{${businessPurposeVariableLabels[part.variable]}}`;
-			})
-			.join('');
-	}
-
-	function userAsRequester(user: Doc<'users'>): RequesterDetails {
-		return {
-			id: user._id,
-			name: user.name,
-			email: user.studentEmail,
-			phone: user.phone,
-			uo95: user.uo95,
-			permanentAddress: user.permanentAddress,
-			idCardFrontFileId: user.idCardFrontFileId,
-			idCardBackFileId: user.idCardBackFileId
-		};
-	}
-
-	function userAsPurchaser(user: Doc<'users'>): PurchaserDetails {
-		return {
-			id: user._id,
-			name: user.name,
-			uo95: user.uo95,
-			permanentAddress: user.permanentAddress,
-			idCardFrontFileId: user.idCardFrontFileId,
-			idCardBackFileId: user.idCardBackFileId
-		};
-	}
-
-	function savedPurchaserDetails(savedPurchaser: Doc<'purchasers'>): PurchaserDetails {
-		return {
-			id: savedPurchaser._id,
-			name: savedPurchaser.name,
-			uo95: savedPurchaser.uo95,
-			permanentAddress: savedPurchaser.permanentAddress,
-			idCardFrontFileId: savedPurchaser.idCardFrontFileId,
-			idCardBackFileId: savedPurchaser.idCardBackFileId
-		};
-	}
 </script>
 
 {#if !clerkContext.currentSession}
@@ -439,31 +327,7 @@
 	</div>
 {:else}
 	<div class="min-h-screen bg-stone-50 text-stone-950">
-		<header class="sticky top-0 z-10 border-b border-stone-200 bg-white">
-			<div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-				<div class="flex items-center gap-3">
-					<a class="text-sm text-stone-500 hover:text-stone-900" href="/app">Back</a>
-					<h1 class="text-lg font-semibold">Event prize reimbursement</h1>
-				</div>
-				<div class="flex items-center gap-3">
-					<span class="text-xs text-stone-500">{saveState}</span>
-					<button
-						class="rounded-md px-3 py-2 text-sm hover:bg-stone-100"
-						type="button"
-						onclick={discard}
-					>
-						Discard
-					</button>
-					<button
-						class="rounded-md bg-stone-950 px-3 py-2 text-sm font-medium text-white hover:bg-stone-800"
-						type="button"
-						onclick={markReady}
-					>
-						Ready for extension
-					</button>
-				</div>
-			</div>
-		</header>
+		<BuilderHeader {saveState} onDiscard={discard} />
 
 		<main class="mx-auto max-w-4xl space-y-5 px-6 py-8">
 			{#if error}<p class="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>{/if}
@@ -485,130 +349,43 @@
 				bind:typeOfPurchase
 				bind:documentationCategories
 				fundLetter={studentOrganization.fundLetter}
-				bind:eventName
-				bind:eventDate
-				bind:eventTime
-				bind:eventLocation
-				bind:eventEstimatedAttendance
+				requesterName={requester?.name ?? ''}
 				bind:vendor
 				bind:itemDescription
 				bind:totalAmount
 				bind:budgetLineItem
 				budgetLineOptions={studentOrganization.budgetLines}
-				bind:officeLocation
 				onChange={onFieldChange}
 			/>
 
-			{#if recipientCategoryApplies}
-				<RecipientRows bind:recipients onChange={onFieldChange} />
-			{/if}
+			<RequirementPanels
+				{documentationCategories}
+				fundLetter={studentOrganization.fundLetter}
+				{purchaserIsSelf}
+				bind:recipients
+				{receiptFileIds}
+				{secondApprovalFileId}
+				{publicityFileId}
+				{cateringWaiverFileId}
+				{printingInvoiceFileId}
+				{brandApprovalFileId}
+				bind:officeLocation
+				{buildingManagerApprovalFileId}
+				{computerPriceQuoteFileId}
+				{uploadRequestFile}
+				onChange={onFieldChange}
+			/>
 
-			<section class="panel">
-				<h2>Business purpose</h2>
-				<textarea
-					class="field min-h-36"
-					bind:value={businessPurposeText}
-					oninput={() => {
-						businessPurposeTemplateId = null;
-						businessPurposeTouched = true;
-						void autosave();
-					}}
-				></textarea>
-				<button
-					class="secondary mt-3"
-					type="button"
-					onclick={() => {
-						businessPurposeTemplateId = null;
-						businessPurposeText = studentOrganization.businessPurposeTemplate;
-						businessPurposeTouched = false;
-						void autosave();
-					}}
-				>
-					Regenerate
-				</button>
-			</section>
+			<BusinessPurposePanel
+				bind:businessPurposeText
+				bind:businessPurposeTemplateId
+				bind:businessPurposeTouched
+				templateText={studentOrganization.businessPurposeTemplate}
+				onInput={() => void autosave()}
+				onRegenerate={() => void autosave()}
+			/>
 
-			<section class="panel">
-				<h2>Files</h2>
-				<div class="grid gap-4 md:grid-cols-3">
-					<FilePicker
-						label="Receipts"
-						multiple
-						status={`${receiptFileIds.length}/3 uploaded`}
-						onFiles={(input) => uploadRequestFile('receipt', input)}
-					/>
-					<FilePicker
-						label="Publicity proof"
-						status={publicityFileId ? 'Uploaded' : asuoFundsApplies ? 'Required' : 'Optional'}
-						onFiles={(input) => uploadRequestFile('publicity', input)}
-					/>
-					{#if foodApplies}
-						<FilePicker
-							label="Catering waiver"
-							status={cateringWaiverFileId ? 'Uploaded' : 'Required'}
-							onFiles={(input) => uploadRequestFile('catering_waiver', input)}
-						/>
-					{/if}
-					{#if printingServicesApplies}
-						<FilePicker
-							label="Printing invoice"
-							status={printingInvoiceFileId ? 'Uploaded' : 'Required'}
-							onFiles={(input) => uploadRequestFile('printing_invoice', input)}
-						/>
-					{/if}
-					{#if merchandiseApparelApplies}
-						<FilePicker
-							label="Brand approval"
-							status={brandApprovalFileId ? 'Uploaded' : 'Optional'}
-							onFiles={(input) => uploadRequestFile('brand_approval', input)}
-						/>
-					{/if}
-					{#if officeSuppliesGoodsApplies}
-						<FilePicker
-							label="Building manager approval"
-							status={buildingManagerApprovalFileId ? 'Uploaded' : 'Optional'}
-							onFiles={(input) => uploadRequestFile('building_manager_approval', input)}
-						/>
-						<FilePicker
-							label="Computer price quote"
-							status={computerPriceQuoteFileId ? 'Uploaded' : 'Optional'}
-							onFiles={(input) => uploadRequestFile('computer_price_quote', input)}
-						/>
-					{/if}
-					{#if purchaserIsSelf}
-						<FilePicker
-							label="Second approval"
-							status={secondApprovalFileId ? 'Uploaded' : 'Required'}
-							onFiles={(input) => uploadRequestFile('second_approval', input)}
-						/>
-					{/if}
-				</div>
-			</section>
+			<ReadyPanels onMarkReady={markReady} />
 		</main>
 	</div>
 {/if}
-
-<style>
-	.panel {
-		border: 1px solid rgb(231 229 228);
-		border-radius: 0.5rem;
-		background: white;
-		padding: 1.25rem;
-	}
-
-	.field {
-		width: 100%;
-		border-radius: 0.375rem;
-		border: 1px solid rgb(214 211 209);
-		padding: 0.5rem 0.75rem;
-		font-size: 0.875rem;
-	}
-
-	.secondary {
-		border-radius: 0.375rem;
-		border: 1px solid rgb(214 211 209);
-		padding: 0.45rem 0.7rem;
-		font-size: 0.8125rem;
-		font-weight: 500;
-	}
-</style>

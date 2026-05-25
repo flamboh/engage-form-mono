@@ -347,13 +347,33 @@ test('reports a complete Personal Reimbursement purchase request as Ready', asyn
 	});
 });
 
-test('accepts one combined ID Card Document for Personal Reimbursement', async () => {
+test('final common facts do not require event details for Ready', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			eventName: '',
+			eventDate: '',
+			eventTime: '',
+			eventLocation: '',
+			eventEstimatedAttendance: 0,
+			businessPurposeSource: parseBusinessPurposeText(
+				'Reimburse {Purchaser} for {Item Description} from {Vendor} for {Total Amount}.'
+			),
+			businessPurposeText: ''
+		} as Doc<'purchaseRequests'>)
+	).resolves.toEqual({
+		ready: true,
+		sections: []
+	});
+});
+
+test('accepts one ID Card Document for Personal Reimbursement', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
 			purchaser: {
 				...request.purchaser,
-				idCardFrontFileId: 'file_id_card',
+				idCardFrontFileId: 'file_id_document',
 				idCardBackFileId: null as never
 			},
 			businessPurposeText: renderBusinessPurpose(request)
@@ -700,16 +720,6 @@ test('reports blocked Draft reasons grouped by section', async () => {
 					'Purchaser UO 95 missing.',
 					'Purchaser address missing.',
 					'ID card document missing.'
-				]
-			},
-			{
-				section: 'Event details',
-				reasons: [
-					'Event name missing.',
-					'Event date missing.',
-					'Event time missing.',
-					'Event location missing.',
-					'Estimated attendance missing.'
 				]
 			},
 			{

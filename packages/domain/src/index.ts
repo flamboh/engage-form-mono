@@ -2,7 +2,6 @@ export type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 
 export type DocumentKind =
 	| 'receipt'
-	| 'id_card'
 	| 'id_front'
 	| 'id_back'
 	| 'second_approval'
@@ -270,36 +269,6 @@ export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 		purchaseRequest.purchaser.permanentAddress,
 		'Purchaser address missing.'
 	);
-	requireText(
-		issues,
-		'eventDetails.name',
-		purchaseRequest.eventDetails.name,
-		'Event name missing.'
-	);
-	requireText(
-		issues,
-		'eventDetails.date',
-		purchaseRequest.eventDetails.date,
-		'Event date missing.'
-	);
-	requireText(
-		issues,
-		'eventDetails.time',
-		purchaseRequest.eventDetails.time,
-		'Event time missing.'
-	);
-	requireText(
-		issues,
-		'eventDetails.location',
-		purchaseRequest.eventDetails.location,
-		'Event location missing.'
-	);
-	if (purchaseRequest.eventDetails.estimatedAttendance <= 0) {
-		issues.push({
-			field: 'eventDetails.estimatedAttendance',
-			message: 'Estimated attendance missing.'
-		});
-	}
 	requireText(issues, 'vendor', purchaseRequest.vendor, 'Vendor missing.');
 	requireText(
 		issues,

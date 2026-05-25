@@ -91,18 +91,12 @@
 									<li class="px-5 py-4">
 										<div class="flex items-start justify-between gap-4">
 											<div>
-												{#if purchase.status === 'draft'}
-													<a
-														class="text-sm font-medium hover:underline"
-														href={`/app/purchase/new?id=${purchase._id}`}
-													>
-														{purchase.itemDescription || 'Untitled request'}
-													</a>
-												{:else}
-													<p class="text-sm font-medium">
-														{purchase.itemDescription || 'Untitled request'}
-													</p>
-												{/if}
+												<a
+													class="text-sm font-medium hover:underline"
+													href={`/app/purchase/new?id=${purchase._id}`}
+												>
+													{purchase.itemDescription || 'Untitled request'}
+												</a>
 												<p class="mt-1 text-sm text-stone-500">{money(purchase.totalAmount)}</p>
 											</div>
 											<span class="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">
