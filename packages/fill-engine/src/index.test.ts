@@ -148,6 +148,52 @@ test('creates upload fill plans', () => {
 	]);
 });
 
+test('fills Documentation inquiry from effective categories without None of the above', () => {
+	const plan = createFillPlan('documentation', {
+		...samplePurchaseRequest,
+		documentationCategories: [],
+		organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
+	});
+
+	expect(plan.actions).not.toContainEqual({
+		type: 'checkbox',
+		labelIncludes: 'None of the above',
+		checked: false
+	});
+	expect(plan.actions).toContainEqual({
+		type: 'checkbox',
+		labelIncludes: 'ASUO funds',
+		checked: false
+	});
+});
+
+test('fills ASUO Funds when it is implicit from Fund Letter I', () => {
+	const plan = createFillPlan('documentation', {
+		...samplePurchaseRequest,
+		documentationCategories: []
+	});
+
+	expect(plan.actions).toContainEqual({
+		type: 'checkbox',
+		labelIncludes: 'ASUO funds',
+		checked: true
+	});
+});
+
+test('fills ASUO Funds when a non-I Fund Letter selects it', () => {
+	const plan = createFillPlan('documentation', {
+		...samplePurchaseRequest,
+		documentationCategories: ['asuo_funds'],
+		organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
+	});
+
+	expect(plan.actions).toContainEqual({
+		type: 'checkbox',
+		labelIncludes: 'ASUO funds',
+		checked: true
+	});
+});
+
 test('skips self approval upload when requester is not purchaser', () => {
 	expect(
 		createFillPlan('selfApproval', {

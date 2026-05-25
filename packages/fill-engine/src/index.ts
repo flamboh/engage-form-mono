@@ -1,6 +1,7 @@
 import {
 	budgetLineText,
 	documentById,
+	effectiveDocumentationCategories,
 	fixedPersonalReimbursementReason,
 	generateBusinessPurpose,
 	recipientIdText,
@@ -50,7 +51,7 @@ type EngageField =
 	| {
 			type: 'checkbox';
 			labelIncludes: string | ((purchaseRequest: PurchaseRequest) => string);
-			checked: boolean;
+			checked: boolean | ((purchaseRequest: PurchaseRequest) => boolean);
 	  }
 	| {
 			type: 'radio';
@@ -152,21 +153,24 @@ export const engageSchema: EngageStepSchema[] = [
 		step: 'documentation',
 		headingIncludes: ['documentation inquiry'],
 		fields: [
-			checkboxField('ASUO funds', true),
+			checkboxField('ASUO funds', (purchase) =>
+				effectiveDocumentationCategories(purchase).includes('asuo_funds')
+			),
 			checkboxField('food', false),
 			checkboxField('printing services', false),
 			checkboxField('merchandise/apparel or gifts', true),
-			checkboxField('office supplies/goods', false),
-			checkboxField('None of the above', false)
+			checkboxField('office supplies/goods', false)
 		]
 	},
 	{
 		step: 'publicity',
 		headingIncludes: ['event open to all students'],
 		fields: [
-			fileField('upload', (purchase) => [
-				documentById(purchase, purchase.eventDetails.publicityProofFileId)
-			])
+			conditionalFileField('upload', (purchase) =>
+				purchase.eventDetails.publicityProofFileId === null
+					? []
+					: [documentById(purchase, purchase.eventDetails.publicityProofFileId)]
+			)
 		]
 	},
 	{
@@ -277,7 +281,7 @@ function resolveField(
 				typeof field.labelIncludes === 'string'
 					? field.labelIncludes
 					: field.labelIncludes(purchaseRequest),
-			checked: field.checked
+			checked: typeof field.checked === 'boolean' ? field.checked : field.checked(purchaseRequest)
 		};
 	}
 
@@ -337,7 +341,7 @@ function selectField(
 
 function checkboxField(
 	labelIncludes: string | ((purchaseRequest: PurchaseRequest) => string),
-	checked: boolean
+	checked: boolean | ((purchaseRequest: PurchaseRequest) => boolean)
 ): EngageField {
 	return { type: 'checkbox', labelIncludes, checked };
 }

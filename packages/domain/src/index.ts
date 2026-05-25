@@ -17,6 +17,7 @@ export type TypeOfPurchase =
 	| 'pcard'
 	| 'co_sponsorship_payment'
 	| 'service_agreement_or_purchase_order_for_service';
+export type DocumentationCategory = 'asuo_funds';
 
 export const fixedPersonalReimbursementReason = 'Other processes are too slow.';
 
@@ -47,7 +48,7 @@ export type EventDetails = {
 	time: string;
 	location: string;
 	estimatedAttendance: number;
-	publicityProofFileId: string;
+	publicityProofFileId: string | null;
 };
 
 export type Document = {
@@ -73,6 +74,7 @@ export type PurchaseRequest = {
 	id: string;
 	status: PurchaseStatus;
 	typeOfPurchase: TypeOfPurchase;
+	documentationCategories: DocumentationCategory[];
 	organization: StudentOrganization;
 	requester: Requester;
 	purchaser: Purchaser;
@@ -99,6 +101,7 @@ export const samplePurchaseRequest: PurchaseRequest = {
 	id: 'purchase_mort_garson',
 	status: 'ready',
 	typeOfPurchase: 'personal_reimbursement',
+	documentationCategories: [],
 	organization: {
 		id: 'org_alc',
 		name: 'Album Listening Club',
@@ -320,12 +323,14 @@ export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 		purchaseRequest.purchaser.idCardBackFileId,
 		'ID card back document missing.'
 	);
-	requireText(
-		issues,
-		'eventDetails.publicityProofFileId',
-		purchaseRequest.eventDetails.publicityProofFileId,
-		'Publicity proof missing.'
-	);
+	if (effectiveDocumentationCategories(purchaseRequest).includes('asuo_funds')) {
+		requireText(
+			issues,
+			'eventDetails.publicityProofFileId',
+			purchaseRequest.eventDetails.publicityProofFileId ?? '',
+			'Publicity proof missing.'
+		);
+	}
 
 	if (purchaseRequest.requesterIsPurchaser) {
 		requireText(
@@ -337,6 +342,12 @@ export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 	}
 
 	return issues;
+}
+
+export function effectiveDocumentationCategories(purchaseRequest: PurchaseRequest) {
+	const categories = new Set(purchaseRequest.documentationCategories);
+	if (purchaseRequest.organization.fundLetter === 'I') categories.add('asuo_funds');
+	return [...categories];
 }
 
 function enteredRecipients(purchaseRequest: PurchaseRequest) {

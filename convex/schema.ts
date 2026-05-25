@@ -20,6 +20,8 @@ const typeOfPurchase = v.union(
 	v.literal('service_agreement_or_purchase_order_for_service')
 );
 
+const documentationCategory = v.union(v.literal('asuo_funds'));
+
 const fileKind = v.union(
 	v.literal('receipt'),
 	v.literal('id_front'),
@@ -134,6 +136,7 @@ export default defineSchema({
 		owner: v.string(),
 		status: v.union(v.literal('draft'), v.literal('ready')),
 		typeOfPurchase,
+		documentationCategories: v.array(documentationCategory),
 		organizationSourceId: v.union(v.id('organizations'), v.null()),
 		purchaserSource: purchaserRef,
 		studentOrganization: studentOrganizationDetails,

@@ -19,6 +19,8 @@ export const typeOfPurchase = v.union(
 	v.literal('service_agreement_or_purchase_order_for_service')
 );
 
+export const documentationCategory = v.union(v.literal('asuo_funds'));
+
 export const fileKind = v.union(
 	v.literal('receipt'),
 	v.literal('id_front'),
@@ -71,6 +73,7 @@ const purchaserDetails = v.object({
 
 export const draftPatch = v.object({
 	typeOfPurchase: v.optional(typeOfPurchase),
+	documentationCategories: v.optional(v.array(documentationCategory)),
 	organizationSourceId: v.optional(v.union(v.id('organizations'), v.null())),
 	purchaserSource: v.optional(purchaserRef),
 	studentOrganization: v.optional(studentOrganizationDetails),
@@ -170,6 +173,7 @@ export const purchaseRequestDoc = v.object({
 	owner: v.string(),
 	status: v.union(v.literal('draft'), v.literal('ready')),
 	typeOfPurchase,
+	documentationCategories: v.array(documentationCategory),
 	organizationSourceId: v.union(v.id('organizations'), v.null()),
 	purchaserSource: purchaserRef,
 	studentOrganization: studentOrganizationDetails,
@@ -216,6 +220,7 @@ export const assembledPurchase = v.object({
 	id: v.id('purchaseRequests'),
 	status: v.union(v.literal('draft'), v.literal('ready')),
 	typeOfPurchase,
+	documentationCategories: v.array(documentationCategory),
 	organization: v.object({
 		id: v.union(v.id('organizations'), v.null()),
 		name: v.string(),
@@ -247,7 +252,7 @@ export const assembledPurchase = v.object({
 		time: v.string(),
 		location: v.string(),
 		estimatedAttendance: v.number(),
-		publicityProofFileId: v.id('files')
+		publicityProofFileId: v.union(v.id('files'), v.null())
 	}),
 	vendor: v.string(),
 	itemDescription: v.string(),

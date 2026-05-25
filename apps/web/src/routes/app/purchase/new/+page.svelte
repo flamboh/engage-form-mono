@@ -17,6 +17,7 @@
 		eventPresets: Doc<'eventPresets'>[];
 	};
 	type TypeOfPurchase = Doc<'purchaseRequests'>['typeOfPurchase'];
+	type DocumentationCategory = Doc<'purchaseRequests'>['documentationCategories'][number];
 	type FundLetter = Doc<'organizations'>['fundLetter'];
 	type StudentOrganizationDetails = {
 		name: string;
@@ -68,6 +69,7 @@
 	let requester = $state<RequesterDetails | null>(null);
 	let purchaser = $state<PurchaserDetails | null>(null);
 	let typeOfPurchase = $state<TypeOfPurchase>('personal_reimbursement');
+	let documentationCategories = $state<DocumentationCategory[]>([]);
 	let eventTemplateId = $state<Id<'eventPresets'> | null>(null);
 	let eventName = $state('');
 	let eventDate = $state('');
@@ -105,6 +107,9 @@
 		return purchasers.find((p) => p._id === id);
 	});
 	const purchaserIsSelf = $derived(purchaserSource.kind === 'self');
+	const asuoFundsApplies = $derived(
+		studentOrganization.fundLetter === 'I' || documentationCategories.includes('asuo_funds')
+	);
 	const purchaserName = $derived(purchaser?.name ?? '{purchaser}');
 	let lastOrganizationId = $state<Id<'organizations'> | null>(null);
 	let lastPurchaserKey = $state('');
@@ -214,6 +219,7 @@
 			requester = draft.requester;
 			purchaser = draft.purchaser;
 			typeOfPurchase = draft.typeOfPurchase;
+			documentationCategories = draft.documentationCategories;
 			eventName = draft.eventName;
 			eventDate = draft.eventDate;
 			eventTime = draft.eventTime;
@@ -245,6 +251,7 @@
 			...(requester === null ? {} : { requester }),
 			...(purchaser === null ? {} : { purchaser }),
 			typeOfPurchase,
+			documentationCategories,
 			eventName,
 			eventDate,
 			eventTime,
@@ -440,6 +447,8 @@
 
 			<PurchaseFields
 				bind:typeOfPurchase
+				bind:documentationCategories
+				fundLetter={studentOrganization.fundLetter}
 				bind:eventName
 				bind:eventDate
 				bind:eventTime
@@ -489,7 +498,7 @@
 					/>
 					<FilePicker
 						label="Publicity proof"
-						status={publicityFileId ? 'Uploaded' : 'Required'}
+						status={publicityFileId ? 'Uploaded' : asuoFundsApplies ? 'Required' : 'Optional'}
 						onFiles={(input) => uploadRequestFile('publicity', input)}
 					/>
 					{#if purchaserIsSelf}
