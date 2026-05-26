@@ -1,3 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
 @import 'tailwindcss';
 
 @source './**/*.{html,svelte,ts}';
+
+@theme inline {
+	--font-sans: 'Outfit', system-ui, sans-serif;
+	--font-heading: 'Outfit', system-ui, sans-serif;
+}

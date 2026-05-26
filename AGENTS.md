@@ -32,12 +32,12 @@ Long term maintainability is a core priority. If you add new functionality, firs
 ## Package Roles
 
 - `apps/web`: SvelteKit Web App
-- `apps/extension`: Manifest V3 Chrome extension
+- `apps/extension`: WXT extension
 - `convex/`: Convex backend
 
 ## Expectations
 
-- Use SvelteKit/Svelte components for `apps/web`; prefer simple local components unless a shared UI primitive is clearly needed.
+- Use SvelteKit/Svelte components for `apps/web`; Use shadcn-svelte components where possible `bunx shadcn-svelte@latest add {component}` (see `apps/web/components.json` for existing components)
 - Keep designs simple, no over explaining, plain colors, no gradients, no decorative elements.
 - Assume dev servers for both Convex and `bun dev` are already running.
 - Use EffectTS for business logic and server side code

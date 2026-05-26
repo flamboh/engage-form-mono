@@ -359,7 +359,7 @@
 	type WebTokenResponse = WebAppTokenStorageResponse;
 </script>
 
-<main class="min-w-80 bg-stone-50 text-stone-950">
+<main class="min-w-80 bg-stone-50 font-sans text-stone-950">
 	<section class="border-b border-stone-200 bg-white px-5 py-4">
 		<p class="text-xs font-medium tracking-wide text-stone-400 uppercase">Engage Form</p>
 		<h1 class="mt-1 text-lg font-semibold">{signedIn ? 'Extension' : 'Sign in'}</h1>

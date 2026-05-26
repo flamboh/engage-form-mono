@@ -44,6 +44,14 @@ _Avoid_: Incomplete request
 A purchase request with the required facts and documents to fill into Engage.
 _Avoid_: Valid, submitted, filled
 
+**Filled**:
+A ready purchase request that has reached Engage review through the extension.
+_Avoid_: Submitted, approved
+
+**Approved**:
+A purchase request the requester has manually marked as approved after Engage review.
+_Avoid_: Complete, accepted
+
 **Engage**:
 The University of Oregon platform where purchase requests are reviewed and submitted.
 _Avoid_: RTP, form backend
@@ -80,9 +88,9 @@ _Avoid_: Organization, account, workspace
 A reusable Business Purpose source scoped to one Student Organization.
 _Avoid_: Event preset, recurring event record
 
-**Event Details**:
-The event name, date, time, location, and attendance described on a purchase request.
-_Avoid_: Event occurrence, event preset
+**Activity Date**:
+The date of the event or activity connected to a purchase request.
+_Avoid_: Event details, event occurrence
 
 **Document**:
 Evidence attached to a purchase request for Engage review.
@@ -125,7 +133,7 @@ _Avoid_: ID card image, ID file, card upload
 - A **Purchase Request** may have a **Purchaser** when its **Type of Purchase** is **Personal Reimbursement**
 - A **Personal Reimbursement** has exactly one **Purchaser**
 - A **Purchase Request** uses exactly one **Fund Letter**
-- A **Purchase Request** records its own **Event Details**
+- A **Purchase Request** may record one **Activity Date**
 - A **Purchase Request** has exactly one **Business Purpose**
 - A **Personal Reimbursement** has exactly one **Reimbursement Reason**
 - A **Purchase Request** charges exactly one **Budget Line Item**
@@ -136,7 +144,9 @@ _Avoid_: ID card image, ID file, card upload
 - A **Self Reimbursement** requires **Second Approval**
 - A **Personal Reimbursement** requires an **ID Card Document** for its **Purchaser**
 - A **Personal Reimbursement** requires one or more **Receipts**
-- A **Purchase Request** is either **Draft** or **Ready**
+- A **Purchase Request** is **Draft**, **Ready**, or **Approved**
+- A **Filled** purchase request remains **Ready** until manually marked **Approved**
+- An **Approved** purchase request may be reopened as **Filled** or **Ready**
 
 ## Example Dialogue
 
