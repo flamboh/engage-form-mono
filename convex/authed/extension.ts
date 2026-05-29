@@ -1,23 +1,24 @@
-import { v } from 'convex/values';
+import { z } from 'zod/v4';
+import { zid } from 'convex-helpers/server/zod4';
 import { type Id } from '../_generated/dataModel';
 import { assemblePurchase, assertReady, ownerFromIdentity } from '../purchaseModel';
-import { assembledPurchase } from '../purchaseValidators';
+import { assembledPurchase, nullReturn } from '../purchaseZod';
 import { authedMutation, authedQuery } from './helpers';
 
-const readyPurchaseSummary = v.object({
-	id: v.id('purchaseRequests'),
-	status: v.literal('ready'),
-	organization: v.string(),
-	purchaser: v.string(),
-	itemDescription: v.string(),
-	totalAmount: v.number(),
-	updatedAt: v.number(),
-	lastFilledAt: v.union(v.number(), v.null())
+const readyPurchaseSummary = z.object({
+	id: zid('purchaseRequests'),
+	status: z.literal('ready'),
+	organization: z.string(),
+	purchaser: z.string(),
+	itemDescription: z.string(),
+	totalAmount: z.number(),
+	updatedAt: z.number(),
+	lastFilledAt: z.number().nullable()
 });
 
 export const listReadyPurchases = authedQuery({
 	args: {},
-	returns: v.array(readyPurchaseSummary),
+	returns: z.array(readyPurchaseSummary),
 	handler: async (ctx) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const ready = await ctx.db
@@ -42,7 +43,7 @@ export const listReadyPurchases = authedQuery({
 });
 
 export const getReadyPurchaseForFill = authedQuery({
-	args: { id: v.id('purchaseRequests') },
+	args: { id: zid('purchaseRequests') },
 	returns: assembledPurchase,
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
@@ -59,8 +60,8 @@ export const getReadyPurchaseForFill = authedQuery({
 });
 
 export const markReviewReached = authedMutation({
-	args: { id: v.id('purchaseRequests') },
-	returns: v.null(),
+	args: { id: zid('purchaseRequests') },
+	returns: nullReturn,
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await ctx.db.get(args.id as Id<'purchaseRequests'>);

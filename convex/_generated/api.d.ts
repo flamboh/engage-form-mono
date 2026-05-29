@@ -18,6 +18,7 @@ import type * as purchaseCategories from "../purchaseCategories.js";
 import type * as purchaseModel from "../purchaseModel.js";
 import type * as purchaseReadiness from "../purchaseReadiness.js";
 import type * as purchaseValidators from "../purchaseValidators.js";
+import type * as purchaseZod from "../purchaseZod.js";
 
 import type {
   ApiFromModules,
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   purchaseModel: typeof purchaseModel;
   purchaseReadiness: typeof purchaseReadiness;
   purchaseValidators: typeof purchaseValidators;
+  purchaseZod: typeof purchaseZod;
 }>;
 
 /**

@@ -10,10 +10,16 @@ export type TypeOfPurchase = Doc<'purchaseRequests'>['typeOfPurchase'];
 export type DocumentationCategory = Doc<'purchaseRequests'>['documentationCategories'][number];
 export type FundLetter = Doc<'organizations'>['fundLetter'];
 export type BusinessPurposeSource = Doc<'purchaseRequests'>['businessPurposeSource'];
-export type BusinessPurposeVariable = Extract<
-	BusinessPurposeSource['parts'][number],
-	{ kind: 'variable' }
->['variable'];
+export type BusinessPurposeVariable =
+	| 'studentOrganization'
+	| 'purchaser'
+	| 'vendor'
+	| 'itemDescription'
+	| 'totalAmount'
+	| 'recipients'
+	| 'recipientUo95Ids'
+	| 'activityDate'
+	| 'officeLocation';
 
 export type StudentOrganizationDetails = {
 	name: string;
@@ -50,9 +56,6 @@ const businessPurposeVariableLabels: Record<BusinessPurposeVariable, string> = {
 	recipients: 'Recipients',
 	recipientUo95Ids: 'Recipient UO 95 IDs',
 	activityDate: 'Activity Date',
-	activityTime: 'Activity Time',
-	activityLocation: 'Activity Location',
-	estimatedAttendance: 'Estimated Attendance',
 	officeLocation: 'Office Location'
 };
 
@@ -60,7 +63,8 @@ export function formatBusinessPurposeSource(source: BusinessPurposeSource) {
 	return source.parts
 		.map((part) => {
 			if (part.kind === 'text') return part.text;
-			return `{${businessPurposeVariableLabels[part.variable]}}`;
+			const label = businessPurposeVariableLabels[part.variable as BusinessPurposeVariable];
+			return label === undefined ? '' : `{${label}}`;
 		})
 		.join('');
 }

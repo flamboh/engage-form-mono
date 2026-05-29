@@ -170,9 +170,7 @@ export const engageSchema: EngageStepSchema[] = [
 		headingIncludes: ['event open to all students'],
 		fields: [
 			conditionalFileField('upload', (purchase) =>
-				purchase.eventDetails.publicityProofFileId === null
-					? []
-					: [documentById(purchase, purchase.eventDetails.publicityProofFileId)]
+				purchase.publicityFileId === null ? [] : [documentById(purchase, purchase.publicityFileId)]
 			)
 		]
 	},

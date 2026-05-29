@@ -169,7 +169,7 @@ test('creates upload fill plans', () => {
 			labelIncludes: 'upload',
 			files: [
 				samplePurchaseRequest.documents.find(
-					(document) => document.id === samplePurchaseRequest.eventDetails.publicityProofFileId
+					(document) => document.id === samplePurchaseRequest.publicityFileId
 				)
 			]
 		}

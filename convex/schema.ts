@@ -64,10 +64,18 @@ const businessPurposeVariable = v.union(
 	v.literal('recipients'),
 	v.literal('recipientUo95Ids'),
 	v.literal('activityDate'),
+	v.literal('officeLocation'),
+	// Deprecated Business Purpose variables. Kept until old rows are backfilled.
+	v.literal('eventName'),
+	v.literal('eventDate'),
+	v.literal('eventTime'),
+	v.literal('eventLocation'),
+	v.literal('eventEstimatedAttendance'),
 	v.literal('activityTime'),
 	v.literal('activityLocation'),
 	v.literal('estimatedAttendance'),
-	v.literal('officeLocation')
+	v.literal('attendance'),
+	v.literal('location')
 );
 
 const businessPurposeSource = v.object({
@@ -173,7 +181,7 @@ export default defineSchema({
 		}),
 	purchaseRequests: defineTable({
 		owner: v.string(),
-		status: v.union(v.literal('draft'), v.literal('ready')),
+		status: v.union(v.literal('draft'), v.literal('ready'), v.literal('approved')),
 		typeOfPurchase,
 		documentationCategories: v.array(documentationCategory),
 		organizationSourceId: v.union(v.id('organizations'), v.null()),
@@ -181,11 +189,13 @@ export default defineSchema({
 		studentOrganization: studentOrganizationDetails,
 		requester: requesterDetails,
 		purchaser: purchaserDetails,
-		eventName: v.string(),
-		eventDate: v.string(),
-		eventTime: v.string(),
-		eventLocation: v.string(),
-		eventEstimatedAttendance: v.number(),
+		activityDate: v.optional(v.string()),
+		// Deprecated after Activity Date replaced Event Details. Kept optional until old rows are backfilled.
+		eventName: v.optional(v.string()),
+		eventDate: v.optional(v.string()),
+		eventTime: v.optional(v.string()),
+		eventLocation: v.optional(v.string()),
+		eventEstimatedAttendance: v.optional(v.number()),
 		vendor: v.string(),
 		itemDescription: v.string(),
 		totalAmount: v.number(),
@@ -207,6 +217,17 @@ export default defineSchema({
 		updatedAt: v.number(),
 		lastFilledAt: v.union(v.number(), v.null())
 	})
+		.index('by_owner_and_organizationSourceId_and_status_and_updatedAt', [
+			'owner',
+			'organizationSourceId',
+			'status',
+			'updatedAt'
+		])
+		.index('by_owner_and_organizationSourceId_and_updatedAt', [
+			'owner',
+			'organizationSourceId',
+			'updatedAt'
+		])
 		.index('by_owner_and_status_and_updatedAt', ['owner', 'status', 'updatedAt'])
 		.index('by_owner_and_status', ['owner', 'status'])
 		.index('by_owner', ['owner'])

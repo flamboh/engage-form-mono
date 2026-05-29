@@ -1,9 +1,9 @@
 // "authed" queries/mutations/actions are ones that get called from the client, protected by the clerk auth token
 
-import { customAction, customMutation, customQuery } from 'convex-helpers/server/customFunctions';
+import { zCustomAction, zCustomMutation, zCustomQuery } from 'convex-helpers/server/zod4';
 import { action, mutation, query } from '../_generated/server';
 
-export const authedQuery = customQuery(query, {
+export const authedQuery = zCustomQuery(query, {
 	args: {},
 	input: async (ctx) => {
 		const identity = await ctx.auth.getUserIdentity();
@@ -15,7 +15,7 @@ export const authedQuery = customQuery(query, {
 	}
 });
 
-export const authedMutation = customMutation(mutation, {
+export const authedMutation = zCustomMutation(mutation, {
 	args: {},
 	input: async (ctx) => {
 		const identity = await ctx.auth.getUserIdentity();
@@ -27,7 +27,7 @@ export const authedMutation = customMutation(mutation, {
 	}
 });
 
-export const authedAction = customAction(action, {
+export const authedAction = zCustomAction(action, {
 	args: {},
 	input: async (ctx) => {
 		const identity = await ctx.auth.getUserIdentity();

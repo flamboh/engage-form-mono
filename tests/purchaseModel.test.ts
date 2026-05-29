@@ -29,7 +29,7 @@ const request = {
 		fundLetter: 'I',
 		budgetLines: ['Event Expenses'],
 		businessPurposeTemplate:
-			'{org} reimburses {purchaser} for {item} from {vendor} for {amount} at {eventName} on {eventDate} with {attendance} students. Recipient: {recipient} ({recipientUo95}) for {recipientReason}.'
+			'{org} reimburses {purchaser} for {item} from {vendor} for {amount} on {activityDate}. Recipient: {recipient} ({recipientUo95}) for {recipientReason}.'
 	},
 	requester: {
 		id: 'user_1',
@@ -49,11 +49,7 @@ const request = {
 		idCardFrontFileId: 'file_front',
 		idCardBackFileId: 'file_back'
 	},
-	eventName: 'Listening party',
-	eventDate: '2026-05-22',
-	eventTime: '6:30 PM',
-	eventLocation: 'EMU',
-	eventEstimatedAttendance: 50,
+	activityDate: '2026-05-22',
 	vendor: 'Amazon',
 	itemDescription: 'record',
 	totalAmount: 22.98,
@@ -77,10 +73,7 @@ const request = {
 } as Doc<'purchaseRequests'>;
 
 test('coerces cleared numeric draft fields to zero', () => {
-	expect(
-		applyDraftPatch(request, { eventEstimatedAttendance: null, totalAmount: null })
-	).toMatchObject({
-		eventEstimatedAttendance: 0,
+	expect(applyDraftPatch(request, { totalAmount: null })).toMatchObject({
 		totalAmount: 0
 	});
 });
@@ -104,13 +97,13 @@ test('uses the fixed Personal Reimbursement reason for draft patches', () => {
 
 test('renders business purpose from current recorded facts', () => {
 	expect(renderBusinessPurpose(request)).toBe(
-		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 at Listening party on 2026-05-22 with 50 students. Recipient: Aidan (951951840) for winning trivia.'
+		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 on 2026-05-22. Recipient: Aidan (951951840) for winning trivia.'
 	);
 });
 
 test('renders optional recipient tokens without unresolved placeholders when absent', () => {
 	expect(renderBusinessPurpose({ ...request, recipients: [] })).toBe(
-		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 at Listening party on 2026-05-22 with 50 students. Recipient: N/A (N/A) for N/A.'
+		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 on 2026-05-22. Recipient: N/A (N/A) for N/A.'
 	);
 });
 
@@ -124,7 +117,7 @@ test('resolves structured Business Purpose source with plural recipient variable
 	const purchase = {
 		...request,
 		businessPurposeSource: parseBusinessPurposeText(
-			'{Student Organization} reimburses {Purchaser} for {Item Description} from {Vendor} for {Total Amount}. Recipients: {Recipients}. UO 95 IDs: {Recipient UO 95 IDs}. Activity: {Activity Date} at {Activity Time} in {Activity Location} for {Estimated Attendance} students.'
+			'{Student Organization} reimburses {Purchaser} for {Item Description} from {Vendor} for {Total Amount}. Recipients: {Recipients}. UO 95 IDs: {Recipient UO 95 IDs}. Activity: {Activity Date}.'
 		),
 		recipients: [
 			{ name: 'Aidan', uo95: '951951840', reason: 'winning trivia', value: 12 },
@@ -133,7 +126,7 @@ test('resolves structured Business Purpose source with plural recipient variable
 	} as Doc<'purchaseRequests'>;
 
 	expect(renderBusinessPurpose(purchase)).toBe(
-		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98. Recipients: Aidan, Maya. UO 95 IDs: 951951840, 950000002. Activity: 2026-05-22 at 6:30 PM in EMU for 50 students.'
+		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98. Recipients: Aidan, Maya. UO 95 IDs: 951951840, 950000002. Activity: 2026-05-22.'
 	);
 });
 
@@ -347,15 +340,11 @@ test('reports a complete Personal Reimbursement purchase request as Ready', asyn
 	});
 });
 
-test('final common facts do not require event details for Ready', async () => {
+test('final common facts do not require Activity Date for Ready', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
-			eventName: '',
-			eventDate: '',
-			eventTime: '',
-			eventLocation: '',
-			eventEstimatedAttendance: 0,
+			activityDate: '',
 			businessPurposeSource: parseBusinessPurposeText(
 				'Reimburse {Purchaser} for {Item Description} from {Vendor} for {Total Amount}.'
 			),
@@ -684,11 +673,7 @@ test('reports blocked Draft reasons grouped by section', async () => {
 				idCardFrontFileId: '' as never,
 				idCardBackFileId: '' as never
 			},
-			eventName: '',
-			eventDate: '',
-			eventTime: '',
-			eventLocation: '',
-			eventEstimatedAttendance: 0,
+			activityDate: '',
 			vendor: '',
 			itemDescription: '',
 			totalAmount: 0,

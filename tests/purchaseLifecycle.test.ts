@@ -39,11 +39,7 @@ const readyRequest = {
 		idCardFrontFileId: 'file_front',
 		idCardBackFileId: 'file_back'
 	},
-	eventName: 'Listening party',
-	eventDate: '2026-05-22',
-	eventTime: '6:30 PM',
-	eventLocation: 'EMU',
-	eventEstimatedAttendance: 50,
+	activityDate: '2026-05-22',
 	vendor: 'Amazon',
 	itemDescription: 'record',
 	totalAmount: 22.98,

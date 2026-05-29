@@ -147,6 +147,7 @@ _Avoid_: ID card image, ID file, card upload
 - A **Purchase Request** is **Draft**, **Ready**, or **Approved**
 - A **Filled** purchase request remains **Ready** until manually marked **Approved**
 - An **Approved** purchase request may be reopened as **Filled** or **Ready**
+- Editing an **Approved** purchase request returns it to **Ready**
 
 ## Example Dialogue
 

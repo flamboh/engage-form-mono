@@ -13,7 +13,7 @@ export type PurchaseReadiness = {
 	sections: ReadinessSection[];
 };
 
-type PurchaseRequest = Doc<'purchaseRequests'> & {
+type PurchaseRequest = Omit<Doc<'purchaseRequests'>, 'businessPurposeSource'> & {
 	businessPurposeSource?: BusinessPurposeSource;
 	businessPurposeText?: string;
 };
@@ -25,7 +25,7 @@ type PurchaserBelongsToOrganization = (
 ) => Promise<boolean>;
 
 export async function evaluatePurchaseReadiness(
-	request: PurchaseRequest,
+	request: Doc<'purchaseRequests'> & { businessPurposeText?: string },
 	options: {
 		documentExists?: DocumentExists;
 		purchaserBelongsToOrganization?: PurchaserBelongsToOrganization;
@@ -97,7 +97,7 @@ export async function evaluatePurchaseReadiness(
 		add('Purchase details', 'Total amount must be greater than zero.');
 	}
 
-	const businessPurpose = businessPurposeReadiness(request);
+	const businessPurpose = businessPurposeReadiness(request as PurchaseRequest);
 	requireSectionText('Business purpose', businessPurpose.text, 'Business purpose missing.');
 	if (businessPurpose.unresolved) {
 		add('Business purpose', 'Business purpose has unresolved variables.');

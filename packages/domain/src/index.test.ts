@@ -11,18 +11,11 @@ test('sample purchase request is ready', () => {
 	expect(validatePurchaseReadiness(samplePurchaseRequest)).toEqual([]);
 });
 
-test('final common facts do not require event details', () => {
+test('final common facts do not require Activity Date', () => {
 	expect(
 		validatePurchaseReadiness({
 			...samplePurchaseRequest,
-			eventDetails: {
-				name: '',
-				date: '',
-				time: '',
-				location: '',
-				estimatedAttendance: 0,
-				publicityProofFileId: samplePurchaseRequest.eventDetails.publicityProofFileId
-			},
+			activityDate: '',
 			businessPurposeText: 'Album Listening Club wishes to reimburse Oliver Boorstein.'
 		})
 	).toEqual([]);
@@ -140,7 +133,6 @@ test('Merchandise/Apparel and Gifts/Prizes require recipient name, UO 95, and va
 						name: '',
 						uo95: '',
 						reason: '',
-						itemDescription: 'Sticker',
 						value: 0
 					}
 				]
@@ -166,7 +158,6 @@ test('recipient reason, dollar limits, and total matching do not block Ready', (
 					name: 'Prize recipient',
 					uo95: '950000001',
 					reason: '',
-					itemDescription: 'Prize',
 					value: 75
 				}
 			]
@@ -207,7 +198,6 @@ test('reports entered recipients regardless of value', () => {
 				name: 'Sticker recipient',
 				uo95: '950000001',
 				reason: '',
-				itemDescription: 'Sticker',
 				value: 8
 			}
 		]

@@ -22,7 +22,9 @@
 		"convex": "^1.39.1",
 		"convex-helpers": "^0.1.118",
 		"convex-svelte": "^0.0.12",
-		"effect": "^3.21.2"
+		"effect": "^3.21.2",
+		"svelte-dnd-action": "^0.9.69",
+		"zod": "^4.4.3"
 	},
 	"devDependencies": {
 		"@fontsource-variable/outfit": "^5.2.8",
@@ -38,9 +40,11 @@
 		"bits-ui": "^2.16.3",
 		"clsx": "^2.1.1",
 		"convex-vite-plugin": "^0.4.0",
+		"formsnap": "^2.0.1",
 		"shadcn-svelte": "^1.2.7",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
+		"sveltekit-superforms": "^2.30.0",
 		"tailwind-merge": "^3.5.0",
 		"tailwind-variants": "^3.2.2",
 		"tailwindcss": "^4.1.18",

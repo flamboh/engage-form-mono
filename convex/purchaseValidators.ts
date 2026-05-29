@@ -63,9 +63,6 @@ export const businessPurposeVariable = v.union(
 	v.literal('recipients'),
 	v.literal('recipientUo95Ids'),
 	v.literal('activityDate'),
-	v.literal('activityTime'),
-	v.literal('activityLocation'),
-	v.literal('estimatedAttendance'),
 	v.literal('officeLocation')
 );
 
@@ -114,11 +111,7 @@ export const draftPatch = v.object({
 	studentOrganization: v.optional(studentOrganizationDetails),
 	requester: v.optional(requesterDetails),
 	purchaser: v.optional(purchaserDetails),
-	eventName: v.optional(v.string()),
-	eventDate: v.optional(v.string()),
-	eventTime: v.optional(v.string()),
-	eventLocation: v.optional(v.string()),
-	eventEstimatedAttendance: v.optional(v.union(v.number(), v.null())),
+	activityDate: v.optional(v.string()),
 	vendor: v.optional(v.string()),
 	itemDescription: v.optional(v.string()),
 	totalAmount: v.optional(v.union(v.number(), v.null())),
@@ -212,7 +205,7 @@ export const businessPurposeTemplateDoc = v.object({
 export const purchaseRequestDoc = v.object({
 	...systemFields,
 	owner: v.string(),
-	status: v.union(v.literal('draft'), v.literal('ready')),
+	status: v.union(v.literal('draft'), v.literal('ready'), v.literal('approved')),
 	typeOfPurchase,
 	documentationCategories: v.array(documentationCategory),
 	organizationSourceId: v.union(v.id('organizations'), v.null()),
@@ -220,11 +213,7 @@ export const purchaseRequestDoc = v.object({
 	studentOrganization: studentOrganizationDetails,
 	requester: requesterDetails,
 	purchaser: purchaserDetails,
-	eventName: v.string(),
-	eventDate: v.string(),
-	eventTime: v.string(),
-	eventLocation: v.string(),
-	eventEstimatedAttendance: v.number(),
+	activityDate: v.string(),
 	vendor: v.string(),
 	itemDescription: v.string(),
 	totalAmount: v.number(),
@@ -265,7 +254,7 @@ export const documentPayload = v.object({
 
 export const assembledPurchase = v.object({
 	id: v.id('purchaseRequests'),
-	status: v.union(v.literal('draft'), v.literal('ready')),
+	status: v.union(v.literal('draft'), v.literal('ready'), v.literal('approved')),
 	typeOfPurchase,
 	documentationCategories: v.array(documentationCategory),
 	organization: v.object({
@@ -293,14 +282,7 @@ export const assembledPurchase = v.object({
 		idCardFrontFileId: v.id('files'),
 		idCardBackFileId: v.union(v.id('files'), v.null())
 	}),
-	eventDetails: v.object({
-		name: v.string(),
-		date: v.string(),
-		time: v.string(),
-		location: v.string(),
-		estimatedAttendance: v.number(),
-		publicityProofFileId: v.union(v.id('files'), v.null())
-	}),
+	activityDate: v.string(),
 	vendor: v.string(),
 	itemDescription: v.string(),
 	totalAmount: v.number(),

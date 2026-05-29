@@ -22,9 +22,11 @@ export { evaluatePurchaseReadiness, unresolvedToken } from './purchaseReadiness'
 export { effectiveDocumentationCategories } from './purchaseCategories';
 
 export type Recipient = { name: string; uo95: string; reason: string; value: number };
-type BusinessPurposeRequest = Doc<'purchaseRequests'> & {
+type BusinessPurposeRequest = Omit<Doc<'purchaseRequests'>, 'businessPurposeSource'> & {
 	businessPurposeSource?: BusinessPurposeSource;
 	businessPurposeText?: string;
+	activityDate?: string;
+	eventDate?: string;
 };
 
 export type PurchaserRef = { kind: 'self' } | { kind: 'purchaser'; purchaserId: Id<'purchasers'> };
@@ -83,11 +85,7 @@ export type DraftPatch = Partial<{
 	studentOrganization: StudentOrganizationDetails;
 	requester: RequesterDetails;
 	purchaser: PurchaserDetails;
-	eventName: string;
-	eventDate: string;
-	eventTime: string;
-	eventLocation: string;
-	eventEstimatedAttendance: number | null;
+	activityDate: string;
 	vendor: string;
 	itemDescription: string;
 	totalAmount: number | null;
@@ -173,14 +171,8 @@ export function applyDraftPatch(
 				: purchase.studentOrganization,
 		requester: patch.requester !== undefined ? patch.requester : purchase.requester,
 		purchaser: patch.purchaser !== undefined ? patch.purchaser : purchase.purchaser,
-		eventName: patch.eventName !== undefined ? patch.eventName : purchase.eventName,
-		eventDate: patch.eventDate !== undefined ? patch.eventDate : purchase.eventDate,
-		eventTime: patch.eventTime !== undefined ? patch.eventTime : purchase.eventTime,
-		eventLocation: patch.eventLocation !== undefined ? patch.eventLocation : purchase.eventLocation,
-		eventEstimatedAttendance:
-			patch.eventEstimatedAttendance !== undefined
-				? numberInput(patch.eventEstimatedAttendance)
-				: purchase.eventEstimatedAttendance,
+		activityDate:
+			patch.activityDate !== undefined ? patch.activityDate : activityDateForPurchase(purchase),
 		vendor: patch.vendor !== undefined ? patch.vendor : purchase.vendor,
 		itemDescription:
 			patch.itemDescription !== undefined ? patch.itemDescription : purchase.itemDescription,
@@ -303,14 +295,7 @@ export function renderBusinessPurpose(request: BusinessPurposeRequest) {
 		recipient: firstRecipient?.name || 'N/A',
 		recipientUo95: firstRecipient?.uo95 || 'N/A',
 		recipientReason: firstRecipient?.reason || 'N/A',
-		eventName: request.eventName || '{eventName}',
-		eventDate: request.eventDate || '{eventDate}',
-		eventTime: request.eventTime || '{eventTime}',
-		eventLocation: request.eventLocation || '{eventLocation}',
-		attendance:
-			request.eventEstimatedAttendance > 0
-				? request.eventEstimatedAttendance.toString()
-				: '{attendance}'
+		activityDate: activityDateForPurchase(request) || '{activityDate}'
 	};
 	return Object.entries(values).reduce(
 		(text, [key, value]) => text.replaceAll(`{${key}}`, value),
@@ -352,16 +337,17 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		organization: orgPayload(request),
 		requester: request.requester,
 		purchaser: request.purchaser,
-		eventDetails: eventDetailsPayload(request, request.publicityFileId),
+		activityDate: activityDateForPurchase(request),
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
 		budgetLineItem: request.budgetLineItem,
 		reimbursementReason: reimbursementReasonFor(request.typeOfPurchase),
-		businessPurposeText: renderBusinessPurpose(request),
+		businessPurposeText: renderBusinessPurpose(request as BusinessPurposeRequest),
 		requesterIsPurchaser: purchaserIsSelf,
 		receiptFileIds: request.receiptFileIds,
 		secondApprovalFileId: purchaserIsSelf ? request.secondApprovalFileId : null,
+		publicityFileId: request.publicityFileId,
 		cateringWaiverFileId: request.cateringWaiverFileId,
 		printingInvoiceFileId: request.printingInvoiceFileId,
 		brandApprovalFileId: request.brandApprovalFileId,
@@ -445,6 +431,12 @@ export function studentOrganizationDetails(org: Doc<'organizations'>): StudentOr
 	};
 }
 
+export function activityDateForPurchase(
+	request: Pick<Doc<'purchaseRequests'>, 'activityDate'> & { eventDate?: string }
+) {
+	return request.activityDate ?? request.eventDate ?? '';
+}
+
 function orgPayload(request: Doc<'purchaseRequests'>) {
 	return {
 		id: request.organizationSourceId,
@@ -452,20 +444,6 @@ function orgPayload(request: Doc<'purchaseRequests'>) {
 		indexNumber: request.studentOrganization.indexNumber,
 		fundLetter: request.studentOrganization.fundLetter,
 		budgetLines: request.studentOrganization.budgetLines
-	};
-}
-
-function eventDetailsPayload(
-	request: Doc<'purchaseRequests'>,
-	publicityFileId: Id<'files'> | null
-) {
-	return {
-		name: request.eventName,
-		date: request.eventDate,
-		time: request.eventTime,
-		location: request.eventLocation,
-		estimatedAttendance: request.eventEstimatedAttendance,
-		publicityProofFileId: publicityFileId
 	};
 }
 

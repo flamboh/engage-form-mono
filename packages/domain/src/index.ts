@@ -13,7 +13,7 @@ export type DocumentKind =
 	| 'brand_approval'
 	| 'recipient_list';
 
-export type PurchaseStatus = 'draft' | 'ready';
+export type PurchaseStatus = 'draft' | 'ready' | 'approved';
 export type TypeOfPurchase =
 	| 'personal_reimbursement'
 	| 'internal_po'
@@ -36,7 +36,7 @@ export type StudentOrganization = {
 	name: string;
 	indexNumber: string;
 	fundLetter: FundLetter;
-	defaultBudgetLineItem: string;
+	budgetLines: string[];
 };
 
 export type Requester = {
@@ -52,15 +52,6 @@ export type Requester = {
 
 export type Purchaser = Requester;
 
-export type EventDetails = {
-	name: string;
-	date: string;
-	time: string;
-	location: string;
-	estimatedAttendance: number;
-	publicityProofFileId: string | null;
-};
-
 export type Document = {
 	id: string;
 	kind: DocumentKind;
@@ -75,7 +66,6 @@ export type Document = {
 export type Recipient = {
 	name: string;
 	uo95: string;
-	itemDescription: string;
 	value: number;
 	reason: string;
 };
@@ -88,7 +78,7 @@ export type PurchaseRequest = {
 	organization: StudentOrganization;
 	requester: Requester;
 	purchaser: Purchaser;
-	eventDetails: EventDetails;
+	activityDate: string;
 	vendor: string;
 	itemDescription: string;
 	totalAmount: number;
@@ -98,6 +88,7 @@ export type PurchaseRequest = {
 	requesterIsPurchaser: boolean;
 	receiptFileIds: string[];
 	secondApprovalFileId: string | null;
+	publicityFileId: string | null;
 	cateringWaiverFileId: string | null;
 	printingInvoiceFileId: string | null;
 	brandApprovalFileId: string | null;
@@ -123,7 +114,7 @@ export const samplePurchaseRequest: PurchaseRequest = {
 		name: 'Album Listening Club',
 		indexNumber: 'OS353i',
 		fundLetter: 'I',
-		defaultBudgetLineItem: 'Event Expenses'
+		budgetLines: ['Event Expenses']
 	},
 	requester: {
 		id: 'person_oliver',
@@ -145,14 +136,7 @@ export const samplePurchaseRequest: PurchaseRequest = {
 		idCardFrontFileId: 'file_id_front',
 		idCardBackFileId: 'file_id_back'
 	},
-	eventDetails: {
-		name: 'Album Listening Club weekly event',
-		date: '04/21',
-		time: '6:30pm',
-		location: 'McKenzie 240A',
-		estimatedAttendance: 50,
-		publicityProofFileId: 'file_publicity'
-	},
+	activityDate: '2026-04-21',
 	vendor: 'Amazon',
 	itemDescription: 'Mort Garson music vinyl',
 	totalAmount: 22.98,
@@ -163,6 +147,7 @@ export const samplePurchaseRequest: PurchaseRequest = {
 	requesterIsPurchaser: true,
 	receiptFileIds: ['file_receipt'],
 	secondApprovalFileId: 'file_approval',
+	publicityFileId: 'file_publicity',
 	cateringWaiverFileId: null,
 	printingInvoiceFileId: null,
 	brandApprovalFileId: null,
@@ -173,7 +158,6 @@ export const samplePurchaseRequest: PurchaseRequest = {
 		{
 			name: "Aidan O'Donnell",
 			uo95: '951951840',
-			itemDescription: 'Mort Garson music vinyl',
 			value: 22.98,
 			reason: 'winning the Kahoot! Trivia'
 		}
@@ -316,8 +300,8 @@ export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 	if (documentationCategories.includes('asuo_funds')) {
 		requireText(
 			issues,
-			'eventDetails.publicityProofFileId',
-			purchaseRequest.eventDetails.publicityProofFileId ?? '',
+			'publicityFileId',
+			purchaseRequest.publicityFileId ?? '',
 			'Publicity proof missing.'
 		);
 	}

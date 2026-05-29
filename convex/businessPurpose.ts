@@ -9,9 +9,6 @@ export const businessPurposeVariables = [
 	{ id: 'recipients', label: 'Recipients' },
 	{ id: 'recipientUo95Ids', label: 'Recipient UO 95 IDs' },
 	{ id: 'activityDate', label: 'Activity Date' },
-	{ id: 'activityTime', label: 'Activity Time' },
-	{ id: 'activityLocation', label: 'Activity Location' },
-	{ id: 'estimatedAttendance', label: 'Estimated Attendance' },
 	{ id: 'officeLocation', label: 'Office Location' }
 ] as const;
 
@@ -20,6 +17,10 @@ export type BusinessPurposePart =
 	| { kind: 'text'; text: string }
 	| { kind: 'variable'; variable: BusinessPurposeVariable };
 export type BusinessPurposeSource = { parts: BusinessPurposePart[] };
+type BusinessPurposeRequest = Omit<Doc<'purchaseRequests'>, 'businessPurposeSource'> & {
+	activityDate?: string;
+	eventDate?: string;
+};
 
 const variablesByLabel: Map<string, (typeof businessPurposeVariables)[number]> = new Map(
 	businessPurposeVariables.map((variable) => [variable.label, variable])
@@ -67,7 +68,7 @@ export function validateBusinessPurposeSource(source: BusinessPurposeSource) {
 
 export function resolveBusinessPurpose(
 	source: BusinessPurposeSource,
-	request: Doc<'purchaseRequests'>
+	request: BusinessPurposeRequest
 ) {
 	validateBusinessPurposeSource(source);
 	const unresolved = new Set<BusinessPurposeVariable>();
@@ -91,7 +92,7 @@ function labelForVariable(variable: BusinessPurposeVariable) {
 	return entry.label;
 }
 
-function valueForVariable(variable: BusinessPurposeVariable, request: Doc<'purchaseRequests'>) {
+function valueForVariable(variable: BusinessPurposeVariable, request: BusinessPurposeRequest) {
 	switch (variable) {
 		case 'studentOrganization':
 			return textValue(request.studentOrganization.name);
@@ -108,15 +109,7 @@ function valueForVariable(variable: BusinessPurposeVariable, request: Doc<'purch
 		case 'recipientUo95Ids':
 			return listValue(request.recipients.map((recipient) => recipient.uo95));
 		case 'activityDate':
-			return textValue(request.eventDate);
-		case 'activityTime':
-			return textValue(request.eventTime);
-		case 'activityLocation':
-			return textValue(request.eventLocation);
-		case 'estimatedAttendance':
-			return request.eventEstimatedAttendance > 0
-				? request.eventEstimatedAttendance.toString()
-				: null;
+			return textValue(activityDateForPurchase(request));
 		case 'officeLocation':
 			return textValue(request.officeLocation);
 	}
@@ -134,4 +127,8 @@ function textValue(value: string) {
 
 function formatMoney(value: number) {
 	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+function activityDateForPurchase(request: BusinessPurposeRequest) {
+	return request.activityDate ?? request.eventDate ?? '';
 }
