@@ -151,18 +151,6 @@ export const organizationDoc = z.object({
 	updatedAt: z.number()
 });
 
-export const fileDoc = z.object({
-	_id: zid('files'),
-	_creationTime: z.number(),
-	owner: z.string(),
-	kind: fileKind,
-	r2Key: z.string(),
-	filename: z.string(),
-	contentType: z.string(),
-	size: z.number(),
-	createdAt: z.number()
-});
-
 export const purchaserDoc = z.object({
 	_id: zid('purchasers'),
 	_creationTime: z.number(),
@@ -304,5 +292,3 @@ export const assembledPurchase = z.object({
 	recipients: z.array(recipient),
 	documents: z.array(documentPayload)
 });
-
-export type WizardSnapshot = z.infer<typeof wizardSnapshot>;

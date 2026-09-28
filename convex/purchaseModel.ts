@@ -6,8 +6,7 @@ import { fileDownloadUrl } from './files';
 import {
 	parseBusinessPurposeText,
 	resolveBusinessPurpose,
-	validateBusinessPurposeText,
-	type BusinessPurposeSource
+	validateBusinessPurposeText
 } from './businessPurpose';
 export {
 	formatBusinessPurposeSource,
@@ -20,9 +19,6 @@ export {
 export { evaluatePurchaseReadiness } from './purchaseReadiness';
 export { effectiveDocumentationCategories } from './purchaseCategories';
 
-export type Recipient = { name: string; uo95: string; reason: string; value: number };
-
-export type PurchaserRef = { kind: 'self' } | { kind: 'purchaser'; purchaserId: Id<'purchasers'> };
 export type TypeOfPurchase =
 	| 'personal_reimbursement'
 	| 'internal_po'
@@ -30,13 +26,6 @@ export type TypeOfPurchase =
 	| 'pcard'
 	| 'co_sponsorship_payment'
 	| 'service_agreement_or_purchase_order_for_service';
-export type DocumentationCategory =
-	| 'asuo_funds'
-	| 'food'
-	| 'printing_services'
-	| 'office_supplies_goods'
-	| 'merchandise_apparel'
-	| 'gifts_prizes';
 export type StudentOrganizationDetails = {
 	name: string;
 	indexNumber: string;
@@ -69,35 +58,6 @@ export type PurchaserDetails = {
 };
 
 type Ctx = QueryCtx | MutationCtx;
-
-export type DraftPatch = Partial<{
-	typeOfPurchase: TypeOfPurchase;
-	documentationCategories: DocumentationCategory[];
-	organizationSourceId: Id<'organizations'> | null;
-	purchaserSource: PurchaserRef;
-	studentOrganization: StudentOrganizationDetails;
-	requester: RequesterDetails;
-	purchaser: PurchaserDetails;
-	activityDate: string;
-	vendor: string;
-	itemDescription: string;
-	totalAmount: number | null;
-	budgetLineItem: string;
-	reimbursementReason: string;
-	businessPurposeSource: BusinessPurposeSource;
-	businessPurposeText: string;
-	businessPurposeTouched: boolean;
-	receiptFileIds: Id<'files'>[];
-	secondApprovalFileId: Id<'files'> | null;
-	publicityFileId: Id<'files'> | null;
-	cateringWaiverFileId: Id<'files'> | null;
-	printingInvoiceFileId: Id<'files'> | null;
-	brandApprovalFileId: Id<'files'> | null;
-	officeLocation: string;
-	buildingManagerApprovalFileId: Id<'files'> | null;
-	computerPriceQuoteFileId: Id<'files'> | null;
-	recipients: Recipient[];
-}>;
 
 const fixedPersonalReimbursementReason = 'Other processes are too slow.';
 
@@ -137,20 +97,6 @@ export async function requireUserProfile(ctx: Ctx, owner: string) {
 	const user = await getUserProfile(ctx, owner);
 	if (user === null) throw new Error('Profile missing.');
 	return user;
-}
-
-export function applyDraftPatch(
-	purchase: Doc<'purchaseRequests'>,
-	patch: DraftPatch
-): Partial<Doc<'purchaseRequests'>> {
-	const typeOfPurchase =
-		patch.typeOfPurchase !== undefined ? patch.typeOfPurchase : purchase.typeOfPurchase;
-	const next = draftPatchFields(purchase, patch, typeOfPurchase);
-	const touched = Object.keys(patch).map((key) =>
-		key === 'businessPurposeText' ? 'businessPurposeSource' : key
-	);
-	const fieldSources = userFieldSources(purchase, next, touched);
-	return fieldSources === purchase.fieldSources ? next : { ...next, fieldSources };
 }
 
 const userTrackedFields = [
@@ -253,84 +199,6 @@ export function previousRequestDefaults(
 		sources.reimbursementReason = 'default';
 	}
 	return { ...defaults, fieldSources: sources };
-}
-
-function draftPatchFields(
-	purchase: Doc<'purchaseRequests'>,
-	patch: DraftPatch,
-	typeOfPurchase: TypeOfPurchase
-): Partial<Doc<'purchaseRequests'>> {
-	return {
-		status: 'draft',
-		typeOfPurchase,
-		documentationCategories:
-			patch.documentationCategories !== undefined
-				? patch.documentationCategories
-				: purchase.documentationCategories,
-		organizationSourceId:
-			patch.organizationSourceId !== undefined
-				? patch.organizationSourceId
-				: purchase.organizationSourceId,
-		purchaserSource:
-			patch.purchaserSource !== undefined ? patch.purchaserSource : purchase.purchaserSource,
-		studentOrganization:
-			patch.studentOrganization !== undefined
-				? patch.studentOrganization
-				: purchase.studentOrganization,
-		requester: patch.requester !== undefined ? patch.requester : purchase.requester,
-		purchaser: patch.purchaser !== undefined ? patch.purchaser : purchase.purchaser,
-		activityDate:
-			patch.activityDate !== undefined ? patch.activityDate : purchase.activityDate,
-		vendor: patch.vendor !== undefined ? patch.vendor : purchase.vendor,
-		itemDescription:
-			patch.itemDescription !== undefined ? patch.itemDescription : purchase.itemDescription,
-		totalAmount:
-			patch.totalAmount !== undefined ? numberInput(patch.totalAmount) : purchase.totalAmount,
-		budgetLineItem:
-			patch.budgetLineItem !== undefined ? patch.budgetLineItem : purchase.budgetLineItem,
-		reimbursementReason: reimbursementReasonFor(typeOfPurchase),
-		businessPurposeSource:
-			patch.businessPurposeSource ??
-			(patch.businessPurposeText !== undefined
-				? parseBusinessPurposeText(patch.businessPurposeText)
-				: purchase.businessPurposeSource),
-		businessPurposeTouched:
-			patch.businessPurposeTouched !== undefined
-				? patch.businessPurposeTouched
-				: purchase.businessPurposeTouched,
-		receiptFileIds:
-			patch.receiptFileIds !== undefined ? patch.receiptFileIds : purchase.receiptFileIds,
-		secondApprovalFileId:
-			patch.secondApprovalFileId !== undefined
-				? patch.secondApprovalFileId
-				: purchase.secondApprovalFileId,
-		publicityFileId:
-			patch.publicityFileId !== undefined ? patch.publicityFileId : purchase.publicityFileId,
-		cateringWaiverFileId:
-			patch.cateringWaiverFileId !== undefined
-				? patch.cateringWaiverFileId
-				: purchase.cateringWaiverFileId,
-		printingInvoiceFileId:
-			patch.printingInvoiceFileId !== undefined
-				? patch.printingInvoiceFileId
-				: purchase.printingInvoiceFileId,
-		brandApprovalFileId:
-			patch.brandApprovalFileId !== undefined
-				? patch.brandApprovalFileId
-				: purchase.brandApprovalFileId,
-		officeLocation:
-			patch.officeLocation !== undefined ? patch.officeLocation : purchase.officeLocation,
-		buildingManagerApprovalFileId:
-			patch.buildingManagerApprovalFileId !== undefined
-				? patch.buildingManagerApprovalFileId
-				: purchase.buildingManagerApprovalFileId,
-		computerPriceQuoteFileId:
-			patch.computerPriceQuoteFileId !== undefined
-				? patch.computerPriceQuoteFileId
-				: purchase.computerPriceQuoteFileId,
-		recipients: patch.recipients !== undefined ? patch.recipients : purchase.recipients,
-		updatedAt: Date.now()
-	};
 }
 
 export function businessPurposeTemplateFields(
@@ -538,10 +406,6 @@ function orgPayload(request: Doc<'purchaseRequests'>) {
 		fundLetter: request.studentOrganization.fundLetter,
 		budgetLines: request.studentOrganization.budgetLines
 	};
-}
-
-function numberInput(value: number | null) {
-	return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function reimbursementReasonFor(typeOfPurchase: TypeOfPurchase) {

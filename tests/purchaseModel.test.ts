@@ -1,7 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
 import {
-	applyDraftPatch,
 	assemblePurchase,
 	assertReady,
 	businessPurposeTemplateDraftPatch,
@@ -78,29 +77,6 @@ const request = {
 	updatedAt: 1,
 	lastFilledAt: null
 } as Doc<'purchaseRequests'>;
-
-test('coerces cleared numeric draft fields to zero', () => {
-	expect(applyDraftPatch(request, { totalAmount: null })).toMatchObject({
-		totalAmount: 0
-	});
-});
-
-test('records Type of Purchase draft changes', () => {
-	expect(applyDraftPatch(request, { typeOfPurchase: 'personal_reimbursement' })).toMatchObject({
-		typeOfPurchase: 'personal_reimbursement'
-	});
-});
-
-test('uses the fixed Personal Reimbursement reason for draft patches', () => {
-	expect(
-		applyDraftPatch(request, {
-			typeOfPurchase: 'personal_reimbursement',
-			reimbursementReason: 'Custom reason'
-		})
-	).toMatchObject({
-		reimbursementReason: 'Other processes are too slow.'
-	});
-});
 
 test('renders business purpose from current recorded facts', () => {
 	expect(renderBusinessPurpose(request)).toBe(
@@ -183,18 +159,6 @@ test('freeform Business Purpose text stays allowed', async () => {
 	).resolves.toEqual({
 		ready: true,
 		sections: []
-	});
-});
-
-test('draft patch stores Business Purpose source instead of resolved text', () => {
-	expect(
-		applyDraftPatch(request, {
-			businessPurposeText: 'Reimburse {Purchaser}.',
-			businessPurposeTouched: true
-		})
-	).toMatchObject({
-		businessPurposeSource: parseBusinessPurposeText('Reimburse {Purchaser}.'),
-		businessPurposeTouched: true
 	});
 });
 

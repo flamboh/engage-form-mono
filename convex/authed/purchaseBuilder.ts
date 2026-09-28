@@ -5,8 +5,6 @@ import { internal } from '../_generated/api';
 import { authedMutation, authedQuery } from './helpers';
 import { deleteStoredFile, issueUploadTicket, requireOwnedKey } from '../files';
 import {
-	applyDraftPatch,
-	assertReady,
 	changedSnapshotPatch,
 	businessPurposeTemplateDraftPatch,
 	businessPurposeTemplateFields,
@@ -23,11 +21,9 @@ import {
 	userAsPurchaserDetails,
 	userAsRequesterDetails,
 	userFieldSources,
-	validateBusinessPurposeText,
-	type DraftPatch
+	validateBusinessPurposeText
 } from '../purchaseModel';
 import {
-	businessPurposeTemplateDoc,
 	fileKind,
 	fundLetter,
 	nullReturn,
@@ -161,48 +157,6 @@ export const listSaved = authedQuery({
 	}
 });
 
-export const listPurchases = authedQuery({
-	args: {},
-	returns: z.array(purchaseRequestDoc),
-	handler: async (ctx) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const purchases = await ctx.db
-			.query('purchaseRequests')
-			.withIndex('by_owner', (q) => q.eq('owner', owner))
-			.order('desc')
-			.take(50);
-		return purchases;
-	}
-});
-
-export const listOrganizationPurchases = authedQuery({
-	args: { organizationId: zid('organizations') },
-	returns: z.array(purchaseRequestDoc),
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
-		const purchases = await ctx.db
-			.query('purchaseRequests')
-			.withIndex('by_owner_and_organizationSourceId_and_updatedAt', (q) =>
-				q.eq('owner', owner).eq('organizationSourceId', args.organizationId)
-			)
-			.order('desc')
-			.take(100);
-		return purchases;
-	}
-});
-
-export const getDraft = authedQuery({
-	args: { id: zid('purchaseRequests') },
-	returns: purchaseRequestDoc,
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		return await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-	}
-});
-
-export const getPurchase = getDraft;
-
 export const createUploadTicket = authedMutation({
 	args: { contentType: z.string(), size: z.number() },
 	returns: z.object({ uploadUrl: z.string(), r2Key: z.string() }),
@@ -303,55 +257,6 @@ export const upsertPurchaser = authedMutation({
 	}
 });
 
-export const searchBusinessPurposeTemplates = authedQuery({
-	args: {
-		organizationId: zid('organizations'),
-		query: z.string(),
-		includeArchived: z.boolean().optional()
-	},
-	returns: z.array(businessPurposeTemplateDoc),
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
-		const includeArchived = args.includeArchived ?? false;
-		const query = args.query.trim();
-		if (query === '') {
-			if (includeArchived) {
-				return await ctx.db
-					.query('businessPurposeTemplates')
-					.withIndex('by_owner_and_organizationId', (q) =>
-						q.eq('owner', owner).eq('organizationId', args.organizationId)
-					)
-					.take(50);
-			}
-			return await ctx.db
-				.query('businessPurposeTemplates')
-				.withIndex('by_owner_and_organizationId_and_archived', (q) =>
-					q.eq('owner', owner).eq('organizationId', args.organizationId).eq('archived', false)
-				)
-				.take(50);
-		}
-		if (includeArchived) {
-			return await ctx.db
-				.query('businessPurposeTemplates')
-				.withSearchIndex('search_text', (q) =>
-					q.search('searchText', query).eq('owner', owner).eq('organizationId', args.organizationId)
-				)
-				.take(50);
-		}
-		return await ctx.db
-			.query('businessPurposeTemplates')
-			.withSearchIndex('search_text', (q) =>
-				q
-					.search('searchText', query)
-					.eq('owner', owner)
-					.eq('organizationId', args.organizationId)
-					.eq('archived', false)
-			)
-			.take(50);
-	}
-});
-
 export const upsertBusinessPurposeTemplate = authedMutation({
 	args: {
 		id: zid('businessPurposeTemplates').nullable(),
@@ -422,17 +327,6 @@ export const setArchived = authedMutation({
 		await requireOwnedDoc(ctx, args.table, args.id as Id<typeof args.table>, owner);
 		await ctx.db.patch(args.id, { archived: args.archived, updatedAt: Date.now() });
 		return null;
-	}
-});
-
-export const createDraft = authedMutation({
-	args: {},
-	returns: zid('purchaseRequests'),
-	handler: async (ctx) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const requester = await requireUserProfile(ctx, owner);
-		const now = Date.now();
-		return await ctx.db.insert('purchaseRequests', emptyDraft(owner, requester, now));
 	}
 });
 
@@ -512,33 +406,6 @@ function withoutDocumentFields<T extends object>(patch: T) {
 	return rest as Omit<T, (typeof documentFields)[number]>;
 }
 
-export const scheduleDraftAutosave = authedMutation({
-	args: { id: zid('purchaseRequests'), patch: z.record(z.string(), z.any()) },
-	returns: nullReturn,
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		await ctx.db.patch(args.id, applyDraftPatch(request, args.patch as DraftPatch));
-		return null;
-	}
-});
-
-export const markReady = authedMutation({
-	args: { id: zid('purchaseRequests'), patch: z.record(z.string(), z.any()).optional() },
-	returns: nullReturn,
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		if (args.patch !== undefined) {
-			await ctx.db.patch(args.id, applyDraftPatch(request, args.patch as DraftPatch));
-		}
-		const updated = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		await assertReady(ctx, updated);
-		await ctx.db.patch(args.id, { status: 'ready', updatedAt: Date.now() });
-		return null;
-	}
-});
-
 export const markApproved = authedMutation({
 	args: { id: zid('purchaseRequests') },
 	returns: nullReturn,
@@ -547,21 +414,6 @@ export const markApproved = authedMutation({
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
 		if (request.status !== 'ready') throw new Error('Only ready requests can be approved.');
 		await ctx.db.patch(args.id, { status: 'approved', updatedAt: Date.now() });
-		return null;
-	}
-});
-
-export const markFilled = authedMutation({
-	args: { id: zid('purchaseRequests') },
-	returns: nullReturn,
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		if (request.status !== 'ready') throw new Error('Only ready requests can be filled.');
-		await ctx.db.patch(args.id, {
-			lastFilledAt: Date.now(),
-			updatedAt: Date.now()
-		});
 		return null;
 	}
 });

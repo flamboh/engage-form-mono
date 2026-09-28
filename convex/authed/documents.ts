@@ -68,23 +68,6 @@ export const getRequestView = authedQuery({
 	}
 });
 
-export const attachDocuments = authedMutation({
-	args: {
-		purchaseRequestId: zid('purchaseRequests'),
-		fileIds: z.array(zid('files')),
-		slot: z.union([documentSlot, z.literal('auto')])
-	},
-	returns: nullReturn,
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
-		requireEditableDocuments(request);
-		for (const fileId of args.fileIds) await requireOwnedDoc(ctx, 'files', fileId, owner);
-		await attachFiles(ctx, request, args.fileIds, args.slot);
-		return null;
-	}
-});
-
 export const attachUpload = authedMutation({
 	args: {
 		purchaseRequestId: zid('purchaseRequests'),
