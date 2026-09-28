@@ -1,0 +1,19 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "engage-form-web",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2026-09-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"routes": [{ "pattern": "forms.oli.boo", "custom_domain": true }],
+	"r2_buckets": [{ "binding": "FILES", "bucket_name": "engage-form-files" }],
+	"observability": { "enabled": true },
+	"vars": {
+		"PUBLIC_CONVEX_URL": "https://rosy-panda-20.convex.cloud",
+		"PUBLIC_CONVEX_SITE_URL": "https://rosy-panda-20.convex.site",
+		"PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_c3Vubnktc25pcGUtNjAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+	}
+}

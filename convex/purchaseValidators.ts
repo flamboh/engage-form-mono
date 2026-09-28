@@ -259,7 +259,7 @@ export const documentPayload = v.object({
 	filename: v.string(),
 	contentType: v.string(),
 	size: v.number(),
-	storageKey: v.id('_storage'),
+	storageKey: v.string(),
 	url: v.union(v.string(), v.null())
 });
 

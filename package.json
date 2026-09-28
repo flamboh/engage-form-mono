@@ -21,7 +21,10 @@
 		"dev:tailscale": "concurrently -n web,convex -c blue,magenta \"bun run --cwd apps/web dev -- --host 0.0.0.0 --port 3676\" \"bunx convex dev\"",
 		"dev:web": "bun run --cwd apps/web dev -- --port 3676",
 		"dev:convex": "bunx convex dev",
-		"dev:ext": "bun run --cwd apps/extension dev"
+		"dev:ext": "bun run --cwd apps/extension dev",
+		"deploy:web": "bun run --cwd apps/web deploy",
+		"deploy:convex": "bunx convex deploy",
+		"deploy": "bun run deploy:convex && bun run deploy:web"
 	},
 	"dependencies": {
 		"@ikhrustalev/convex-debouncer": "^0.1.2",

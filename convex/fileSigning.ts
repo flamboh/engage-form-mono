@@ -1,4 +1,4 @@
-export type FileAction = 'put' | 'get';
+export type FileAction = 'put' | 'get' | 'delete';
 
 export type FileTicket = {
 	action: FileAction;
@@ -53,13 +53,22 @@ export async function verifyFileTicket(
 
 export async function signedFileUrl(baseUrl: string, secret: string, ticket: FileTicket) {
 	const signature = await signFileTicket(secret, ticket);
-	const url = new URL(`/api/files/${ticket.action === 'put' ? 'upload' : 'object'}`, baseUrl);
+	const url = new URL(filePath(ticket.action), baseUrl);
 	url.searchParams.set('key', ticket.key);
 	url.searchParams.set('exp', String(ticket.expiresAt));
 	if (ticket.contentType !== undefined) url.searchParams.set('ct', ticket.contentType);
 	if (ticket.maxSize !== undefined) url.searchParams.set('max', String(ticket.maxSize));
 	url.searchParams.set('sig', signature);
 	return url.toString();
+}
+
+export function filePath(action: FileAction) {
+	return action === 'put' ? '/api/files/upload' : '/api/files/object';
+}
+
+export function ownsKey(prefix: string, key: string) {
+	const rest = key.startsWith(`${prefix}/`) ? key.slice(prefix.length + 1) : '';
+	return /^[0-9a-f-]{36}$/.test(rest);
 }
 
 export function ticketFromUrl(

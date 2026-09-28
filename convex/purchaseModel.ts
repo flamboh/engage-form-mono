@@ -6,6 +6,7 @@ import {
 	unresolvedToken
 } from './purchaseReadiness';
 import { effectiveDocumentationCategories } from './purchaseCategories';
+import { fileDownloadUrl } from './files';
 import {
 	parseBusinessPurposeText,
 	resolveBusinessPurpose,
@@ -382,7 +383,7 @@ async function documentPayload(ctx: Ctx, id: Id<'files'>, owner: string) {
 		contentType: doc.contentType,
 		size: doc.size,
 		storageKey: doc.r2Key ?? doc.storageId ?? '',
-		url: doc.storageId === undefined ? null : await ctx.storage.getUrl(doc.storageId)
+		url: await fileDownloadUrl(ctx, doc)
 	};
 }
 

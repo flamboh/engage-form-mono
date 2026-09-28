@@ -20,18 +20,26 @@ export async function uploadFile(
 	kind: Kind,
 	file: File
 ): Promise<Id<'files'>> {
-	const uploadUrl = await convexMutation(session, api.authed.purchaseBuilder.generateUploadUrl, {});
+	const contentType = file.type || 'application/octet-stream';
+	const { uploadUrl, r2Key } = await convexMutation(
+		session,
+		api.authed.purchaseBuilder.createUploadTicket,
+		{ contentType, size: file.size }
+	);
 	const response = await fetch(uploadUrl, {
-		method: 'POST',
-		headers: { 'Content-Type': file.type || 'application/octet-stream' },
+		method: 'PUT',
+		headers: {
+			'Content-Type': 'application/octet-stream',
+			'X-File-Name': encodeURIComponent(file.name)
+		},
 		body: file
 	});
-	const { storageId } = (await response.json()) as { storageId: Id<'_storage'> };
+	if (!response.ok) throw new Error(`Upload failed with ${response.status}.`);
 	return await convexMutation(session, api.authed.purchaseBuilder.saveFile, {
 		kind,
-		storageId,
+		r2Key,
 		filename: file.name,
-		contentType: file.type || 'application/octet-stream',
+		contentType,
 		size: file.size
 	});
 }

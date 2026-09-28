@@ -259,7 +259,7 @@ export const documentPayload = z.object({
 	filename: z.string(),
 	contentType: z.string(),
 	size: z.number(),
-	storageKey: zid('_storage'),
+	storageKey: z.string(),
 	url: z.string().nullable()
 });
 
