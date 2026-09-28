@@ -229,6 +229,14 @@ export default defineSchema({
 		buildingManagerApprovalFileId: v.union(v.id('files'), v.null()),
 		computerPriceQuoteFileId: v.union(v.id('files'), v.null()),
 		recipients: v.array(recipient),
+		receiptChecks: v.optional(
+			v.array(
+				v.object({
+					field: v.union(v.literal('vendor'), v.literal('itemDescription')),
+					value: v.string()
+				})
+			)
+		),
 		createdAt: v.number(),
 		updatedAt: v.number(),
 		lastFilledAt: v.union(v.number(), v.null()),

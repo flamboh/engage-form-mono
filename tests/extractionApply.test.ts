@@ -6,6 +6,7 @@ import {
 	isCurrentAttempt,
 	placeDocument,
 	receiptFieldsPatch,
+	receiptRemovalChecks,
 	requestDocuments,
 	requestReviews,
 	resolveReviewPatch,
@@ -386,4 +387,66 @@ test('documents that failed or read nothing are flagged for the user', () => {
 test('failed receipts are left out of totals while successful ones still sum', () => {
 	const failed = extraction(receiptB, { status: 'failed' });
 	expect(receiptFieldsPatch(draft, [bigbox, failed]).totalAmount).toBe(28.48);
+});
+
+test('removing a receipt asks to check user-typed store and items that mention it', () => {
+	const typed = {
+		...draft,
+		receiptFileIds: [receiptA],
+		vendor: 'Bigbox and Corner Records',
+		itemDescription: 'New LP for the listening party',
+		fieldSources: { vendor: 'user', itemDescription: 'user' }
+	} as Doc<'purchaseRequests'>;
+	const checks = receiptRemovalChecks(typed, corner);
+	expect(checks).toEqual([
+		{ field: 'vendor', value: 'Bigbox and Corner Records' },
+		{ field: 'itemDescription', value: 'New LP for the listening party' }
+	]);
+	const removed = { ...typed, receiptChecks: checks } as Doc<'purchaseRequests'>;
+	expect(requestReviews(removed, [bigbox])).toEqual([
+		{ field: 'vendor', value: 'Bigbox and Corner Records', alternatives: ['Bigbox Wholesale'] },
+		{
+			field: 'itemDescription',
+			value: 'New LP for the listening party',
+			alternatives: ['KS Trail Mix, KS Cocoa Bites']
+		}
+	]);
+});
+
+test('removal checks skip unrelated, receipt-filled, and already edited fields', () => {
+	const typed = {
+		...draft,
+		vendor: 'Bigbox Wholesale',
+		itemDescription: 'Snacks',
+		fieldSources: { vendor: 'user', itemDescription: 'receipt' }
+	} as Doc<'purchaseRequests'>;
+	expect(receiptRemovalChecks(typed, corner)).toEqual([]);
+	expect(receiptRemovalChecks(typed, { status: 'failed', vendor: null, items: [] })).toEqual([
+		{ field: 'vendor', value: 'Bigbox Wholesale' }
+	]);
+	const edited = {
+		...typed,
+		vendor: 'Bigbox',
+		receiptChecks: [{ field: 'vendor', value: 'Bigbox Wholesale' }]
+	} as Doc<'purchaseRequests'>;
+	expect(requestReviews(edited, [])).toEqual([]);
+});
+
+test('confirming a store or items clears its removal check', () => {
+	const flagged = {
+		...draft,
+		vendor: 'Corner Records',
+		itemDescription: 'LP',
+		fieldSources: { vendor: 'user', itemDescription: 'user' },
+		receiptChecks: [
+			{ field: 'vendor', value: 'Corner Records' },
+			{ field: 'itemDescription', value: 'LP' }
+		]
+	} as Doc<'purchaseRequests'>;
+	expect(resolveReviewPatch(flagged, 'itemDescription', ' Vinyl LP ')).toEqual({
+		itemDescription: 'Vinyl LP',
+		fieldSources: { vendor: 'user', itemDescription: 'user' },
+		receiptChecks: [{ field: 'vendor', value: 'Corner Records' }]
+	});
+	expect(() => resolveReviewPatch(flagged, 'itemDescription', ' ')).toThrow('Items missing.');
 });

@@ -36,18 +36,36 @@ const suggestedCategory = v.union(
 const attemptArg = v.optional(v.number());
 
 export const extractFile = internalAction({
-	args: { extractionId: v.id('extractions'), classify: v.boolean(), attempt: attemptArg },
+	args: {
+		extractionId: v.id('extractions'),
+		fileId: v.optional(v.id('files')),
+		classify: v.boolean(),
+		attempt: attemptArg
+	},
 	handler: async (ctx, args) => {
+		const actionStart = Date.now();
+		const elapsed = () => Date.now() - actionStart;
+		const prefetch = args.fileId === undefined ? null : readFileBytes(ctx, args.fileId);
+		prefetch?.catch(() => undefined);
 		const started = await ctx.runMutation(internal.extraction.jobs.startExtraction, {
 			extractionId: args.extractionId,
 			attempt: args.attempt
 		});
 		if (started === null) return null;
+		const timing: Record<string, number> = {
+			queued: actionStart - started.queuedAt,
+			claimed: elapsed()
+		};
 		try {
 			const env = extractionEnv();
-			const { file, bytes } = await readFileBytes(ctx, started.fileId);
+			const { file, bytes } = await (prefetch !== null && args.fileId === started.fileId
+				? prefetch
+				: readFileBytes(ctx, started.fileId));
+			timing.downloaded = elapsed();
 			const text = await readDocumentText(new Uint8Array(bytes), file.contentType, env);
+			timing.read = elapsed();
 			const result = await extractDocument(text, env);
+			timing.extracted = elapsed();
 			const purchaseRequestId = await ctx.runMutation(internal.extraction.jobs.finishExtraction, {
 				extractionId: args.extractionId,
 				attempt: args.attempt,
@@ -55,9 +73,16 @@ export const extractFile = internalAction({
 				textSource: text.source,
 				result: storedResult(result)
 			});
-			if (purchaseRequestId === null || !isReceipt(result, args.classify)) return null;
-			await refreshDecisions(ctx, env, purchaseRequestId, text.lines.join('\n')).catch((error) =>
-				console.error('Default decisions failed', error)
+			timing.applied = elapsed();
+			if (purchaseRequestId !== null && isReceipt(result, args.classify)) {
+				await refreshDecisions(ctx, env, purchaseRequestId, text.lines.join('\n')).catch((error) =>
+					console.error('Default decisions failed', error)
+				);
+				timing.decided = elapsed();
+			}
+			console.log(
+				'Extraction timing',
+				JSON.stringify({ ...timing, source: text.source, bytes: bytes.byteLength })
 			);
 		} catch (error) {
 			await ctx.runMutation(internal.extraction.jobs.failExtraction, {
@@ -107,7 +132,7 @@ export const startExtraction = internalMutation({
 		if (extraction === null || extraction.status === 'done') return null;
 		if (!isCurrentAttempt(extraction, args.attempt)) return null;
 		await ctx.db.patch(args.extractionId, { status: 'running', updatedAt: Date.now() });
-		return { fileId: extraction.fileId };
+		return { fileId: extraction.fileId, queuedAt: extraction.updatedAt };
 	}
 });
 
