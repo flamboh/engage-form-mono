@@ -205,25 +205,6 @@ export function changedSnapshotPatch<Patch extends object>(
 	) as Partial<Patch>;
 }
 
-export function keepFilledFields<Patch extends Partial<Doc<'purchaseRequests'>>>(
-	request: Doc<'purchaseRequests'>,
-	patch: Patch
-): Patch {
-	const sources = request.fieldSources ?? {};
-	const automatic = (field: string) => sources[field] === 'receipt' || sources[field] === 'default';
-	const kept = { ...patch };
-	for (const field of ['vendor', 'itemDescription'] as const) {
-		if (kept[field] === '' && request[field] !== '' && automatic(field)) delete kept[field];
-	}
-	if (kept.totalAmount === 0 && request.totalAmount > 0 && automatic('totalAmount')) {
-		delete kept.totalAmount;
-	}
-	if (kept.activityDate === '' && request.activityDate !== '' && automatic('activityDate')) {
-		delete kept.activityDate;
-	}
-	return kept;
-}
-
 export type PreviousRequestDefaults = Pick<
 	Doc<'purchaseRequests'>,
 	| 'purchaserSource'

@@ -12,7 +12,6 @@ import {
 	businessPurposeTemplateFields,
 	businessPurposeTemplateUpdateFields,
 	getUserProfile,
-	keepFilledFields,
 	ownerFromIdentity,
 	parseBusinessPurposeText,
 	previousRequestDefaults,
@@ -476,17 +475,14 @@ export const saveDraftSnapshot = authedMutation({
 	args: {
 		id: zid('purchaseRequests'),
 		snapshot: wizardSnapshot,
-		changedFields: z.array(z.string()).optional()
+		changedFields: z.array(z.string())
 	},
 	returns: nullReturn,
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		const changedFields = args.changedFields;
 		const patch = withoutDocumentFields(
-			changedFields === undefined
-				? keepFilledFields(request, snapshotPatch(args.snapshot))
-				: changedSnapshotPatch(snapshotPatch(args.snapshot), changedFields)
+			changedSnapshotPatch(snapshotPatch(args.snapshot), args.changedFields)
 		);
 		if (Object.keys(patch).every((key) => key === 'updatedAt')) return null;
 		const fieldSources = userFieldSources(request, patch);
