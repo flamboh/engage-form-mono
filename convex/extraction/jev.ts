@@ -160,7 +160,7 @@ export function parseDocumentResponse(
 	const vendor = vendorField(answers.vendor, vendorNames);
 	const items = plan.itemLines.filter((line, index) => {
 		const answer = answers[`item_${index}`];
-		if (vendor !== null && sameVendor(vendorKey(cleanVendor(line)), vendorKey(vendor.value))) {
+		if (vendor !== null && namesVendor(line, vendor.value)) {
 			return false;
 		}
 		return answer?.type === 'noul' && answer.noul >= itemThreshold;
@@ -228,6 +228,11 @@ function vendorField(
 		alternatives,
 		confidence
 	};
+}
+
+function namesVendor(line: string, vendor: string) {
+	const key = vendorKey(cleanVendor(line));
+	return key !== '' && vendorKey(vendor).startsWith(key);
 }
 
 function sameVendor(left: string, right: string) {
