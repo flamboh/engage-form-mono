@@ -1,9 +1,11 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
 import { getReadyPurchaseForFill, listReadyPurchases } from '../convex/authed/extension';
-import { getDraft } from '../convex/authed/purchaseBuilder';
-import { saveDraftPatch } from '../convex/internal/purchaseAutosave';
+import { saveDraftSnapshot } from '../convex/authed/purchaseBuilder';
 import { parseBusinessPurposeText } from '../convex/purchaseModel';
+
+vi.stubEnv('FILES_BASE_URL', 'https://files.example');
+vi.stubEnv('FILES_SIGNING_SECRET', 'test-secret');
 
 const readyRequest = {
 	_id: 'purchase_1',
@@ -62,44 +64,26 @@ const readyRequest = {
 	lastFilledAt: null
 } as Doc<'purchaseRequests'>;
 
-test('Ready Purchase Requests can be opened in the editor', async () => {
-	await expect(
-		getDraft._handler(editorCtx(readyRequest) as never, {
-			id: readyRequest._id
-		})
-	).resolves.toMatchObject({
-		_id: readyRequest._id,
-		status: 'ready'
-	});
-});
-
-test('fact edits return Ready Purchase Requests to Draft', async () => {
+test('snapshot saves patch only changed fields and reopen Approved requests as Ready', async () => {
 	const patches: Partial<Doc<'purchaseRequests'>>[] = [];
 
-	await saveDraftPatch._handler(saveCtx(readyRequest, patches) as never, {
-		id: readyRequest._id,
-		owner: readyRequest.owner,
-		patch: { itemDescription: 'cassette' }
-	});
+	await saveDraftSnapshot._handler(
+		saveCtx({ ...readyRequest, status: 'approved' }, patches) as never,
+		{
+			id: readyRequest._id,
+			snapshot: { ...snapshotOf(readyRequest), vendor: '', itemDescription: 'cassette' },
+			changedFields: ['itemDescription']
+		}
+	);
 
-	expect(patches).toHaveLength(1);
-	expect(patches[0]).toMatchObject({ status: 'draft', itemDescription: 'cassette' });
-});
-
-test('document edits return Ready Purchase Requests to Draft', async () => {
-	const patches: Partial<Doc<'purchaseRequests'>>[] = [];
-
-	await saveDraftPatch._handler(saveCtx(readyRequest, patches) as never, {
-		id: readyRequest._id,
-		owner: readyRequest.owner,
-		patch: { receiptFileIds: ['file_receipt_2' as never] }
-	});
-
-	expect(patches).toHaveLength(1);
-	expect(patches[0]).toMatchObject({
-		status: 'draft',
-		receiptFileIds: ['file_receipt_2']
-	});
+	expect(patches).toEqual([
+		{
+			itemDescription: 'cassette',
+			updatedAt: expect.any(Number),
+			fieldSources: { itemDescription: 'user' },
+			status: 'ready'
+		}
+	]);
 });
 
 test('extension lists only Ready Purchase Requests', async () => {
@@ -146,20 +130,12 @@ test('extension fill payload includes resolved Business Purpose plain text', asy
 
 function saveCtx(request: Doc<'purchaseRequests'>, patches: Partial<Doc<'purchaseRequests'>>[]) {
 	return {
+		auth: { getUserIdentity: async () => ({ tokenIdentifier: 'owner' }) },
 		db: {
 			get: async () => request,
 			patch: async (_id: string, patch: Partial<Doc<'purchaseRequests'>>) => {
 				patches.push(patch);
 			}
-		}
-	};
-}
-
-function editorCtx(request: Doc<'purchaseRequests'>) {
-	return {
-		auth: { getUserIdentity: async () => ({ tokenIdentifier: 'owner' }) },
-		db: {
-			get: async () => request
 		}
 	};
 }
@@ -193,9 +169,6 @@ function extensionGetCtx(request: Doc<'purchaseRequests'>) {
 				if (id.startsWith('file_')) return file(id);
 				return null;
 			}
-		},
-		storage: {
-			getUrl: async (storageId: string) => `https://files.example/${storageId}`
 		}
 	};
 }
@@ -226,7 +199,36 @@ function file(id: string) {
 		filename: `${id}.pdf`,
 		contentType: 'application/pdf',
 		size: 1,
-		storageId: `storage_${id}`,
+		r2Key: `owner/${id}`,
 		createdAt: 1
+	};
+}
+
+function snapshotOf(request: Doc<'purchaseRequests'>) {
+	return {
+		typeOfPurchase: request.typeOfPurchase,
+		documentationCategories: request.documentationCategories,
+		purchaserSource: request.purchaserSource,
+		purchaser: request.purchaser,
+		activityDate: request.activityDate,
+		activityTime: '',
+		activityLocation: '',
+		vendor: request.vendor,
+		itemDescription: request.itemDescription,
+		totalAmount: request.totalAmount,
+		budgetLineItem: request.budgetLineItem,
+		businessPurposeText: 'Reimburse {Purchaser} for {Item Description}.',
+		businessPurposeTouched: request.businessPurposeTouched,
+		purpose: '',
+		receiptFileIds: request.receiptFileIds,
+		secondApprovalFileId: request.secondApprovalFileId,
+		publicityFileId: request.publicityFileId,
+		cateringWaiverFileId: request.cateringWaiverFileId,
+		printingInvoiceFileId: request.printingInvoiceFileId,
+		brandApprovalFileId: request.brandApprovalFileId,
+		officeLocation: request.officeLocation,
+		buildingManagerApprovalFileId: request.buildingManagerApprovalFileId,
+		computerPriceQuoteFileId: request.computerPriceQuoteFileId,
+		recipients: request.recipients
 	};
 }

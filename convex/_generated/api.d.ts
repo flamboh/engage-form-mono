@@ -11,7 +11,6 @@
 import type * as approvalEmail from "../approvalEmail.js";
 import type * as authed_approvers from "../authed/approvers.js";
 import type * as authed_board from "../authed/board.js";
-import type * as authed_demo from "../authed/demo.js";
 import type * as authed_documents from "../authed/documents.js";
 import type * as authed_extension from "../authed/extension.js";
 import type * as authed_helpers from "../authed/helpers.js";
@@ -27,11 +26,9 @@ import type * as extraction_pipeline from "../extraction/pipeline.js";
 import type * as extraction_textract from "../extraction/textract.js";
 import type * as fileSigning from "../fileSigning.js";
 import type * as files from "../files.js";
-import type * as internal_purchaseAutosave from "../internal/purchaseAutosave.js";
 import type * as purchaseCategories from "../purchaseCategories.js";
 import type * as purchaseModel from "../purchaseModel.js";
 import type * as purchaseReadiness from "../purchaseReadiness.js";
-import type * as purchaseValidators from "../purchaseValidators.js";
 import type * as purchaseZod from "../purchaseZod.js";
 import type * as requestView from "../requestView.js";
 
@@ -45,7 +42,6 @@ declare const fullApi: ApiFromModules<{
   approvalEmail: typeof approvalEmail;
   "authed/approvers": typeof authed_approvers;
   "authed/board": typeof authed_board;
-  "authed/demo": typeof authed_demo;
   "authed/documents": typeof authed_documents;
   "authed/extension": typeof authed_extension;
   "authed/helpers": typeof authed_helpers;
@@ -61,11 +57,9 @@ declare const fullApi: ApiFromModules<{
   "extraction/textract": typeof extraction_textract;
   fileSigning: typeof fileSigning;
   files: typeof files;
-  "internal/purchaseAutosave": typeof internal_purchaseAutosave;
   purchaseCategories: typeof purchaseCategories;
   purchaseModel: typeof purchaseModel;
   purchaseReadiness: typeof purchaseReadiness;
-  purchaseValidators: typeof purchaseValidators;
   purchaseZod: typeof purchaseZod;
   requestView: typeof requestView;
 }>;
@@ -96,6 +90,4 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {
-  debouncer: import("@ikhrustalev/convex-debouncer/_generated/component.js").ComponentApi<"debouncer">;
-};
+export declare const components: {};

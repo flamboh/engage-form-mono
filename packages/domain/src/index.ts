@@ -58,7 +58,6 @@ export type Document = {
 	filename: string;
 	contentType: string;
 	size: number;
-	storageKey: string;
 	url?: string | null;
 	dataUrl?: string;
 };
@@ -387,7 +386,6 @@ function document(id: string, kind: DocumentKind, filename: string, contentType:
 		kind,
 		filename,
 		contentType,
-		size: 1,
-		storageKey: `sample/${filename}`
+		size: 1
 	};
 }

@@ -43,12 +43,8 @@ test('Time and Location resolve in the Business Purpose', () => {
 	});
 });
 
-test('Time and Location fall back to legacy event fields and stay unresolved when empty', () => {
+test('Time and Location stay unresolved when empty', () => {
 	const source = parseBusinessPurposeText('At {Time} in {Location}.');
-	const legacy = { eventTime: '18:30', eventLocation: 'Knight Library' } as unknown as Parameters<
-		typeof resolveBusinessPurpose
-	>[1];
-	expect(resolveBusinessPurpose(source, legacy).text).toBe('At 6:30 PM in Knight Library.');
 	const empty = {} as unknown as Parameters<typeof resolveBusinessPurpose>[1];
 	expect(resolveBusinessPurpose(source, empty).unresolved).toEqual([
 		'activityTime',

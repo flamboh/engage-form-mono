@@ -1,5 +1,4 @@
 import type { Doc, Id } from './_generated/dataModel';
-import type { BusinessPurposeSource } from './businessPurpose';
 import { effectiveDocumentationCategories } from './purchaseCategories';
 import { resolveBusinessPurpose } from './businessPurpose';
 
@@ -13,11 +12,6 @@ export type PurchaseReadiness = {
 	sections: ReadinessSection[];
 };
 
-type PurchaseRequest = Omit<Doc<'purchaseRequests'>, 'businessPurposeSource'> & {
-	businessPurposeSource?: BusinessPurposeSource;
-	businessPurposeText?: string;
-};
-
 type DocumentExists = (id: Id<'files'>) => Promise<boolean>;
 type PurchaserBelongsToOrganization = (
 	purchaserId: Id<'purchasers'>,
@@ -25,7 +19,7 @@ type PurchaserBelongsToOrganization = (
 ) => Promise<boolean>;
 
 export async function evaluatePurchaseReadiness(
-	request: Doc<'purchaseRequests'> & { businessPurposeText?: string },
+	request: Doc<'purchaseRequests'>,
 	options: {
 		documentExists?: DocumentExists;
 		purchaserBelongsToOrganization?: PurchaserBelongsToOrganization;
@@ -98,7 +92,7 @@ export async function evaluatePurchaseReadiness(
 		add('Purchase details', 'Total amount must be greater than zero.');
 	}
 
-	const businessPurpose = businessPurposeReadiness(request as PurchaseRequest);
+	const businessPurpose = businessPurposeReadiness(request);
 	requireSectionText('Business purpose', businessPurpose.text, 'Business purpose missing.');
 	if (businessPurpose.unresolved) {
 		add('Business purpose', 'Business purpose has unresolved variables.');
@@ -200,13 +194,9 @@ export async function evaluatePurchaseReadiness(
 	return { ready: sections.length === 0, sections };
 }
 
-function businessPurposeReadiness(request: PurchaseRequest) {
-	if (request.businessPurposeSource !== undefined) {
-		const resolved = resolveBusinessPurpose(request.businessPurposeSource, request);
-		return { text: resolved.text, unresolved: resolved.unresolved.length > 0 };
-	}
-	const text = request.businessPurposeText ?? '';
-	return { text, unresolved: unresolvedToken(text) };
+function businessPurposeReadiness(request: Doc<'purchaseRequests'>) {
+	const resolved = resolveBusinessPurpose(request.businessPurposeSource, request);
+	return { text: resolved.text, unresolved: resolved.unresolved.length > 0 };
 }
 
 export function formatReadinessBlockers(readiness: PurchaseReadiness) {
@@ -214,10 +204,6 @@ export function formatReadinessBlockers(readiness: PurchaseReadiness) {
 		'Purchase request is not ready.',
 		...readiness.sections.map((section) => `${section.section}: ${section.reasons.join(' ')}`)
 	].join('\n');
-}
-
-export function unresolvedToken(value: string) {
-	return /\{[A-Za-z][A-Za-z0-9]*\}/.test(value);
 }
 
 async function requireOwnedDocument(

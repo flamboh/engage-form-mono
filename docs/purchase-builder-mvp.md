@@ -29,11 +29,12 @@ Out of scope:
 
 ## App Routes
 
-- `/app`: dashboard with recent purchase requests and start-new action
-- `/app/purchase/new`: single long-page purchase builder
+- `/app`: Student Organization picker
+- `/app/org/[organizationId]`: board with the organization's purchase requests and receipt drop to start a new one
+- `/app/org/[organizationId]/purchase/[purchaseRequestId]`: purchase request page
 - `/app/saved`: one page for student organizations, purchasers, and Business Purpose Templates
 
-The builder may create autofill sources inline. Autofill sources can also be managed from `/app/saved`.
+The request page may create autofill sources inline. Autofill sources can also be managed from `/app/saved`.
 
 ## Autofill Sources
 
@@ -77,17 +78,15 @@ Request fields:
 - Student Organization
 - Requester
 - Purchaser, defaulting to the requester
-- Event name
-- Event date
-- Event time
-- Event location
-- Estimated attendance
+- Activity date
+- Time and location, optional
+- Purpose
 - Vendor
 - Item description
 - Total amount
 - Budget Line Item
 - Reimbursement reason
-- Business purpose text
+- Business purpose source
 - `businessPurposeTouched`
 - Recipients
 - Receipt documents, up to three
@@ -96,30 +95,26 @@ Request fields:
 - Status: `draft`, `ready`
 - `lastFilledAt`
 
-Drafts are created immediately and autosaved through Convex debounced mutations. Discarding a draft hard deletes the draft and synchronously deletes purchase-request-local uploaded documents. Saved purchaser ID card documents are not deleted by draft discard.
+Drafts are created immediately and autosaved by sending the latest snapshot with the list of changed fields. The server applies only the changed fields. Discarding a draft hard deletes the draft and its purchase-request-local uploaded documents. Saved purchaser ID card documents are not deleted by draft discard.
 
 ## Business Purpose
 
-Business purpose is explicit text, initialized from the organization's template.
+Business purpose is stored as a source of text and variables, initialized from the organization's template and resolved from the request's facts when read.
 
-Supported template tokens:
+Supported variables:
 
-- `{org}`
-- `{requester}`
-- `{purchaser}`
-- `{vendor}`
-- `{item}`
-- `{amount}`
-- `{recipient}`
-- `{recipientUo95}`
-- `{recipientReason}`
-- `{eventName}`
-- `{eventDate}`
-- `{eventTime}`
-- `{eventLocation}`
-- `{attendance}`
-
-Business purpose regenerates while `businessPurposeTouched` is false. Once the user edits it, the text is preserved. A regenerate action resets from the current template and variables.
+- `{Student Organization}`
+- `{Purchaser}`
+- `{Vendor}`
+- `{Item Description}`
+- `{Total Amount}`
+- `{Recipients}`
+- `{Recipient UO 95 IDs}`
+- `{Activity Date}`
+- `{Time}`
+- `{Location}`
+- `{Office Location}`
+- `{Purpose}`
 
 Missing variables remain visible as token text. Unresolved tokens block ready status.
 
@@ -138,7 +133,7 @@ The item description is global for the purchase. Recipient values should sum to 
 
 ## Documents
 
-MVP accepts any document type and records filename, content type, size, and Convex storage ID.
+MVP accepts any document type and records filename, content type, size, and R2 key.
 
 Reusable documents:
 
@@ -159,18 +154,13 @@ Ready status is blocked unless all required data exists:
 - Student Organization selected
 - Requester recorded
 - Purchaser selected
-- Event name
-- Event date
-- Event time
-- Event location
-- Estimated attendance greater than zero
 - Vendor
 - Item description
 - Total amount greater than zero
 - Budget Line Item
 - Reimbursement reason
 - Business purpose text
-- No unresolved business purpose tokens
+- No unresolved business purpose variables
 - At least one recipient
 - Recipient name, UO 95, reason, and value
 - Each recipient value under `$50`
@@ -198,7 +188,7 @@ The extension background fetches document blobs in extension context and caches 
 
 ## Engage Mapping
 
-The builder hides Engage page structure. Fill logic maps the Purchase Request model to the existing Engage fill plan.
+The web app hides Engage page structure. Fill logic maps the Purchase Request model to the existing Engage fill plan.
 
 Requester fields fill Engage requestor fields. Purchaser fields fill reimbursement recipient fields, address, and ID uploads.
 

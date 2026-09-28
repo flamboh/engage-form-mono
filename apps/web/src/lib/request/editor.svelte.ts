@@ -1,9 +1,8 @@
 import type { Doc, Id } from '$convex/_generated/dataModel';
 import type { Approver } from '$convex/approvalEmail';
-import { mentionsPurpose, withPurpose } from '$convex/businessPurpose';
+import { formatBusinessPurposeSource, mentionsPurpose, withPurpose } from '$convex/businessPurpose';
 import type { DocumentSlot, RequestView } from '$convex/requestView';
 import {
-	formatBusinessPurposeSource,
 	savedPurchaserDetails,
 	userAsPurchaser,
 	type DocumentationCategory,

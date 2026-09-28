@@ -12,7 +12,7 @@ export const freshPreviewUrl = authedQuery({
 		const file = await ctx.db.get(args.fileId);
 		if (file === null || file.owner !== owner) return null;
 		try {
-			return await fileDownloadUrl(ctx, file);
+			return await fileDownloadUrl(file);
 		} catch {
 			return null;
 		}

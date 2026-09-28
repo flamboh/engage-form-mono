@@ -179,8 +179,7 @@ test('creates upload fill plans', () => {
 		...samplePurchaseRequest.documents[0],
 		id: 'file_catering_waiver',
 		kind: 'catering_waiver' as const,
-		filename: 'catering-waiver.pdf',
-		storageKey: 'storage_catering_waiver'
+		filename: 'catering-waiver.pdf'
 	};
 	expect(
 		createFillPlan('cateringWaiver', {
@@ -213,7 +212,6 @@ test('skips optional second ID card upload when only one ID card document exists
 				filename: 'id-card.pdf',
 				contentType: 'application/pdf',
 				size: 1,
-				storageKey: 'storage_id_document',
 				url: 'https://files.example/id-card.pdf'
 			}
 		]

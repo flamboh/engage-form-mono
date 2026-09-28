@@ -7,3 +7,7 @@ The purchase wizard will use one shared Zod schema for its editable draft shape,
 - Wizard form validation and Convex argument validation can share the same field shape.
 - Readiness remains separate domain validation because it depends on conditional rules and document ownership.
 - Convex mutations still patch stored documents, but their client contract accepts the latest editable snapshot.
+
+## Update
+
+Superseded in part: saves now send the snapshot together with the fields the user changed, and the server applies only those fields. A stale snapshot can no longer erase values filled from a receipt.

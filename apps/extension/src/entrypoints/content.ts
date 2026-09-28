@@ -28,7 +28,6 @@ const runActiveMessage = 'Engage Form is already filling this page.';
 type UploadDocument = {
 	filename: string;
 	contentType: string;
-	storageKey: string;
 	dataUrl?: string;
 };
 
@@ -427,7 +426,8 @@ async function assignFiles(
 	const transfer = new DataTransfer();
 
 	for (const file of files) {
-		const response = await fetch(file.dataUrl ?? browser.runtime.getURL(file.storageKey as never));
+		if (file.dataUrl === undefined) return uploadMiss(`Upload asset missing: ${file.filename}.`);
+		const response = await fetch(file.dataUrl);
 		if (!response.ok) return uploadMiss(`Upload asset missing: ${file.filename}.`);
 
 		transfer.items.add(
