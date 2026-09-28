@@ -19,7 +19,8 @@ export type BusinessPurposeVariable =
 	| 'recipients'
 	| 'recipientUo95Ids'
 	| 'activityDate'
-	| 'officeLocation';
+	| 'officeLocation'
+	| 'purpose';
 
 export type StudentOrganizationDetails = {
 	name: string;
@@ -56,7 +57,8 @@ const businessPurposeVariableLabels: Record<BusinessPurposeVariable, string> = {
 	recipients: 'Recipients',
 	recipientUo95Ids: 'Recipient UO 95 IDs',
 	activityDate: 'Activity Date',
-	officeLocation: 'Office Location'
+	officeLocation: 'Office Location',
+	purpose: 'Purpose'
 };
 
 export function formatBusinessPurposeSource(source: BusinessPurposeSource) {

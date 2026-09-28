@@ -8,6 +8,7 @@
 	import { errorMessage } from '$lib/app/styles';
 	import ReceiptDrop from '$lib/board/ReceiptDrop.svelte';
 	import RequestRow from '$lib/board/RequestRow.svelte';
+	import { prefetchRequest } from '$lib/request/prefetch';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
 	import { startUploads, uploadsFor } from '$lib/uploads.svelte';
 	import { useConvexClient, useQuery } from 'convex-svelte';
@@ -17,6 +18,8 @@
 	const organizationId = $derived(page.params.organizationId as Id<'organizations'>);
 	const boardQuery = useQuery(api.authed.board.organizationBoard, () => ({ organizationId }));
 	const board = $derived(boardQuery.data);
+	const pendingFillQuery = useQuery(api.authed.extension.getPendingFill, () => ({}));
+	const fillingId = $derived(pendingFillQuery.data?.purchaseRequestId ?? null);
 
 	let starting = $state(false);
 	let busyId = $state<Id<'purchaseRequests'> | null>(null);
@@ -30,10 +33,12 @@
 		starting = true;
 		error = '';
 		try {
-			const id = await client.mutation(api.authed.purchaseBuilder.createDraftForOrganization, {
+			const created = client.mutation(api.authed.purchaseBuilder.createDraftForOrganization, {
 				organizationId
 			});
-			if (files.length > 0) void startUploads(session, id, files, 'auto');
+			if (files.length > 0) startUploads(session, created, files, 'auto');
+			const id = await created;
+			prefetchRequest(client, id, organizationId);
 			await goto(requestHref(id));
 		} catch (err) {
 			error = errorMessage(err);
@@ -43,6 +48,7 @@
 	}
 
 	async function fillOnEngage(item: BoardItem) {
+		if (busyId !== null) return;
 		const tab = window.open('about:blank', '_blank');
 		busyId = item.id;
 		error = '';
@@ -158,14 +164,27 @@
 					<ul class="divide-y divide-stone-200 border-y border-stone-200">
 						{#each board.readyToFill as item (item.id)}
 							<RequestRow {item} href={requestHref(item.id)}>
-								<button
-									class="inline-flex h-10 items-center rounded-full bg-[#154733] px-4 text-sm font-medium text-white hover:bg-[#0f3526] disabled:opacity-60"
-									type="button"
-									disabled={busyId === item.id}
-									onclick={() => fillOnEngage(item)}
-								>
-									Fill on Engage
-								</button>
+								{#if fillingId === item.id && busyId !== item.id}
+									<span class="flex items-center gap-2 text-sm text-stone-700" role="status">
+										<span class="filling h-2 w-2 shrink-0 rounded-full bg-[#154733]" aria-hidden="true"
+										></span>
+										Filling on Engage…
+										<button
+											class="text-stone-500 underline hover:text-stone-900"
+											type="button"
+											onclick={() => fillOnEngage(item)}>Open again</button
+										>
+									</span>
+								{:else}
+									<button
+										class="inline-flex h-10 items-center rounded-full bg-[#154733] px-4 text-sm font-medium text-white hover:bg-[#0f3526] disabled:opacity-60"
+										type="button"
+										disabled={busyId !== null}
+										onclick={() => fillOnEngage(item)}
+									>
+										{busyId === item.id ? 'Opening Engage…' : 'Fill on Engage'}
+									</button>
+								{/if}
 							</RequestRow>
 						{/each}
 					</ul>
@@ -232,3 +251,21 @@
 		{/if}
 	</main>
 </AppShell>
+
+<style>
+	.filling {
+		animation: filling 1.4s ease-in-out infinite;
+	}
+
+	@keyframes filling {
+		50% {
+			opacity: 0.25;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.filling {
+			animation: none;
+		}
+	}
+</style>

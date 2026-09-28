@@ -6,24 +6,25 @@
 	let {
 		items,
 		reading,
-		deferReceiptFields,
+		ready,
 		onjump,
 		onfiles
 	}: {
 		items: LeftItem[];
 		reading: boolean;
-		deferReceiptFields: boolean;
+		ready: boolean;
 		onjump: (item: LeftItem) => void;
 		onfiles: (files: File[], slot: UploadSlot) => void;
 	} = $props();
 
-	const visible = $derived(
-		deferReceiptFields ? items.filter((item) => !item.waitsForReceipt) : items
-	);
+	const collapsedCount = 3;
+	let expanded = $state(false);
+	const shown = $derived(expanded ? items : items.slice(0, collapsedCount));
+	const hiddenCount = $derived(items.length - shown.length);
 </script>
 
 <section id="whats-left" class="flex flex-col gap-3" aria-labelledby="left-heading">
-	{#if visible.length === 0 && !reading}
+	{#if items.length === 0 && ready}
 		<h2 id="left-heading" class="text-lg font-semibold text-(--ink)">Everything’s here</h2>
 		<p class="text-sm text-(--quiet)">Look it over, then fill it on Engage.</p>
 	{:else}
@@ -40,7 +41,7 @@
 					</span>
 				</li>
 			{/if}
-			{#each visible as item (item.key)}
+			{#each shown as item (item.key)}
 				<li class="flex items-center gap-3 border-b border-(--line)">
 					<span
 						class={['size-2 shrink-0', item.blocking ? 'bg-(--ink)' : 'bg-(--marker-deep)']}
@@ -77,6 +78,15 @@
 				</li>
 			{/each}
 		</ol>
+		{#if hiddenCount > 0}
+			<button
+				class="self-start text-sm text-(--quiet) underline hover:text-(--ink) focus-visible:outline-2 focus-visible:outline-(--pine)"
+				type="button"
+				onclick={() => (expanded = true)}
+			>
+				{hiddenCount} more
+			</button>
+		{/if}
 	{/if}
 </section>
 

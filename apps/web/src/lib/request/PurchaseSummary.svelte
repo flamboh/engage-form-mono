@@ -4,6 +4,7 @@
 	import EditableValue from './EditableValue.svelte';
 	import { formatDate, formatMoney } from './labels';
 	import ReviewPrompt from './ReviewPrompt.svelte';
+	import SourceCue from './SourceCue.svelte';
 	import type { ReviewField } from './whatsLeft';
 
 	let { editor, reading }: { editor: RequestEditor; reading: boolean } = $props();
@@ -33,7 +34,12 @@
 	<h2 id="summary-heading" class="sr-only">Purchase</h2>
 
 	<div id="field-totalAmount" class="flex flex-col items-start gap-1">
-		<span class="text-sm text-(--quiet)">Total</span>
+		<span class="flex items-baseline gap-2 text-sm text-(--quiet)">
+			Total
+			{#if !reviewFor.totalAmount && total !== null}
+				<SourceCue source={editor.sourceOf('totalAmount')} />
+			{/if}
+		</span>
 		{#if reading && total === null}
 			<span class="shimmer h-11 w-40" aria-label="Reading the total"></span>
 		{:else}
@@ -63,7 +69,10 @@
 	<dl
 		class="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-4 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-x-6"
 	>
-		<dt class="pt-0.5 text-sm text-(--quiet)">Store</dt>
+		<dt class="flex flex-col pt-0.5 text-sm text-(--quiet)">
+			Store
+			{#if !reviewFor.vendor && form?.vendor}<SourceCue source={editor.sourceOf('vendor')} />{/if}
+		</dt>
 		<dd id="field-vendor" class="min-w-0">
 			{#if reading && !form?.vendor}
 				<span class="shimmer block h-6 w-48" aria-label="Reading the store"></span>
@@ -89,7 +98,10 @@
 			{/if}
 		</dd>
 
-		<dt class="pt-0.5 text-sm text-(--quiet)">Items</dt>
+		<dt class="flex flex-col pt-0.5 text-sm text-(--quiet)">
+			Items
+			{#if form?.itemDescription}<SourceCue source={editor.sourceOf('itemDescription')} />{/if}
+		</dt>
 		<dd id="field-itemDescription" class="min-w-0">
 			{#if reading && !form?.itemDescription}
 				<span class="shimmer block h-6 w-64 max-w-full" aria-label="Reading the items"></span>

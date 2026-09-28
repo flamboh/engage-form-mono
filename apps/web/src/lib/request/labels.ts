@@ -44,22 +44,24 @@ export const categoryOptions: {
 ];
 
 export function formatMoney(value: number | null | undefined) {
-	if (value === null || value === undefined || value <= 0) return '';
+	if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) return '';
 	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
 export function formatDate(value: string) {
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
 	const [year, month, day] = value.split('-').map(Number);
+	const date = new Date(year, month - 1, day);
+	if (Number.isNaN(date.getTime())) return value;
 	return new Intl.DateTimeFormat('en-US', {
 		month: 'short',
 		day: 'numeric',
 		year: 'numeric'
-	}).format(new Date(year, month - 1, day));
+	}).format(date);
 }
 
 export function reviewDisplay(field: 'vendor' | 'totalAmount' | 'receiptDate', value: string) {
-	if (field === 'totalAmount') return formatMoney(Number(value)) || value;
+	if (field === 'totalAmount') return formatMoney(Number(value.replace(/[$,\s]/g, ''))) || value;
 	if (field === 'receiptDate') return formatDate(value);
 	return value;
 }

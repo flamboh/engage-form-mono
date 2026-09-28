@@ -48,6 +48,7 @@
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 	const transport: UploadTransport = {
+		prepare: async (file) => file,
 		upload: async (file) => {
 			await wait(700);
 			const id = `mock_upload_${++counter}` as Id<'files'>;
@@ -65,7 +66,8 @@
 					filename: file?.name ?? 'document',
 					contentType: file?.type ?? 'application/octet-stream',
 					previewUrl: null,
-					reading: kind === 'receipt'
+					reading: kind === 'receipt',
+					readFailed: false
 				});
 				if (kind === 'receipt') {
 					view.purchase.receiptFileIds = [...view.purchase.receiptFileIds, fileId];
@@ -119,6 +121,18 @@
 			view.reviews = view.reviews.filter((review) => review.field !== field);
 			await refresh();
 		},
+		retryReading: async (fileId) => {
+			await wait(150);
+			for (const document of view.documents) {
+				if (document.fileId === fileId) {
+					document.readFailed = false;
+					document.reading = true;
+				}
+			}
+			view.reading = true;
+			void finishReading();
+		},
+		freshPreview: async () => mockReceiptImage,
 		removeDocument: async (fileId) => {
 			await wait(150);
 			view.documents = view.documents.filter((document) => document.fileId !== fileId);
@@ -170,6 +184,7 @@
 	{view}
 	saved={mockSaved}
 	user={mockUser}
+	recentPurposes={['snacks for the general meeting', 'prizes for the bouldering comp', 'gear swap supplies']}
 	organizationId={mockOrganizationId}
 	{pending}
 	{backend}

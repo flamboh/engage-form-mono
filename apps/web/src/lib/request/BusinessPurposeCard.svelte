@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { RequestEditor } from './editor.svelte';
+	import SourceCue from './SourceCue.svelte';
 
 	let { editor, resolvedText }: { editor: RequestEditor; resolvedText: string } = $props();
 
@@ -7,6 +8,7 @@
 	let textarea = $state<HTMLTextAreaElement | null>(null);
 
 	const variables = [
+		'Purpose',
 		'Student Organization',
 		'Purchaser',
 		'Vendor',
@@ -44,7 +46,10 @@
 
 <section id="field-businessPurpose" class="flex flex-col gap-3" aria-labelledby="purpose-heading">
 	<div class="flex items-baseline justify-between gap-3">
-		<h2 id="purpose-heading" class="text-lg font-semibold text-(--ink)">Business Purpose</h2>
+		<h2 id="purpose-heading" class="flex items-baseline gap-2 text-lg font-semibold text-(--ink)">
+			Business Purpose
+			<SourceCue source={editor.sourceOf('businessPurposeSource', 'businessPurposeText')} />
+		</h2>
 		<button
 			class="text-sm text-(--pine) underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--pine)"
 			type="button"
@@ -81,7 +86,7 @@
 		</div>
 		<p class="text-xs text-(--quiet)">Words in braces fill in from this request.</p>
 	{:else if resolvedText.trim() === ''}
-		<p class="text-sm text-(--quiet)">Pick what it was for above, or customize the sentence.</p>
+		<p class="text-sm text-(--quiet)">Say what it was for above, or customize the sentence.</p>
 	{:else}
 		<p class="max-w-prose text-base leading-relaxed text-(--ink)">
 			{#each parts as part, index (index)}

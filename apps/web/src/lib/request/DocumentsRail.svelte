@@ -17,15 +17,34 @@
 		documents,
 		pending,
 		missingSlots,
+		locked = false,
 		onfiles,
-		onremove
+		onremove,
+		onretryreading,
+		refreshpreview
 	}: {
 		documents: RequestDocument[];
 		pending: PendingUpload[];
 		missingSlots: DocumentSlot[];
 		onfiles: (files: File[], slot: UploadSlot) => void;
+		locked?: boolean;
 		onremove: (fileId: Id<'files'>) => void;
+		onretryreading: (fileId: Id<'files'>) => void;
+		refreshpreview: (fileId: Id<'files'>) => Promise<string | null>;
 	} = $props();
+
+	let freshUrls = $state<Record<string, string>>({});
+	let expired = $state<Record<string, boolean>>({});
+
+	async function previewFailed(fileId: Id<'files'>) {
+		if (fileId in freshUrls || expired[fileId]) {
+			expired = { ...expired, [fileId]: true };
+			return;
+		}
+		const url = await refreshpreview(fileId).catch(() => null);
+		if (url === null) expired = { ...expired, [fileId]: true };
+		else freshUrls = { ...freshUrls, [fileId]: url };
+	}
 
 	const knownIds = $derived(new Set(documents.map((document) => document.fileId)));
 	const inFlight = $derived(
@@ -36,7 +55,11 @@
 	const empty = $derived(documents.length === 0 && inFlight.length === 0);
 </script>
 
-<section class="flex flex-col gap-3 lg:gap-4" aria-labelledby="documents-heading">
+<section
+	id="field-documents"
+	class="flex flex-col gap-3 lg:gap-4"
+	aria-labelledby="documents-heading"
+>
 	<h2 id="documents-heading" class="text-sm font-semibold text-(--ink)">Documents</h2>
 
 	{#if !empty}
@@ -49,9 +72,16 @@
 						label={kindLabels[document.kind] ?? 'Document'}
 						filename={document.filename}
 						contentType={document.contentType}
-						preview={localPreviewFor(document.fileId) ?? document.previewUrl}
-						status={document.reading ? 'reading' : 'saved'}
-						onremove={() => onremove(document.fileId)}
+						preview={localPreviewFor(document.fileId) ??
+							freshUrls[document.fileId] ??
+							document.previewUrl}
+						status={document.reading ? 'reading' : document.readFailed ? 'unreadable' : 'saved'}
+						expired={expired[document.fileId] ?? false}
+						onremove={locked ? undefined : () => onremove(document.fileId)}
+						onretryreading={document.kind === 'receipt' && !locked
+							? () => onretryreading(document.fileId)
+							: undefined}
+						onpreviewerror={() => void previewFailed(document.fileId)}
 					/>
 				</li>
 			{/each}
