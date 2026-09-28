@@ -1,5 +1,6 @@
-const maxSide = 4000;
+const maxSide = 2000;
 const maxBytes = 10 * 1024 * 1024 - 64 * 1024;
+const keepBytes = 2 * 1024 * 1024;
 
 const extensionTypes: Record<string, string> = {
 	jpg: 'image/jpeg',
@@ -45,13 +46,17 @@ export async function prepareForUpload(file: File): Promise<File> {
 	if (!type.startsWith('image/')) {
 		throw new UploadProblem(`${file.name} isn’t a photo or PDF.`);
 	}
-	if ((type === 'image/jpeg' || type === 'image/png') && file.size < maxBytes) {
-		return withType(file, type);
+	try {
+		return await toJpeg(file, type);
+	} catch (err) {
+		if ((type === 'image/jpeg' || type === 'image/png') && file.size < maxBytes) {
+			return withType(file, type);
+		}
+		throw err;
 	}
-	return await toJpeg(file);
 }
 
-async function toJpeg(file: File) {
+async function toJpeg(file: File, type: string) {
 	let bitmap: ImageBitmap;
 	try {
 		bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -62,8 +67,11 @@ async function toJpeg(file: File) {
 	}
 	try {
 		let scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+		if (scale === 1 && (type === 'image/jpeg' || type === 'image/png') && file.size < keepBytes) {
+			return withType(file, type);
+		}
 		for (let attempt = 0; attempt < 4; attempt += 1) {
-			for (const quality of [0.9, 0.8, 0.7]) {
+			for (const quality of [0.85, 0.75, 0.65]) {
 				const blob = await draw(bitmap, scale, quality);
 				if (blob.size < maxBytes) {
 					return new File([blob], jpegName(file.name), { type: 'image/jpeg' });

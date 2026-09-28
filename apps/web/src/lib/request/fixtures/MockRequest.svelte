@@ -49,35 +49,34 @@
 
 	const transport: UploadTransport = {
 		prepare: async (file) => file,
-		upload: async (file) => {
+		put: async (file) => {
 			await wait(700);
-			const id = `mock_upload_${++counter}` as Id<'files'>;
-			files[id] = file;
-			return id;
+			const r2Key = `mock_upload_${++counter}`;
+			files[r2Key] = file;
+			return { r2Key, filename: file.name, contentType: file.type, size: file.size };
 		},
-		attach: async (_requestId, fileIds, slot) => {
+		attach: async (_requestId, stored, slot) => {
 			await wait(250);
-			for (const fileId of fileIds) {
-				const file = files[fileId];
-				const kind: DocumentSlot = slot === 'auto' ? 'receipt' : slot;
-				view.documents.push({
-					fileId,
-					kind,
-					filename: file?.name ?? 'document',
-					contentType: file?.type ?? 'application/octet-stream',
-					previewUrl: null,
-					reading: kind === 'receipt',
-					readFailed: false
-				});
-				if (kind === 'receipt') {
-					view.purchase.receiptFileIds = [...view.purchase.receiptFileIds, fileId];
-					view.reading = true;
-				} else if (kind !== 'recipient_list') {
-					Object.assign(view.purchase, { [slotField[kind]]: fileId });
-				}
+			const fileId = stored.r2Key as Id<'files'>;
+			const kind: DocumentSlot = slot === 'auto' ? 'receipt' : slot;
+			view.documents.push({
+				fileId,
+				kind,
+				filename: stored.filename,
+				contentType: stored.contentType,
+				previewUrl: null,
+				reading: kind === 'receipt',
+				readFailed: false
+			});
+			if (kind === 'receipt') {
+				view.purchase.receiptFileIds = [...view.purchase.receiptFileIds, fileId];
+				view.reading = true;
+			} else if (kind !== 'recipient_list') {
+				Object.assign(view.purchase, { [slotField[kind]]: fileId });
 			}
 			await refresh();
 			if (view.reading) void finishReading();
+			return fileId;
 		}
 	};
 
@@ -117,6 +116,7 @@
 			await wait(150);
 			if (field === 'totalAmount') view.purchase.totalAmount = Number(value) || 0;
 			else if (field === 'vendor') view.purchase.vendor = value;
+			else if (field === 'itemDescription') view.purchase.itemDescription = value;
 			else view.purchase.receiptDate = value;
 			view.reviews = view.reviews.filter((review) => review.field !== field);
 			await refresh();

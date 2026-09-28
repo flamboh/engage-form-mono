@@ -9,7 +9,7 @@
 
 	let { editor, reading }: { editor: RequestEditor; reading: boolean } = $props();
 
-	let editing = $state<Record<ReviewField | 'itemDescription', boolean>>({
+	let editing = $state<Record<ReviewField, boolean>>({
 		vendor: false,
 		totalAmount: false,
 		receiptDate: false,
@@ -100,7 +100,9 @@
 
 		<dt class="flex flex-col pt-0.5 text-sm text-(--quiet)">
 			Items
-			{#if form?.itemDescription}<SourceCue source={editor.sourceOf('itemDescription')} />{/if}
+			{#if !reviewFor.itemDescription && form?.itemDescription}<SourceCue
+					source={editor.sourceOf('itemDescription')}
+				/>{/if}
 		</dt>
 		<dd id="field-itemDescription" class="min-w-0">
 			{#if reading && !form?.itemDescription}
@@ -111,8 +113,21 @@
 					label="Items"
 					placeholder="Describe what was bought"
 					value={form?.itemDescription ?? ''}
+					highlight={reviewFor.itemDescription !== undefined}
 					bind:editing={editing.itemDescription}
-					oncommit={(value) => editor.update({ itemDescription: value })}
+					oncommit={(value) =>
+						reviewFor.itemDescription
+							? void editor.resolveReview('itemDescription', value)
+							: editor.update({ itemDescription: value })}
+				/>
+			{/if}
+			{#if reviewFor.itemDescription}
+				<ReviewPrompt
+					field="itemDescription"
+					value={reviewFor.itemDescription.value}
+					alternatives={reviewFor.itemDescription.alternatives}
+					onpick={(value) => void editor.resolveReview('itemDescription', value)}
+					onother={() => (editing.itemDescription = true)}
 				/>
 			{/if}
 		</dd>

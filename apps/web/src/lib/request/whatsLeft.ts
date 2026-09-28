@@ -12,7 +12,7 @@ export type MissingSlot =
 	| 'second_approval'
 	| 'catering_waiver'
 	| 'printing_invoice';
-export type ReviewField = 'vendor' | 'totalAmount' | 'receiptDate';
+export type ReviewField = 'vendor' | 'totalAmount' | 'receiptDate' | 'itemDescription';
 export type LeftField =
 	| 'why'
 	| 'purchaser'
@@ -194,13 +194,15 @@ const purposeCopy: Copy = {
 const reviewReasonKey: Record<ReviewField, string | null> = {
 	vendor: 'vendor',
 	totalAmount: 'totalAmount',
-	receiptDate: null
+	receiptDate: null,
+	itemDescription: 'itemDescription'
 };
 
 const reviewCopy: Record<ReviewField, string> = {
 	vendor: 'Check the store',
 	totalAmount: 'Check the total',
-	receiptDate: 'Check the receipt date'
+	receiptDate: 'Check the receipt date',
+	itemDescription: 'Check the items'
 };
 
 export function reviewProposal(review: { value: string; alternatives: string[] }) {

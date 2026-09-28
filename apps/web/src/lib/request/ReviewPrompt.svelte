@@ -20,7 +20,8 @@
 	const nouns: Record<ReviewField, string> = {
 		vendor: 'store',
 		totalAmount: 'total',
-		receiptDate: 'receipt date'
+		receiptDate: 'receipt date',
+		itemDescription: 'items'
 	};
 
 	const proposal = $derived(reviewProposal({ value, alternatives }));
@@ -32,7 +33,9 @@
 			.slice(0, 3)
 	);
 	const question = $derived(
-		confirming ? 'Is this right?' : `Is the ${nouns[field]} ${reviewDisplay(field, proposal)}?`
+		confirming
+			? 'Is this right?'
+			: `${field === 'itemDescription' ? 'Were' : 'Is'} the ${nouns[field]} ${reviewDisplay(field, proposal)}?`
 	);
 </script>
 

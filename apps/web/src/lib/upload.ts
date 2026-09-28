@@ -15,11 +15,14 @@ type Kind =
 	| 'brand_approval'
 	| 'recipient_list';
 
-export async function uploadFile(
-	session: ClerkSession,
-	kind: Kind,
-	file: File
-): Promise<Id<'files'>> {
+export type StoredObject = {
+	r2Key: string;
+	filename: string;
+	contentType: string;
+	size: number;
+};
+
+export async function putFile(session: ClerkSession, file: File): Promise<StoredObject> {
 	const contentType = file.type || 'application/octet-stream';
 	const { uploadUrl, r2Key } = await convexMutation(
 		session,
@@ -35,11 +38,14 @@ export async function uploadFile(
 		body: file
 	});
 	if (!response.ok) throw new Error(`Upload failed with ${response.status}.`);
-	return await convexMutation(session, api.authed.purchaseBuilder.saveFile, {
-		kind,
-		r2Key,
-		filename: file.name,
-		contentType,
-		size: file.size
-	});
+	return { r2Key, filename: file.name, contentType, size: file.size };
+}
+
+export async function uploadFile(
+	session: ClerkSession,
+	kind: Kind,
+	file: File
+): Promise<Id<'files'>> {
+	const stored = await putFile(session, file);
+	return await convexMutation(session, api.authed.purchaseBuilder.saveFile, { kind, ...stored });
 }

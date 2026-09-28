@@ -216,12 +216,13 @@ export class RequestEditor {
 	}
 
 	async resolveReview(field: ReviewField, value: string) {
-		const key = field === 'vendor' ? 'vendor' : field === 'totalAmount' ? 'totalAmount' : null;
+		const key = field === 'receiptDate' ? null : field;
 		const hadOverride = key !== null && key in this.overrides;
 		const previousOverride = key === null ? undefined : this.overrides[key];
 		const previousResolved = this.resolved[field];
 		this.resolved = { ...this.resolved, [field]: value };
 		if (field === 'vendor') this.overrides = { ...this.overrides, vendor: value };
+		if (field === 'itemDescription') this.overrides = { ...this.overrides, itemDescription: value };
 		if (field === 'totalAmount') {
 			this.overrides = { ...this.overrides, totalAmount: parseMoney(value) };
 		}

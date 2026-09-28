@@ -60,7 +60,10 @@ export function formatDate(value: string) {
 	}).format(date);
 }
 
-export function reviewDisplay(field: 'vendor' | 'totalAmount' | 'receiptDate', value: string) {
+export function reviewDisplay(
+	field: 'vendor' | 'totalAmount' | 'receiptDate' | 'itemDescription',
+	value: string
+) {
 	if (field === 'totalAmount') return formatMoney(Number(value.replace(/[$,\s]/g, ''))) || value;
 	if (field === 'receiptDate') return formatDate(value);
 	return value;

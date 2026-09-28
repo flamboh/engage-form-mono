@@ -3,7 +3,7 @@ import type { Id } from '$convex/_generated/dataModel';
 import type { DocumentSlot } from '$convex/requestView';
 import { convexMutation, type ClerkSession } from '$lib/convex-http';
 import { fileType, prepareForUpload, previewable, UploadProblem } from '$lib/imageConvert';
-import { uploadFile } from '$lib/upload';
+import { putFile, type StoredObject } from '$lib/upload';
 
 export type UploadSlot = DocumentSlot | 'auto';
 
@@ -22,17 +22,18 @@ export type PendingUpload = {
 
 export type UploadTransport = {
 	prepare?(file: File): Promise<File>;
-	upload(file: File, slot: UploadSlot): Promise<Id<'files'>>;
+	put(file: File): Promise<StoredObject>;
 	attach(
 		purchaseRequestId: Id<'purchaseRequests'>,
-		fileIds: Id<'files'>[],
+		stored: StoredObject,
 		slot: UploadSlot
-	): Promise<void>;
+	): Promise<Id<'files'>>;
 };
 
 type Source = {
 	file: File;
 	prepared: File | null;
+	stored: StoredObject | null;
 	transport: UploadTransport;
 	request: Promise<Id<'purchaseRequests'>>;
 };
@@ -44,14 +45,13 @@ const sources: Record<string, Source> = {};
 export function convexUploadTransport(session: ClerkSession): UploadTransport {
 	return {
 		prepare: prepareForUpload,
-		upload: (file, slot) => uploadFile(session, slot === 'auto' ? 'receipt' : slot, file),
-		attach: async (purchaseRequestId, fileIds, slot) => {
-			await convexMutation(session, api.authed.documents.attachDocuments, {
+		put: (file) => putFile(session, file),
+		attach: (purchaseRequestId, stored, slot) =>
+			convexMutation(session, api.authed.documents.attachUpload, {
 				purchaseRequestId,
-				fileIds,
-				slot
-			});
-		}
+				slot,
+				...stored
+			})
 	};
 }
 
@@ -64,17 +64,18 @@ export function startUploads(
 ) {
 	const request = Promise.resolve(purchaseRequestId);
 	const known = typeof purchaseRequestId === 'string' ? purchaseRequestId : '';
-	const ids = Array.from(files).map((file) => {
+	const ids = Array.from(files).map((file, index) => {
 		const id = crypto.randomUUID();
+		const fileSlot = slot === 'auto' || slot === 'receipt' || index === 0 ? slot : 'auto';
 		const type = fileType(file);
-		sources[id] = { file, prepared: null, transport, request };
+		sources[id] = { file, prepared: null, stored: null, transport, request };
 		uploads.push({
 			id,
 			purchaseRequestId: known,
 			filename: file.name,
 			contentType: type,
 			objectUrl: previewable(type) ? URL.createObjectURL(file) : null,
-			slot,
+			slot: fileSlot,
 			status: 'uploading',
 			fileId: null,
 			error: '',
@@ -93,7 +94,7 @@ export function startUploads(
 			for (const id of ids) dismissUpload(id);
 		}
 	);
-	void run(ids, slot);
+	for (const id of ids) void send(id, find(id)?.slot ?? slot);
 	return ids;
 }
 
@@ -122,7 +123,7 @@ export function retryUpload(id: string) {
 	if (upload === undefined || sources[id] === undefined) return;
 	upload.status = 'uploading';
 	upload.error = '';
-	void run([id], upload.slot);
+	void send(id, upload.slot);
 }
 
 export function dismissUpload(id: string) {
@@ -134,56 +135,28 @@ export function dismissUpload(id: string) {
 	delete sources[id];
 }
 
-async function run(ids: string[], slot: UploadSlot) {
-	if (slot === 'auto' || slot === 'receipt') {
-		await Promise.all(ids.map(async (id) => attach(present([await uploadOne(id, slot)]), slot)));
-		return;
-	}
-	await attach(present(await Promise.all(ids.map((id) => uploadOne(id, slot)))), slot);
-}
-
-type Uploaded = { id: string; fileId: Id<'files'>; source: Source };
-
-function present(items: (Uploaded | null)[]) {
-	return items.filter((item) => item !== null);
-}
-
-async function attach(items: Uploaded[], slot: UploadSlot) {
-	if (items.length === 0) return;
-	const { source } = items[0];
-	try {
-		const purchaseRequestId = await source.request;
-		await source.transport.attach(
-			purchaseRequestId,
-			items.map((item) => item.fileId),
-			slot
-		);
-		for (const item of items) markAttached(item.id);
-	} catch (err) {
-		for (const item of items) fail(item.id, err, 'attach');
-	}
-}
-
-async function uploadOne(id: string, slot: UploadSlot): Promise<Uploaded | null> {
+async function send(id: string, slot: UploadSlot) {
 	const source = sources[id];
-	const upload = find(id);
-	if (source === undefined || upload === undefined) return null;
+	if (source === undefined || find(id) === undefined) return;
+	let stage: 'upload' | 'attach' = 'upload';
 	try {
-		if (upload.fileId === null) {
+		if (source.stored === null) {
 			source.prepared ??= await (source.transport.prepare?.(source.file) ?? source.file);
 			useConvertedPreview(id, source.prepared);
-			const fileId = await source.transport.upload(source.prepared, slot);
-			const current = find(id);
-			if (current === undefined) return null;
-			current.fileId = fileId;
+			source.stored = await source.transport.put(source.prepared);
 		}
 		const current = find(id);
-		if (current === undefined || current.fileId === null) return null;
+		if (current === undefined) return;
 		current.status = 'attaching';
-		return { id, fileId: current.fileId, source };
+		stage = 'attach';
+		const purchaseRequestId = await source.request;
+		const fileId = await source.transport.attach(purchaseRequestId, source.stored, slot);
+		const attached = find(id);
+		if (attached === undefined) return;
+		attached.fileId = fileId;
+		markAttached(id);
 	} catch (err) {
-		fail(id, err, 'upload');
-		return null;
+		fail(id, err, stage);
 	}
 }
 
