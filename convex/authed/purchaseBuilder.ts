@@ -1,6 +1,7 @@
 import { z } from 'zod/v4';
 import { zid } from 'convex-helpers/server/zod4';
 import type { Doc, Id } from '../_generated/dataModel';
+import { internal } from '../_generated/api';
 import { authedMutation, authedQuery } from './helpers';
 import type { BusinessPurposePart, BusinessPurposeSource } from '../businessPurpose';
 import {
@@ -10,8 +11,10 @@ import {
 	businessPurposeTemplateFields,
 	businessPurposeTemplateUpdateFields,
 	getUserProfile,
+	keepFilledFields,
 	ownerFromIdentity,
 	parseBusinessPurposeText,
+	previousRequestDefaults,
 	purchaserDetails,
 	requireOwnedDoc,
 	requireText,
@@ -19,6 +22,7 @@ import {
 	studentOrganizationDetails,
 	userAsPurchaserDetails,
 	userAsRequesterDetails,
+	userFieldSources,
 	type DraftPatch
 } from '../purchaseModel';
 import {
@@ -382,10 +386,15 @@ export const applyBusinessPurposeTemplate = authedMutation({
 				updatedAt: Date.now()
 			});
 		}
-		await ctx.db.patch(
-			args.draftId,
-			businessPurposeTemplateDraftPatch({ ...template, businessPurposeTemplate })
-		);
+		await ctx.db.patch(args.draftId, {
+			...businessPurposeTemplateDraftPatch({ ...template, businessPurposeTemplate }),
+			fieldSources: { ...(draft.fieldSources ?? {}), businessPurposeSource: 'user' }
+		});
+		if (draft.status === 'draft' && draft.receiptFileIds.length > 0) {
+			await ctx.scheduler.runAfter(0, internal.extraction.jobs.refreshDefaults, {
+				purchaseRequestId: args.draftId
+			});
+		}
 		return presentPurchaseRequest(
 			await requireOwnedDoc(ctx, 'purchaseRequests', args.draftId, owner)
 		);
@@ -514,12 +523,28 @@ export const createDraftForOrganization = authedMutation({
 				updatedAt: now
 			});
 		}
+		const previous = await ctx.db
+			.query('purchaseRequests')
+			.withIndex('by_owner_and_organizationSourceId_and_updatedAt', (q) =>
+				q.eq('owner', owner).eq('organizationSourceId', organization._id)
+			)
+			.order('desc')
+			.first();
+		const previousPurchaser =
+			previous?.purchaserSource.kind === 'purchaser'
+				? await ctx.db.get(previous.purchaserSource.purchaserId)
+				: null;
 		return await ctx.db.insert('purchaseRequests', {
 			...draft,
 			organizationSourceId: organization._id,
 			studentOrganization: studentOrganizationDetails({ ...organization, businessPurposeTemplate }),
 			budgetLineItem: organization.budgetLines[0] ?? '',
-			businessPurposeSource: parseBusinessPurposeText(businessPurposeTemplate)
+			businessPurposeSource: parseBusinessPurposeText(businessPurposeTemplate),
+			...previousRequestDefaults(
+				previous === null ? null : presentPurchaseRequest(previous),
+				organization,
+				previousPurchaser !== null && previousPurchaser.owner === owner ? previousPurchaser : null
+			)
 		});
 	}
 });
@@ -530,14 +555,13 @@ export const saveDraftSnapshot = authedMutation({
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		if (request.status === 'approved') {
-			await ctx.db.patch(args.id, {
-				...snapshotPatch(request, args.snapshot),
-				status: 'ready'
-			});
-			return null;
-		}
-		await ctx.db.patch(args.id, snapshotPatch(request, args.snapshot));
+		const patch = keepFilledFields(request, snapshotPatch(request, args.snapshot));
+		const fieldSources = userFieldSources(request, patch);
+		await ctx.db.patch(args.id, {
+			...patch,
+			...(fieldSources === request.fieldSources ? {} : { fieldSources }),
+			...(request.status === 'approved' ? { status: 'ready' as const } : {})
+		});
 		return null;
 	}
 });
@@ -718,7 +742,7 @@ function snapshotPatch(
 	};
 }
 
-function presentPurchaseRequest(request: Doc<'purchaseRequests'>) {
+export function presentPurchaseRequest(request: Doc<'purchaseRequests'>) {
 	return {
 		...request,
 		activityDate: activityDateForBackfill(request),

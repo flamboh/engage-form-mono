@@ -152,6 +152,125 @@ export function applyDraftPatch(
 ): Partial<Doc<'purchaseRequests'>> {
 	const typeOfPurchase =
 		patch.typeOfPurchase !== undefined ? patch.typeOfPurchase : purchase.typeOfPurchase;
+	const next = draftPatchFields(purchase, patch, typeOfPurchase);
+	const touched = Object.keys(patch).map((key) =>
+		key === 'businessPurposeText' ? 'businessPurposeSource' : key
+	);
+	const fieldSources = userFieldSources(purchase, next, touched);
+	return fieldSources === purchase.fieldSources ? next : { ...next, fieldSources };
+}
+
+const userTrackedFields = [
+	'typeOfPurchase',
+	'documentationCategories',
+	'purchaserSource',
+	'activityDate',
+	'vendor',
+	'itemDescription',
+	'totalAmount',
+	'budgetLineItem',
+	'businessPurposeSource',
+	'officeLocation',
+	'recipients'
+] as const;
+
+type FieldSources = NonNullable<Doc<'purchaseRequests'>['fieldSources']>;
+
+export function userFieldSources(
+	request: Doc<'purchaseRequests'>,
+	next: Partial<Doc<'purchaseRequests'>>,
+	fields: readonly string[] = Object.keys(next)
+): Doc<'purchaseRequests'>['fieldSources'] {
+	const sources: FieldSources = { ...(request.fieldSources ?? {}) };
+	let changed = false;
+	for (const field of userTrackedFields) {
+		if (!fields.includes(field) || !(field in next)) continue;
+		const previous = field === 'activityDate' ? activityDateForPurchase(request) : request[field];
+		if (JSON.stringify(next[field]) === JSON.stringify(previous)) continue;
+		if (sources[field] === 'user') continue;
+		sources[field] = 'user';
+		changed = true;
+	}
+	return changed ? sources : request.fieldSources;
+}
+
+export function keepFilledFields<Patch extends Partial<Doc<'purchaseRequests'>>>(
+	request: Doc<'purchaseRequests'>,
+	patch: Patch
+): Patch {
+	const sources = request.fieldSources ?? {};
+	const automatic = (field: string) => sources[field] === 'receipt' || sources[field] === 'default';
+	const kept = { ...patch };
+	for (const field of ['vendor', 'itemDescription'] as const) {
+		if (kept[field] === '' && request[field] !== '' && automatic(field)) delete kept[field];
+	}
+	if (kept.totalAmount === 0 && request.totalAmount > 0 && automatic('totalAmount')) {
+		delete kept.totalAmount;
+	}
+	if (
+		kept.activityDate === '' &&
+		activityDateForPurchase(request) !== '' &&
+		automatic('activityDate')
+	) {
+		delete kept.activityDate;
+	}
+	return kept;
+}
+
+export type PreviousRequestDefaults = Pick<
+	Doc<'purchaseRequests'>,
+	| 'purchaserSource'
+	| 'budgetLineItem'
+	| 'documentationCategories'
+	| 'reimbursementReason'
+	| 'businessPurposeTouched'
+> & { businessPurposeSource: BusinessPurposeSource };
+
+export function previousRequestDefaults(
+	previous: PreviousRequestDefaults | null,
+	organization: Pick<Doc<'organizations'>, '_id' | 'budgetLines'>,
+	purchaser: Doc<'purchasers'> | null
+): Partial<Doc<'purchaseRequests'>> {
+	if (previous === null) return {};
+	const sources: FieldSources = {};
+	const defaults: Partial<Doc<'purchaseRequests'>> = {};
+	if (previous.purchaserSource.kind === 'self') {
+		sources.purchaserSource = 'default';
+	} else if (
+		purchaser !== null &&
+		purchaser._id === previous.purchaserSource.purchaserId &&
+		!purchaser.archived &&
+		purchaser.organizationId === organization._id
+	) {
+		defaults.purchaserSource = previous.purchaserSource;
+		defaults.purchaser = purchaserDetails(purchaser);
+		sources.purchaserSource = 'default';
+	}
+	if (previous.businessPurposeSource.parts.length > 0) {
+		defaults.businessPurposeSource = previous.businessPurposeSource;
+		defaults.businessPurposeTouched = previous.businessPurposeTouched;
+		sources.businessPurposeSource = 'default';
+	}
+	if (organization.budgetLines.includes(previous.budgetLineItem)) {
+		defaults.budgetLineItem = previous.budgetLineItem;
+		sources.budgetLineItem = 'default';
+	}
+	if (previous.documentationCategories.length > 0) {
+		defaults.documentationCategories = previous.documentationCategories;
+		sources.documentationCategories = 'default';
+	}
+	if (previous.reimbursementReason.trim() !== '') {
+		defaults.reimbursementReason = previous.reimbursementReason;
+		sources.reimbursementReason = 'default';
+	}
+	return { ...defaults, fieldSources: sources };
+}
+
+function draftPatchFields(
+	purchase: Doc<'purchaseRequests'>,
+	patch: DraftPatch,
+	typeOfPurchase: TypeOfPurchase
+): Partial<Doc<'purchaseRequests'>> {
 	return {
 		status: 'draft',
 		typeOfPurchase,
@@ -360,7 +479,12 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 }
 
 export async function assertReady(ctx: Ctx, request: Doc<'purchaseRequests'>) {
-	const readiness = await evaluatePurchaseReadiness(request, {
+	const readiness = await purchaseReadiness(ctx, request);
+	if (!readiness.ready) throw new Error(formatReadinessBlockers(readiness));
+}
+
+export async function purchaseReadiness(ctx: Ctx, request: Doc<'purchaseRequests'>) {
+	return await evaluatePurchaseReadiness(request, {
 		documentExists: async (id) => {
 			const doc = await ctx.db.get(id);
 			return doc !== null && doc.owner === request.owner;
@@ -370,7 +494,6 @@ export async function assertReady(ctx: Ctx, request: Doc<'purchaseRequests'>) {
 			return doc !== null && doc.owner === request.owner && doc.organizationId === organizationId;
 		}
 	});
-	if (!readiness.ready) throw new Error(formatReadinessBlockers(readiness));
 }
 
 async function documentPayload(ctx: Ctx, id: Id<'files'>, owner: string) {
