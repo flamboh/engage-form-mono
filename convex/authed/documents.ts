@@ -3,13 +3,14 @@ import { zid } from 'convex-helpers/server/zod4';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { fileDownloadUrl } from '../files';
+import { fileDownloadUrl, requireOwnedKey } from '../files';
 import {
 	demoteIfNotReady,
 	ownerFromIdentity,
 	purchaseReadiness,
 	renderBusinessPurpose,
-	requireOwnedDoc
+	requireOwnedDoc,
+	requireText
 } from '../purchaseModel';
 import { nullReturn } from '../purchaseZod';
 import { documentSlot, requestView, reviewField } from '../requestView';
@@ -17,6 +18,7 @@ import {
 	detachDocument,
 	documentReadFailed,
 	placeDocument,
+	receiptRemovalChecks,
 	requestDocuments,
 	requestReviews,
 	resolveReviewPatch,
@@ -77,23 +79,41 @@ export const attachDocuments = authedMutation({
 	returns: nullReturn,
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
-		let request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
+		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
 		requireEditableDocuments(request);
-		const fileIds = [...new Set(args.fileIds)];
-		for (const [index, fileId] of fileIds.entries()) {
-			await requireOwnedDoc(ctx, 'files', fileId, owner);
-			const explicit = args.slot !== 'auto' && (args.slot === 'receipt' || index === 0);
-			const slot: Slot = explicit ? (args.slot as Slot) : 'receipt';
-			await ctx.db.patch(request._id, {
-				...placeDocument(request, fileId, slot),
-				updatedAt: Date.now()
-			});
-			if (explicit) await ctx.db.patch(fileId, { kind: slot });
-			if (slot === 'receipt') await startExtraction(ctx, request, fileId, !explicit);
-			request = await requireOwnedDoc(ctx, 'purchaseRequests', request._id, owner);
-		}
-		await demoteIfNotReady(ctx, request._id);
+		for (const fileId of args.fileIds) await requireOwnedDoc(ctx, 'files', fileId, owner);
+		await attachFiles(ctx, request, args.fileIds, args.slot);
 		return null;
+	}
+});
+
+export const attachUpload = authedMutation({
+	args: {
+		purchaseRequestId: zid('purchaseRequests'),
+		slot: z.union([documentSlot, z.literal('auto')]),
+		r2Key: z.string(),
+		filename: z.string(),
+		contentType: z.string(),
+		size: z.number()
+	},
+	returns: zid('files'),
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
+		requireEditableDocuments(request);
+		requireText(args.filename, 'Filename missing.');
+		await requireOwnedKey(owner, args.r2Key);
+		const fileId = await ctx.db.insert('files', {
+			kind: args.slot === 'auto' ? 'receipt' : args.slot,
+			r2Key: args.r2Key,
+			filename: args.filename,
+			contentType: args.contentType,
+			size: args.size,
+			owner,
+			createdAt: Date.now()
+		});
+		await attachFiles(ctx, request, [fileId], args.slot);
+		return fileId;
 	}
 });
 
@@ -106,11 +126,12 @@ export const removeDocument = authedMutation({
 		const slot = slotOf(request, args.fileId);
 		if (slot === null) return null;
 		requireEditableDocuments(request);
+		const extraction = await extractionForFile(ctx, args.fileId);
 		await ctx.db.patch(request._id, {
 			...detachDocument(request, args.fileId),
+			...(slot === 'receipt' ? { receiptChecks: receiptRemovalChecks(request, extraction) } : {}),
 			updatedAt: Date.now()
 		});
-		const extraction = await extractionForFile(ctx, args.fileId);
 		if (extraction !== null && extraction.purchaseRequestId === request._id) {
 			await ctx.db.patch(extraction._id, { purchaseRequestId: null, updatedAt: Date.now() });
 		}
@@ -155,6 +176,29 @@ export const resolveReview = authedMutation({
 	}
 });
 
+async function attachFiles(
+	ctx: MutationCtx,
+	initial: Doc<'purchaseRequests'>,
+	fileIds: Id<'files'>[],
+	target: Slot | 'auto'
+) {
+	let request = initial;
+	for (const [index, fileId] of [...new Set(fileIds)].entries()) {
+		const explicit = target !== 'auto' && (target === 'receipt' || index === 0);
+		const slot: Slot = explicit ? (target as Slot) : 'receipt';
+		await ctx.db.patch(request._id, {
+			...placeDocument(request, fileId, slot),
+			updatedAt: Date.now()
+		});
+		if (explicit) await ctx.db.patch(fileId, { kind: slot });
+		if (slot === 'receipt') await startExtraction(ctx, request, fileId, !explicit);
+		const next = await ctx.db.get(request._id);
+		if (next === null) throw new Error('Purchase request not found.');
+		request = next;
+	}
+	await demoteIfNotReady(ctx, request._id);
+}
+
 async function startExtraction(
 	ctx: MutationCtx,
 	request: Doc<'purchaseRequests'>,
@@ -193,6 +237,7 @@ async function startExtraction(
 	}
 	await ctx.scheduler.runAfter(0, internal.extraction.jobs.extractFile, {
 		extractionId,
+		fileId,
 		classify,
 		attempt: fields.attempt
 	});
