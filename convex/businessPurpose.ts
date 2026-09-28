@@ -20,7 +20,7 @@ export type BusinessPurposePart =
 	| { kind: 'text'; text: string }
 	| { kind: 'variable'; variable: BusinessPurposeVariable };
 export type BusinessPurposeSource = { parts: BusinessPurposePart[] };
-type BusinessPurposeRequest = Omit<Doc<'purchaseRequests'>, 'businessPurposeSource'>;
+export type BusinessPurposeRequest = Omit<Doc<'purchaseRequests'>, 'businessPurposeSource'>;
 
 const variablesByLabel: Map<string, (typeof businessPurposeVariables)[number]> = new Map(
 	businessPurposeVariables.map((variable) => [variable.label, variable])
@@ -122,7 +122,10 @@ function labelForVariable(variable: BusinessPurposeVariable) {
 	return entry.label;
 }
 
-function valueForVariable(variable: BusinessPurposeVariable, request: BusinessPurposeRequest) {
+export function valueForVariable(
+	variable: BusinessPurposeVariable,
+	request: BusinessPurposeRequest
+) {
 	switch (variable) {
 		case 'studentOrganization':
 			return textValue(request.studentOrganization.name);

@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as approvalEmail from "../approvalEmail.js";
+import type * as authed_approvers from "../authed/approvers.js";
 import type * as authed_board from "../authed/board.js";
 import type * as authed_documents from "../authed/documents.js";
 import type * as authed_extension from "../authed/extension.js";
@@ -37,6 +39,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  approvalEmail: typeof approvalEmail;
+  "authed/approvers": typeof authed_approvers;
   "authed/board": typeof authed_board;
   "authed/documents": typeof authed_documents;
   "authed/extension": typeof authed_extension;

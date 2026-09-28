@@ -8,13 +8,15 @@
 		reading,
 		ready,
 		onjump,
-		onfiles
+		onfiles,
+		onapproval
 	}: {
 		items: LeftItem[];
 		reading: boolean;
 		ready: boolean;
 		onjump: (item: LeftItem) => void;
 		onfiles: (files: File[], slot: UploadSlot) => void;
+		onapproval: () => void;
 	} = $props();
 
 	const collapsedCount = 3;
@@ -77,6 +79,15 @@
 								aria-hidden="true">Add</span
 							>
 						</FilePick>
+						{#if slot === 'second_approval'}
+							<button
+								class="shrink-0 bg-(--pine) px-3 py-1.5 text-sm font-medium text-white hover:bg-(--pine-deep) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--pine)"
+								type="button"
+								onclick={onapproval}
+							>
+								Get it approved
+							</button>
+						{/if}
 					{:else}
 						<button class="row" type="button" onclick={() => onjump(item)}>
 							<span class="text-sm font-medium text-(--ink)">{item.label}</span>

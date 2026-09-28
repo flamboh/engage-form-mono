@@ -173,6 +173,13 @@ export default defineSchema({
 		.index('by_owner_and_organizationId_and_archived', ['owner', 'organizationId', 'archived'])
 		.index('by_owner_and_archived', ['owner', 'archived'])
 		.index('by_owner', ['owner']),
+	approvers: defineTable({
+		owner: v.string(),
+		organizationId: v.id('organizations'),
+		name: v.string(),
+		email: v.string(),
+		usedAt: v.number()
+	}).index('by_owner_and_organizationId_and_usedAt', ['owner', 'organizationId', 'usedAt']),
 	businessPurposeTemplates: defineTable({
 		owner: v.string(),
 		organizationId: v.id('organizations'),

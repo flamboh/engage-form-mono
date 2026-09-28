@@ -62,7 +62,7 @@ const reasonCopy: Record<string, Copy> = {
 	'Second approval missing.': {
 		key: 'second_approval',
 		label: 'Add a Second Approval',
-		detail: 'You paid, so another officer signs off. A screenshot of their approval email works.',
+		detail: 'You paid, so another officer OKs it by email. We’ll write it for you.',
 		target: { kind: 'slot', slot: 'second_approval' },
 		waitsForReceipt: false
 	},

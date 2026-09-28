@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { UploadSlot } from '$lib/uploads.svelte';
+	import type { Snippet } from 'svelte';
 	import FilePick from './FilePick.svelte';
 
 	let {
@@ -8,7 +9,8 @@
 		title,
 		hint,
 		compact = false,
-		onfiles
+		onfiles,
+		children
 	}: {
 		id?: string;
 		slot: UploadSlot;
@@ -16,6 +18,7 @@
 		hint: string;
 		compact?: boolean;
 		onfiles: (files: File[], slot: UploadSlot) => void;
+		children?: Snippet;
 	} = $props();
 
 	let over = $state(false);
@@ -59,6 +62,11 @@
 				Add
 			</FilePick>
 		</div>
+		{#if children}
+			<div class="border-t border-dashed border-(--marker-deep)/40 px-3 py-2">
+				{@render children()}
+			</div>
+		{/if}
 	{:else}
 		<div class="flex flex-col items-center gap-3 px-4 py-6 text-center">
 			<p class="text-base font-medium text-(--ink)">{title}</p>

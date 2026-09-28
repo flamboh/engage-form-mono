@@ -6,8 +6,10 @@
 	import type { RequestBackend } from '../editor.svelte';
 	import { slotField } from '../editor.svelte';
 	import RequestPage from '../RequestPage.svelte';
+	import type { SavedApprover } from '../ApprovalDialog.svelte';
 	import { untrack } from 'svelte';
 	import {
+		mockApprovers,
 		mockEngageUrl,
 		mockOrganizationId,
 		mockRead,
@@ -25,6 +27,7 @@
 	const initialScenario = untrack(() => scenario);
 	const initial = scenarioView(initialScenario);
 	let view = $state<RequestView>(initial);
+	let approvers = $state<SavedApprover[]>(mockApprovers());
 	const pending = $derived(uploadsFor(mockRequestId));
 	const session = { getToken: async () => null };
 	const files: Record<string, File> = {};
@@ -163,6 +166,17 @@
 			await wait(150);
 			view.purchase.status = 'ready';
 		},
+		rememberApprover: async (approver) => {
+			await wait(120);
+			const rest = approvers.filter(
+				(saved) => saved.email.toLowerCase() !== approver.email.toLowerCase()
+			);
+			approvers = [{ id: `mock_approver_${++counter}` as Id<'approvers'>, ...approver }, ...rest];
+		},
+		forgetApprover: async (id) => {
+			await wait(120);
+			approvers = approvers.filter((saved) => saved.id !== id);
+		},
 		upload: (files, slot) => {
 			startUploads(session, mockRequestId, files, slot, transport);
 		}
@@ -193,6 +207,7 @@
 		'prizes for the bouldering comp',
 		'gear swap supplies'
 	]}
+	{approvers}
 	organizationId={mockOrganizationId}
 	{pending}
 	{backend}
