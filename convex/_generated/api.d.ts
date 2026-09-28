@@ -31,6 +31,7 @@ import type * as purchaseModel from "../purchaseModel.js";
 import type * as purchaseReadiness from "../purchaseReadiness.js";
 import type * as purchaseZod from "../purchaseZod.js";
 import type * as requestView from "../requestView.js";
+import type * as seed from "../seed.js";
 
 import type {
   ApiFromModules,
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   purchaseReadiness: typeof purchaseReadiness;
   purchaseZod: typeof purchaseZod;
   requestView: typeof requestView;
+  seed: typeof seed;
 }>;
 
 /**

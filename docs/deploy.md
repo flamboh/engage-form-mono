@@ -74,3 +74,14 @@ Tickets are only valid for up to about 2 hours, so rotating the secret just brea
 2. Set it on the Worker: `bunx wrangler secret put FILES_SIGNING_SECRET < secret.txt`, run in `apps/web`.
 3. Set it on both Convex deployments with the same value, using `bunx convex env set --from-file` with and without `--prod`.
 4. Delete the local secret file.
+
+## Dogfooding seed
+
+After wiping a deployment, restore your own profile, UO ID photos, and Student Organization instead of redoing onboarding:
+
+```sh
+bun run seed        # dev
+bun run seed:prod   # prod
+```
+
+The script reads `.seed/seed.json` plus the ID images next to it, uploads the images to R2 under the owner's key prefix, and calls the internal `seed:restoreOwner` mutation. `.seed/` is gitignored because it holds personal data. `seed.json` has `owner` (the Clerk token identifier), `profile`, `idCardFront`/`idCardBack` (`kind`, `filename`, `contentType`), and `organizations`. Organizations that already exist by name are skipped. Requires `FILES_BASE_URL` and `FILES_SIGNING_SECRET` in `.env.local`.

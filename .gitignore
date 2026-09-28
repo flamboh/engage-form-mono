@@ -32,3 +32,4 @@ dist-ssr
 .dev.vars
 .wrangler
 .convex/
+.seed/
