@@ -3,10 +3,12 @@
 	import type { DocumentSlot, RequestView } from '$convex/requestView';
 	import { requirementPanelsFor, type RequirementPanel } from '$lib/purchase/builderFlow';
 	import type { SavedData } from '$lib/purchase/draftDetails';
-	import type { PendingUpload, UploadSlot } from '$lib/uploads.svelte';
+	import { goto } from '$app/navigation';
+	import { dismissUpload, type PendingUpload, type UploadSlot } from '$lib/uploads.svelte';
 	import ActionBar from './ActionBar.svelte';
 	import ApprovalDialog, { type SavedApprover } from './ApprovalDialog.svelte';
 	import BusinessPurposeCard from './BusinessPurposeCard.svelte';
+	import DeleteRequest from './DeleteRequest.svelte';
 	import DocumentsRail from './DocumentsRail.svelte';
 	import EditDetails from './EditDetails.svelte';
 	import { RequestEditor, slotField, type RequestBackend } from './editor.svelte';
@@ -305,6 +307,16 @@
 						onfiles={upload}
 					/>
 				</div>
+				{#if purchase.status === 'draft'}
+					<DeleteRequest
+						{editor}
+						documentCount={view.documents.length}
+						ondeleted={async () => {
+							for (const upload of pending) dismissUpload(upload.id);
+							await goto(`/app/org/${organizationId}`, { replaceState: true });
+						}}
+					/>
+				{/if}
 			{/if}
 		</main>
 	</div>

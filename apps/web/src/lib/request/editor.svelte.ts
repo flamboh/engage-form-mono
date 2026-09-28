@@ -55,6 +55,7 @@ export type RequestBackend = {
 	requestFill(): Promise<{ engageUrl: string }>;
 	markApproved(): Promise<void>;
 	reopen(): Promise<void>;
+	discard(): Promise<void>;
 	upload(files: File[], slot: UploadSlot): void;
 	rememberApprover(approver: Approver): Promise<void>;
 	forgetApprover(id: Id<'approvers'>): Promise<void>;
@@ -331,6 +332,18 @@ export class RequestEditor {
 	async reopen() {
 		this.fillPhase = 'idle';
 		await this.#run(() => this.#backend().reopen());
+	}
+
+	async discard() {
+		if (this.#timer !== null) clearTimeout(this.#timer);
+		this.#timer = null;
+		this.#dirty.clear();
+		let discarded = false;
+		await this.#run(async () => {
+			await this.#backend().discard();
+			discarded = true;
+		});
+		return discarded;
 	}
 
 	#save() {

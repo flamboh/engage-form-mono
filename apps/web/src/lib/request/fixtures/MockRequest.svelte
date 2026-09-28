@@ -166,6 +166,9 @@
 			await wait(150);
 			view.purchase.status = 'ready';
 		},
+		discard: async () => {
+			await wait(150);
+		},
 		rememberApprover: async (approver) => {
 			await wait(120);
 			const rest = approvers.filter(

@@ -86,6 +86,9 @@
 				clearFilled: false
 			});
 		},
+		discard: async () => {
+			await client.mutation(api.authed.purchaseBuilder.discardDraft, { id: purchaseRequestId });
+		},
 		rememberApprover: async (approver) => {
 			await client.mutation(api.authed.approvers.rememberApprover, { organizationId, ...approver });
 		},
