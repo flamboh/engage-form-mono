@@ -8,9 +8,11 @@ import {
 	businessPurposeTemplateFields,
 	businessPurposeTemplateUpdateFields,
 	filterBusinessPurposeTemplates,
+	formatBusinessPurposeSource,
 	parseBusinessPurposeText,
 	renderBusinessPurpose,
-	userAsPurchaserDetails
+	userAsPurchaserDetails,
+	validateBusinessPurposeText
 } from '../convex/purchaseModel';
 import { evaluatePurchaseReadiness } from '../convex/purchaseReadiness';
 
@@ -107,8 +109,26 @@ test('renders optional recipient tokens without unresolved placeholders when abs
 	);
 });
 
-test('rejects unknown Business Purpose variables', () => {
-	expect(() => parseBusinessPurposeText('Reimburse {Purchaser} for {Bad Variable}.')).toThrow(
+test('keeps unknown Business Purpose tokens as literal text', () => {
+	expect(parseBusinessPurposeText('Reimburse {Purchaser} for {Bad Variable} at {vendor}.')).toEqual(
+		{
+			parts: [
+				{ kind: 'text', text: 'Reimburse ' },
+				{ kind: 'variable', variable: 'purchaser' },
+				{ kind: 'text', text: ' for {Bad Variable} at ' },
+				{ kind: 'variable', variable: 'vendor' },
+				{ kind: 'text', text: '.' }
+			]
+		}
+	);
+	expect(parseBusinessPurposeText('{oops}')).toEqual({ parts: [{ kind: 'text', text: '{oops}' }] });
+	expect(
+		formatBusinessPurposeSource(parseBusinessPurposeText('Snacks {Vendor} {x} {Total Amount}'))
+	).toBe('Snacks {Vendor} {x} {Total Amount}');
+});
+
+test('templates still reject unknown Business Purpose variables', () => {
+	expect(() => validateBusinessPurposeText('Reimburse {Purchaser} for {Bad Variable}.')).toThrow(
 		'Unknown Business Purpose variable: Bad Variable.'
 	);
 });

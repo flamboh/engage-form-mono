@@ -11,13 +11,34 @@ export type FileTicket = {
 const encoder = new TextEncoder();
 
 function canonical(ticket: FileTicket) {
-	return [
+	return JSON.stringify([
 		ticket.action,
 		ticket.key,
-		String(ticket.expiresAt),
-		ticket.contentType ?? '',
-		ticket.maxSize === undefined ? '' : String(ticket.maxSize)
-	].join('\n');
+		ticket.expiresAt,
+		ticket.contentType ?? null,
+		ticket.maxSize ?? null
+	]);
+}
+
+export const uploadContentTypes = [
+	'image/jpeg',
+	'image/png',
+	'image/webp',
+	'image/heic',
+	'image/heif',
+	'application/pdf',
+	'text/plain'
+] as const;
+
+export function uploadContentType(contentType: string) {
+	const normalized = contentType.trim().toLowerCase();
+	if (
+		!/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(normalized) ||
+		!(uploadContentTypes as readonly string[]).includes(normalized)
+	) {
+		throw new Error('Upload a photo (JPEG, PNG, WebP, HEIC), PDF, or text file.');
+	}
+	return normalized;
 }
 
 async function hmac(secret: string, message: string) {

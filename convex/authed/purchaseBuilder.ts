@@ -8,6 +8,7 @@ import type { BusinessPurposePart, BusinessPurposeSource } from '../businessPurp
 import {
 	applyDraftPatch,
 	assertReady,
+	changedSnapshotPatch,
 	businessPurposeTemplateDraftPatch,
 	businessPurposeTemplateFields,
 	businessPurposeTemplateUpdateFields,
@@ -24,6 +25,7 @@ import {
 	userAsPurchaserDetails,
 	userAsRequesterDetails,
 	userFieldSources,
+	validateBusinessPurposeText,
 	type DraftPatch
 } from '../purchaseModel';
 import {
@@ -238,7 +240,7 @@ export const upsertOrganization = authedMutation({
 		requireText(args.name, 'Organization name missing.');
 		requireText(args.indexNumber, 'Index number missing.');
 		requireText(args.businessPurposeTemplate, 'Business Purpose Template missing.');
-		parseBusinessPurposeText(args.businessPurposeTemplate);
+		validateBusinessPurposeText(args.businessPurposeTemplate);
 		const budgetLines = args.budgetLines.map((line) => line.trim()).filter((line) => line !== '');
 		if (budgetLines.length === 0) throw new Error('Add at least one budget line.');
 		const fields = {
@@ -553,14 +555,22 @@ export const createDraftForOrganization = authedMutation({
 });
 
 export const saveDraftSnapshot = authedMutation({
-	args: { id: zid('purchaseRequests'), snapshot: wizardSnapshot },
+	args: {
+		id: zid('purchaseRequests'),
+		snapshot: wizardSnapshot,
+		changedFields: z.array(z.string()).optional()
+	},
 	returns: nullReturn,
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
+		const changedFields = args.changedFields;
 		const patch = withoutDocumentFields(
-			keepFilledFields(request, snapshotPatch(request, args.snapshot))
+			changedFields === undefined
+				? keepFilledFields(request, snapshotPatch(args.snapshot))
+				: changedSnapshotPatch(snapshotPatch(args.snapshot), changedFields)
 		);
+		if (Object.keys(patch).every((key) => key === 'updatedAt')) return null;
 		const fieldSources = userFieldSources(request, patch);
 		await ctx.db.patch(args.id, {
 			...patch,
@@ -676,7 +686,17 @@ export const discardDraft = authedMutation({
 		].filter((id): id is Id<'files'> => id !== null);
 		for (const fileId of fileIds) {
 			await deleteStoredFile(ctx, await requireOwnedDoc(ctx, 'files', fileId, owner));
+			const extractions = await ctx.db
+				.query('extractions')
+				.withIndex('by_fileId', (q) => q.eq('fileId', fileId))
+				.take(10);
+			for (const extraction of extractions) await ctx.db.delete(extraction._id);
 		}
+		const detached = await ctx.db
+			.query('extractions')
+			.withIndex('by_purchaseRequestId', (q) => q.eq('purchaseRequestId', args.id))
+			.take(50);
+		for (const extraction of detached) await ctx.db.delete(extraction._id);
 		await ctx.db.delete(args.id);
 		return null;
 	}
@@ -727,10 +747,7 @@ function emptyDraft(
 	};
 }
 
-function snapshotPatch(
-	request: { typeOfPurchase: DraftPatch['typeOfPurchase'] },
-	snapshot: z.infer<typeof wizardSnapshot>
-) {
+function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {
 	return {
 		typeOfPurchase: snapshot.typeOfPurchase,
 		documentationCategories: snapshot.documentationCategories,

@@ -2,6 +2,8 @@ import { expect, test } from 'vitest';
 import type { Doc, Id } from '../convex/_generated/dataModel';
 import {
 	detachDocument,
+	documentReadFailed,
+	isCurrentAttempt,
 	placeDocument,
 	receiptFieldsPatch,
 	requestDocuments,
@@ -10,6 +12,7 @@ import {
 	slotForKind
 } from '../convex/extraction/apply';
 import {
+	changedSnapshotPatch,
 	keepFilledFields,
 	parseBusinessPurposeText,
 	previousRequestDefaults,
@@ -317,4 +320,70 @@ test('stale empty snapshots do not erase receipt-filled fields', () => {
 	).toEqual({ itemDescription: '' });
 	const typed = { ...filled, fieldSources: { vendor: 'user' } } as Doc<'purchaseRequests'>;
 	expect(keepFilledFields(typed, { vendor: '' })).toEqual({ vendor: '' });
+});
+
+test('snapshot saves with changedFields only apply and mark the edited fields', () => {
+	const filled = {
+		...draft,
+		vendor: 'Bigbox Wholesale',
+		totalAmount: 28.48,
+		budgetLineItem: 'Event Expenses',
+		fieldSources: { vendor: 'receipt', totalAmount: 'receipt' }
+	} as Doc<'purchaseRequests'>;
+	const staleSnapshot = {
+		typeOfPurchase: 'personal_reimbursement' as const,
+		reimbursementReason: 'Other processes are too slow.',
+		vendor: '',
+		totalAmount: 0,
+		budgetLineItem: 'Food',
+		businessPurposeSource: parseBusinessPurposeText('For {Vendor}'),
+		purchaserSource: { kind: 'self' as const },
+		purchaser: filled.purchaser,
+		updatedAt: 5
+	};
+	const patch = changedSnapshotPatch(staleSnapshot, ['budgetLineItem']);
+	expect(patch).toEqual({ budgetLineItem: 'Food', updatedAt: 5 });
+	expect(userFieldSources(filled, patch)).toEqual({
+		vendor: 'receipt',
+		totalAmount: 'receipt',
+		budgetLineItem: 'user'
+	});
+	expect(Object.keys(changedSnapshotPatch(staleSnapshot, ['businessPurposeText']))).toEqual([
+		'businessPurposeSource',
+		'updatedAt'
+	]);
+	expect(Object.keys(changedSnapshotPatch(staleSnapshot, ['typeOfPurchase']))).toEqual([
+		'typeOfPurchase',
+		'reimbursementReason',
+		'updatedAt'
+	]);
+	expect(Object.keys(changedSnapshotPatch(staleSnapshot, ['purchaserSource']))).toEqual([
+		'purchaserSource',
+		'purchaser',
+		'updatedAt'
+	]);
+	expect(changedSnapshotPatch(staleSnapshot, [])).toEqual({ updatedAt: 5 });
+});
+
+test('only the current extraction attempt may finish or fail', () => {
+	expect(isCurrentAttempt({ attempt: 2 }, 2)).toBe(true);
+	expect(isCurrentAttempt({ attempt: 2 }, 1)).toBe(false);
+	expect(isCurrentAttempt({ attempt: 1 }, undefined)).toBe(false);
+	expect(isCurrentAttempt({}, undefined)).toBe(true);
+	expect(isCurrentAttempt({}, 1)).toBe(false);
+});
+
+test('documents that failed or read nothing are flagged for the user', () => {
+	expect(documentReadFailed('receipt', null)).toBe(false);
+	expect(documentReadFailed('receipt', extraction(receiptA, { status: 'failed' }))).toBe(true);
+	expect(documentReadFailed('publicity', extraction(receiptA, { status: 'failed' }))).toBe(true);
+	expect(documentReadFailed('receipt', extraction(receiptA, { status: 'running' }))).toBe(false);
+	expect(documentReadFailed('receipt', extraction(receiptA, {}))).toBe(true);
+	expect(documentReadFailed('publicity', extraction(receiptA, {}))).toBe(false);
+	expect(documentReadFailed('receipt', bigbox)).toBe(false);
+});
+
+test('failed receipts are left out of totals while successful ones still sum', () => {
+	const failed = extraction(receiptB, { status: 'failed' });
+	expect(receiptFieldsPatch(draft, [bigbox, failed]).totalAmount).toBe(28.48);
 });

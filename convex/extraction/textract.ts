@@ -21,6 +21,7 @@ export type AwsCredentials = {
 };
 
 export const textractMaxBytes = 10 * 1024 * 1024;
+const textractTimeoutMs = 20_000;
 
 export async function analyzeExpense(
 	bytes: Uint8Array,
@@ -43,7 +44,7 @@ export async function analyzeExpense(
 		},
 		body: JSON.stringify({ Document: { Bytes: bytesToBase64(bytes) } })
 	});
-	const response = await fetcher(request);
+	const response = await fetcher(request, { signal: AbortSignal.timeout(textractTimeoutMs) });
 	if (!response.ok) {
 		const body = await response.text();
 		throw new Error(`Textract failed with ${response.status}: ${body.slice(0, 200)}`);

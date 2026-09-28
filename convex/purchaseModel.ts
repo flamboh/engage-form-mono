@@ -10,13 +10,15 @@ import { fileDownloadUrl } from './files';
 import {
 	parseBusinessPurposeText,
 	resolveBusinessPurpose,
+	validateBusinessPurposeText,
 	type BusinessPurposeSource
 } from './businessPurpose';
 export {
 	formatBusinessPurposeSource,
 	parseBusinessPurposeText,
 	resolveBusinessPurpose,
-	validateBusinessPurposeSource
+	validateBusinessPurposeSource,
+	validateBusinessPurposeText
 } from './businessPurpose';
 
 export { evaluatePurchaseReadiness, unresolvedToken } from './purchaseReadiness';
@@ -195,6 +197,25 @@ export function userFieldSources(
 	return changed ? sources : request.fieldSources;
 }
 
+const snapshotFieldTargets: Record<string, readonly string[]> = {
+	typeOfPurchase: ['typeOfPurchase', 'reimbursementReason'],
+	purchaserSource: ['purchaserSource', 'purchaser'],
+	businessPurposeText: ['businessPurposeSource']
+};
+
+export function changedSnapshotPatch<Patch extends object>(
+	patch: Patch,
+	changedFields: readonly string[]
+): Partial<Patch> {
+	const keys = new Set(['updatedAt']);
+	for (const field of changedFields) {
+		for (const key of snapshotFieldTargets[field] ?? [field]) keys.add(key);
+	}
+	return Object.fromEntries(
+		Object.entries(patch).filter(([key]) => keys.has(key))
+	) as Partial<Patch>;
+}
+
 export function keepFilledFields<Patch extends Partial<Doc<'purchaseRequests'>>>(
 	request: Doc<'purchaseRequests'>,
 	patch: Patch
@@ -365,7 +386,7 @@ export function businessPurposeTemplateUpdateFields(
 	const title = input.title.trim();
 	requireText(title, 'Business Purpose Template title missing.');
 	requireText(input.businessPurposeTemplate, 'Business Purpose Template missing.');
-	parseBusinessPurposeText(input.businessPurposeTemplate);
+	validateBusinessPurposeText(input.businessPurposeTemplate);
 	return {
 		title,
 		businessPurposeTemplate: input.businessPurposeTemplate,
@@ -495,6 +516,13 @@ export async function purchaseReadiness(ctx: Ctx, request: Doc<'purchaseRequests
 			return doc !== null && doc.owner === request.owner && doc.organizationId === organizationId;
 		}
 	});
+}
+
+export async function demoteIfNotReady(ctx: MutationCtx, id: Id<'purchaseRequests'>) {
+	const request = await ctx.db.get(id);
+	if (request === null || request.status !== 'ready') return;
+	if ((await purchaseReadiness(ctx, request)).ready) return;
+	await ctx.db.patch(id, { status: 'draft', updatedAt: Date.now() });
 }
 
 async function documentPayload(ctx: Ctx, id: Id<'files'>, owner: string) {

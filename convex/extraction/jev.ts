@@ -339,6 +339,8 @@ export function parseDecisionResponse(context: DecisionContext, response: JevRes
 	};
 }
 
+const jevTimeoutMs = 10_000;
+
 export async function askJev(
 	request: JevRequest,
 	apiKey: string,
@@ -348,7 +350,8 @@ export async function askJev(
 		const response = await fetcher(jevUrl, {
 			method: 'POST',
 			headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-			body: JSON.stringify(request)
+			body: JSON.stringify(request),
+			signal: AbortSignal.timeout(jevTimeoutMs)
 		});
 		if (response.ok) return (await response.json()) as JevResponse;
 		if ((response.status === 429 || response.status === 529) && attempt < 2) {

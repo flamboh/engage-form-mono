@@ -9,9 +9,9 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { readFileBytes } from '../files';
-import { renderBusinessPurpose } from '../purchaseModel';
+import { demoteIfNotReady, renderBusinessPurpose } from '../purchaseModel';
 import { presentPurchaseRequest } from '../authed/purchaseBuilder';
-import { detachDocument, placeDocument, receiptFieldsPatch, slotForKind, slotOf } from './apply';
+import { isCurrentAttempt, placeDocument, receiptFieldsPatch, slotForKind, slotOf } from './apply';
 import { documentKinds, type DocumentExtraction, type ParsedField } from './jev';
 import { decideDefaults, extractDocument, readDocumentText, type ExtractionEnv } from './pipeline';
 
@@ -33,11 +33,14 @@ const suggestedCategory = v.union(
 	v.literal('gifts_prizes')
 );
 
+const attemptArg = v.optional(v.number());
+
 export const extractFile = internalAction({
-	args: { extractionId: v.id('extractions'), classify: v.boolean() },
+	args: { extractionId: v.id('extractions'), classify: v.boolean(), attempt: attemptArg },
 	handler: async (ctx, args) => {
 		const started = await ctx.runMutation(internal.extraction.jobs.startExtraction, {
-			extractionId: args.extractionId
+			extractionId: args.extractionId,
+			attempt: args.attempt
 		});
 		if (started === null) return null;
 		try {
@@ -47,6 +50,7 @@ export const extractFile = internalAction({
 			const result = await extractDocument(text, env);
 			const purchaseRequestId = await ctx.runMutation(internal.extraction.jobs.finishExtraction, {
 				extractionId: args.extractionId,
+				attempt: args.attempt,
 				classify: args.classify,
 				textSource: text.source,
 				result: storedResult(result)
@@ -58,6 +62,7 @@ export const extractFile = internalAction({
 		} catch (error) {
 			await ctx.runMutation(internal.extraction.jobs.failExtraction, {
 				extractionId: args.extractionId,
+				attempt: args.attempt,
 				error: error instanceof Error ? error.message.slice(0, 500) : 'Extraction failed.'
 			});
 		}
@@ -76,12 +81,16 @@ export const refreshDefaults = internalAction({
 export const extractionTimeoutMs = 3 * 60 * 1000;
 
 export const expireExtraction = internalMutation({
-	args: { extractionId: v.id('extractions') },
+	args: { extractionId: v.id('extractions'), attempt: attemptArg },
 	handler: async (ctx, args) => {
 		const extraction = await ctx.db.get(args.extractionId);
-		if (extraction === null) return null;
+		if (extraction === null || !isCurrentAttempt(extraction, args.attempt)) return null;
 		if (extraction.status !== 'pending' && extraction.status !== 'running') return null;
-		if (Date.now() - extraction.updatedAt < extractionTimeoutMs - 10_000) return null;
+		const remaining = extractionTimeoutMs - (Date.now() - extraction.updatedAt);
+		if (remaining > 0) {
+			await ctx.scheduler.runAfter(remaining, internal.extraction.jobs.expireExtraction, args);
+			return null;
+		}
 		await ctx.db.patch(args.extractionId, {
 			status: 'failed',
 			error: 'Reading the document timed out.',
@@ -92,20 +101,21 @@ export const expireExtraction = internalMutation({
 });
 
 export const startExtraction = internalMutation({
-	args: { extractionId: v.id('extractions') },
+	args: { extractionId: v.id('extractions'), attempt: attemptArg },
 	handler: async (ctx, args) => {
 		const extraction = await ctx.db.get(args.extractionId);
 		if (extraction === null || extraction.status === 'done') return null;
+		if (!isCurrentAttempt(extraction, args.attempt)) return null;
 		await ctx.db.patch(args.extractionId, { status: 'running', updatedAt: Date.now() });
 		return { fileId: extraction.fileId };
 	}
 });
 
 export const failExtraction = internalMutation({
-	args: { extractionId: v.id('extractions'), error: v.string() },
+	args: { extractionId: v.id('extractions'), attempt: attemptArg, error: v.string() },
 	handler: async (ctx, args) => {
 		const extraction = await ctx.db.get(args.extractionId);
-		if (extraction === null) return null;
+		if (extraction === null || !isCurrentAttempt(extraction, args.attempt)) return null;
 		await ctx.db.patch(args.extractionId, {
 			status: 'failed',
 			error: args.error,
@@ -118,6 +128,7 @@ export const failExtraction = internalMutation({
 export const finishExtraction = internalMutation({
 	args: {
 		extractionId: v.id('extractions'),
+		attempt: attemptArg,
 		classify: v.boolean(),
 		textSource: v.union(v.literal('text_layer'), v.literal('textract')),
 		result: v.object({
@@ -131,7 +142,7 @@ export const finishExtraction = internalMutation({
 	},
 	handler: async (ctx, args) => {
 		const extraction = await ctx.db.get(args.extractionId);
-		if (extraction === null) return null;
+		if (extraction === null || !isCurrentAttempt(extraction, args.attempt)) return null;
 		const slot = slotForKind(args.result.documentKind, args.result.looksLikePurchase);
 		const receiptLike = isReceipt(args.result, args.classify);
 		await ctx.db.patch(args.extractionId, {
@@ -148,7 +159,8 @@ export const finishExtraction = internalMutation({
 		if (extraction.purchaseRequestId === null) return null;
 		const request = await ctx.db.get(extraction.purchaseRequestId);
 		if (request === null || request.owner !== extraction.owner) return null;
-		if (args.classify) await classifyDocument(ctx, request, extraction.fileId, slot);
+		if (args.classify && request.status !== 'approved')
+			await classifyDocument(ctx, request, extraction.fileId, slot);
 		await applyReceiptFields(ctx, request._id);
 		return request._id;
 	}
@@ -221,11 +233,7 @@ async function classifyDocument(
 	slot: ReturnType<typeof slotForKind>
 ) {
 	const current = slotOf(request, fileId);
-	if (current === null || current === slot) return;
-	if (slot === null) {
-		await ctx.db.patch(request._id, { ...detachDocument(request, fileId), updatedAt: Date.now() });
-		return;
-	}
+	if (current === null || slot === null || current === slot) return;
 	await ctx.db.patch(request._id, {
 		...placeDocument(request, fileId, slot),
 		updatedAt: Date.now()
@@ -239,7 +247,7 @@ export async function applyReceiptFields(
 	purchaseRequestId: Id<'purchaseRequests'>
 ) {
 	const request = await ctx.db.get(purchaseRequestId);
-	if (request === null || request.status !== 'draft') return;
+	if (request === null || request.status === 'approved') return;
 	const extractions = await ctx.db
 		.query('extractions')
 		.withIndex('by_purchaseRequestId', (q) => q.eq('purchaseRequestId', purchaseRequestId))
@@ -247,6 +255,7 @@ export async function applyReceiptFields(
 	const patch = receiptFieldsPatch(request, extractions);
 	if (Object.keys(patch).length === 0) return;
 	await ctx.db.patch(purchaseRequestId, { ...patch, updatedAt: Date.now() });
+	await demoteIfNotReady(ctx, purchaseRequestId);
 }
 
 async function refreshDecisions(

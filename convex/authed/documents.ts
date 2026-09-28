@@ -5,6 +5,7 @@ import type { MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { fileDownloadUrl } from '../files';
 import {
+	demoteIfNotReady,
 	ownerFromIdentity,
 	purchaseReadiness,
 	renderBusinessPurpose,
@@ -14,6 +15,7 @@ import { nullReturn } from '../purchaseZod';
 import { documentSlot, requestView, reviewField } from '../requestView';
 import {
 	detachDocument,
+	documentReadFailed,
 	placeDocument,
 	requestDocuments,
 	requestReviews,
@@ -35,22 +37,23 @@ export const getRequestView = authedQuery({
 			.query('extractions')
 			.withIndex('by_purchaseRequestId', (q) => q.eq('purchaseRequestId', request._id))
 			.take(50);
-		const readingFiles = new Set(
-			extractions
-				.filter((row) => row.status === 'pending' || row.status === 'running')
-				.map((row) => row.fileId)
-		);
+		const extractionsByFile = new Map(extractions.map((row) => [row.fileId, row]));
 		const documents = [];
-		for (const { fileId } of requestDocuments(request)) {
+		for (const { fileId, slot } of requestDocuments(request)) {
 			const file = await ctx.db.get(fileId);
 			if (file === null || file.owner !== owner) continue;
+			const extraction = extractionsByFile.get(fileId) ?? null;
+			const url = await previewUrl(ctx, file);
 			documents.push({
 				fileId,
 				kind: file.kind,
 				filename: file.filename,
 				contentType: file.contentType,
-				previewUrl: await previewUrl(ctx, file),
-				reading: readingFiles.has(fileId)
+				previewUrl: url,
+				reading: extraction?.status === 'pending' || extraction?.status === 'running',
+				readFailed:
+					documentReadFailed(slot, extraction) ||
+					(slot === 'receipt' && url === null && extraction?.status !== 'done')
 			});
 		}
 		const purchase = presentPurchaseRequest(request);
@@ -75,6 +78,7 @@ export const attachDocuments = authedMutation({
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		let request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
+		requireEditableDocuments(request);
 		const fileIds = [...new Set(args.fileIds)];
 		for (const [index, fileId] of fileIds.entries()) {
 			await requireOwnedDoc(ctx, 'files', fileId, owner);
@@ -82,13 +86,13 @@ export const attachDocuments = authedMutation({
 			const slot: Slot = explicit ? (args.slot as Slot) : 'receipt';
 			await ctx.db.patch(request._id, {
 				...placeDocument(request, fileId, slot),
-				status: 'draft',
 				updatedAt: Date.now()
 			});
 			if (explicit) await ctx.db.patch(fileId, { kind: slot });
 			if (slot === 'receipt') await startExtraction(ctx, request, fileId, !explicit);
 			request = await requireOwnedDoc(ctx, 'purchaseRequests', request._id, owner);
 		}
+		await demoteIfNotReady(ctx, request._id);
 		return null;
 	}
 });
@@ -101,9 +105,9 @@ export const removeDocument = authedMutation({
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
 		const slot = slotOf(request, args.fileId);
 		if (slot === null) return null;
+		requireEditableDocuments(request);
 		await ctx.db.patch(request._id, {
 			...detachDocument(request, args.fileId),
-			status: 'draft',
 			updatedAt: Date.now()
 		});
 		const extraction = await extractionForFile(ctx, args.fileId);
@@ -111,6 +115,23 @@ export const removeDocument = authedMutation({
 			await ctx.db.patch(extraction._id, { purchaseRequestId: null, updatedAt: Date.now() });
 		}
 		if (slot === 'receipt') await applyReceiptFields(ctx, request._id);
+		await demoteIfNotReady(ctx, request._id);
+		return null;
+	}
+});
+
+export const retryExtraction = authedMutation({
+	args: { purchaseRequestId: zid('purchaseRequests'), fileId: zid('files') },
+	returns: nullReturn,
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
+		requireEditableDocuments(request);
+		if (slotOf(request, args.fileId) !== 'receipt') throw new Error('Only receipts can be read.');
+		await requireOwnedDoc(ctx, 'files', args.fileId, owner);
+		const existing = await extractionForFile(ctx, args.fileId);
+		if (existing?.status === 'pending' || existing?.status === 'running') return null;
+		await startExtraction(ctx, request, args.fileId, false, true);
 		return null;
 	}
 });
@@ -138,11 +159,12 @@ async function startExtraction(
 	ctx: MutationCtx,
 	request: Doc<'purchaseRequests'>,
 	fileId: Id<'files'>,
-	classify: boolean
+	classify: boolean,
+	force = false
 ) {
 	const now = Date.now();
 	const existing = await extractionForFile(ctx, fileId);
-	if (existing !== null && existing.status === 'done' && !classify) {
+	if (existing !== null && existing.status === 'done' && !classify && !force) {
 		await ctx.db.patch(existing._id, { purchaseRequestId: request._id, updatedAt: now });
 		await applyReceiptFields(ctx, request._id);
 		return;
@@ -159,6 +181,7 @@ async function startExtraction(
 		receiptDate: null,
 		items: [],
 		error: null,
+		attempt: (existing?.attempt ?? 0) + 1,
 		updatedAt: now
 	};
 	let extractionId: Id<'extractions'>;
@@ -170,11 +193,19 @@ async function startExtraction(
 	}
 	await ctx.scheduler.runAfter(0, internal.extraction.jobs.extractFile, {
 		extractionId,
-		classify
+		classify,
+		attempt: fields.attempt
 	});
 	await ctx.scheduler.runAfter(extractionTimeoutMs, internal.extraction.jobs.expireExtraction, {
-		extractionId
+		extractionId,
+		attempt: fields.attempt
 	});
+}
+
+function requireEditableDocuments(request: Doc<'purchaseRequests'>) {
+	if (request.status === 'approved') {
+		throw new Error('This request is approved. Reopen it before changing documents.');
+	}
 }
 
 async function extractionForFile(ctx: MutationCtx, fileId: Id<'files'>) {

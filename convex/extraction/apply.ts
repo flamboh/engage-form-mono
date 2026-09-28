@@ -249,3 +249,28 @@ export function resolveReviewPatch(
 	}
 	return patch;
 }
+
+export function isCurrentAttempt(
+	extraction: Pick<Doc<'extractions'>, 'attempt'>,
+	attempt: number | undefined
+) {
+	return (extraction.attempt ?? 0) === (attempt ?? 0);
+}
+
+export function documentReadFailed(
+	slot: Slot,
+	extraction: Pick<
+		Doc<'extractions'>,
+		'status' | 'vendor' | 'totalAmount' | 'receiptDate' | 'items'
+	> | null
+) {
+	if (extraction === null) return false;
+	if (extraction.status === 'failed') return true;
+	if (slot !== 'receipt' || extraction.status !== 'done') return false;
+	return (
+		extraction.vendor === null &&
+		extraction.totalAmount === null &&
+		extraction.receiptDate === null &&
+		extraction.items.length === 0
+	);
+}
