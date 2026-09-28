@@ -9,15 +9,21 @@ const appRoot = import.meta.dirname;
 const workspaceRoot = path.resolve(appRoot, '../..');
 const convexProjectDir = workspaceRoot;
 const convexFunctionsDir = 'convex';
-const localConvexPort = 3210;
-const localConvexSiteProxyPort = 3211;
+const localConvexPort = Number(process.env.LOCAL_CONVEX_PORT ?? 3210);
+const localConvexSiteProxyPort = Number(process.env.LOCAL_CONVEX_SITE_PORT ?? localConvexPort + 1);
 const localConvexUrl = `http://localhost:${localConvexPort}`;
 const localConvexSiteUrl = `http://localhost:${localConvexSiteProxyPort}`;
 
 const getEnvValue = (loadedEnv: Record<string, string>, key: string) =>
 	process.env[key] ?? loadedEnv[key];
 
-const LOCAL_CONVEX_ENV_KEYS = ['CLERK_SECRET_KEY', 'CLERK_JWT_ISSUER_DOMAIN'] as const;
+const LOCAL_CONVEX_ENV_KEYS = [
+	'CLERK_SECRET_KEY',
+	'CLERK_JWT_ISSUER_DOMAIN',
+	'TYPESAFE_AI_KEY',
+	'FILES_SIGNING_SECRET',
+	'FILES_BASE_URL'
+] as const;
 
 const getLocalConvexEnvVars = (loadedEnv: Record<string, string>) => {
 	return Object.fromEntries(
