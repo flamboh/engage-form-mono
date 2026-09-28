@@ -10,6 +10,7 @@ import {
 	type SavedData
 } from '$lib/purchase/draftDetails';
 import { createSingleFlight } from '$lib/singleFlight';
+import { SvelteSet } from 'svelte/reactivity';
 import type { UploadSlot } from '$lib/uploads.svelte';
 import type { ReviewField } from './whatsLeft';
 
@@ -71,7 +72,7 @@ export class RequestEditor {
 	#getUser: () => Doc<'users'> | null;
 	#backend: () => RequestBackend;
 	#timer: ReturnType<typeof setTimeout> | null = null;
-	#dirty = new Set<keyof FormState>();
+	#dirty = new SvelteSet<keyof FormState>();
 	#saver = createSingleFlight(async () => {
 		const state = this.form;
 		if (state === null || this.#dirty.size === 0) return;

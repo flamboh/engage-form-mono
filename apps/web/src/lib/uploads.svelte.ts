@@ -17,6 +17,7 @@ export type PendingUpload = {
 	status: 'uploading' | 'attaching' | 'attached' | 'failed';
 	fileId: Id<'files'> | null;
 	error: string;
+	retryable: boolean;
 };
 
 export type UploadTransport = {
@@ -76,7 +77,8 @@ export function startUploads(
 			slot,
 			status: 'uploading',
 			fileId: null,
-			error: ''
+			error: '',
+			retryable: true
 		});
 		return id;
 	});
@@ -103,10 +105,13 @@ export function localPreviewFor(fileId: string) {
 	return uploads.find((upload) => upload.fileId === fileId)?.objectUrl ?? null;
 }
 
-export function settleUploads(purchaseRequestId: string, serverFileIds: Iterable<string>) {
-	const known = new Set(serverFileIds);
+export function settleUploads(purchaseRequestId: string, serverFileIds: string[]) {
 	for (const upload of uploadsFor(purchaseRequestId)) {
-		if (upload.status === 'attached' && upload.fileId !== null && known.has(upload.fileId)) {
+		if (
+			upload.status === 'attached' &&
+			upload.fileId !== null &&
+			serverFileIds.includes(upload.fileId)
+		) {
 			dismissUpload(upload.id);
 		}
 	}
@@ -207,6 +212,7 @@ function fail(id: string, err: unknown, stage: 'upload' | 'attach') {
 	const upload = find(id);
 	if (upload === undefined) return;
 	upload.status = 'failed';
+	upload.retryable = !(err instanceof UploadProblem);
 	upload.error =
 		err instanceof UploadProblem
 			? err.message

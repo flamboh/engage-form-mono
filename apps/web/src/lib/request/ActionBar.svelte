@@ -79,7 +79,9 @@
 				<button
 					class="secondary-action hidden sm:inline-flex"
 					type="button"
-					onclick={() => void editor.fill()}>Fill again</button
+					disabled={editor.fillPhase === 'opening'}
+					onclick={() => void editor.fill()}
+					>{editor.fillPhase === 'opening' ? 'Opening Engage…' : 'Fill again'}</button
 				>
 				<button
 					class="primary-action"

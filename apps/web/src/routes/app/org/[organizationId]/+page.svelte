@@ -166,7 +166,9 @@
 							<RequestRow {item} href={requestHref(item.id)}>
 								{#if fillingId === item.id && busyId !== item.id}
 									<span class="flex items-center gap-2 text-sm text-stone-700" role="status">
-										<span class="filling h-2 w-2 shrink-0 rounded-full bg-[#154733]" aria-hidden="true"
+										<span
+											class="filling h-2 w-2 shrink-0 rounded-full bg-[#154733]"
+											aria-hidden="true"
 										></span>
 										Filling on Engage…
 										<button

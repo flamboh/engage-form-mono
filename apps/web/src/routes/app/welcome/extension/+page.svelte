@@ -5,6 +5,7 @@
 	import { errorMessage } from '$lib/app/styles';
 	import ReceiptDrop from '$lib/board/ReceiptDrop.svelte';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
+	import { prefetchRequest } from '$lib/request/prefetch';
 	import { startUploads } from '$lib/uploads.svelte';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 
@@ -22,10 +23,12 @@
 		starting = true;
 		error = '';
 		try {
-			const id = await client.mutation(api.authed.purchaseBuilder.createDraftForOrganization, {
+			const created = client.mutation(api.authed.purchaseBuilder.createDraftForOrganization, {
 				organizationId: organization._id
 			});
-			void startUploads(session, id, files, 'auto');
+			if (files.length > 0) startUploads(session, created, files, 'auto');
+			const id = await created;
+			prefetchRequest(client, id, organization._id);
 			await goto(`/app/org/${organization._id}/purchase/${id}`);
 		} catch (err) {
 			error = errorMessage(err);

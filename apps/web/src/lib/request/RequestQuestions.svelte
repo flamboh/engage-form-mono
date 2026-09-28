@@ -3,7 +3,7 @@
 	import type { FundLetter } from '$lib/purchase/draftDetails';
 	import Chip from './Chip.svelte';
 	import type { RequestEditor } from './editor.svelte';
-	import { categoryOptions, formatDate } from './labels';
+	import { categoryOptions, dateInputValue, formatDate } from './labels';
 	import RecipientsEditor from './RecipientsEditor.svelte';
 	import SourceCue from './SourceCue.svelte';
 
@@ -75,7 +75,8 @@
 				autocomplete="off"
 				placeholder="Prizes for trivia night"
 				value={purpose}
-				oninput={(event) => editor.update({ purpose: event.currentTarget.value }, { debounce: true })}
+				oninput={(event) =>
+					editor.update({ purpose: event.currentTarget.value }, { debounce: true })}
 			/>
 			{#if purposeChips.length > 0}
 				<div class="flex flex-wrap items-center gap-2" aria-label="Recent answers">
@@ -122,7 +123,9 @@
 
 		<div id="field-activityDate" class="flex flex-col gap-1.5">
 			<span class="flex items-baseline gap-2">
-				<label class="text-sm font-medium text-(--ink)" for="activity-date">When was the event?</label>
+				<label class="text-sm font-medium text-(--ink)" for="activity-date"
+					>When was the event?</label
+				>
 				<SourceCue source={editor.sourceOf('activityDate')} />
 			</span>
 			<div class="flex flex-wrap items-center gap-2">
@@ -130,7 +133,7 @@
 					id="activity-date"
 					class="input max-w-56"
 					type="date"
-					value={form?.activityDate ?? ''}
+					value={dateInputValue(form?.activityDate)}
 					onchange={(event) => editor.update({ activityDate: event.currentTarget.value })}
 				/>
 				{#if !form?.activityDate && editor.receiptDate}

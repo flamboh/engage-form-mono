@@ -36,13 +36,13 @@
 	let freshUrls = $state<Record<string, string>>({});
 	let expired = $state<Record<string, boolean>>({});
 
-	async function previewFailed(fileId: Id<'files'>) {
+	async function previewFailed(fileId: Id<'files'>, failedUrl: string | null) {
 		if (fileId in freshUrls || expired[fileId]) {
 			expired = { ...expired, [fileId]: true };
 			return;
 		}
 		const url = await refreshpreview(fileId).catch(() => null);
-		if (url === null) expired = { ...expired, [fileId]: true };
+		if (url === null || url === failedUrl) expired = { ...expired, [fileId]: true };
 		else freshUrls = { ...freshUrls, [fileId]: url };
 	}
 
@@ -81,7 +81,11 @@
 						onretryreading={document.kind === 'receipt' && !locked
 							? () => onretryreading(document.fileId)
 							: undefined}
-						onpreviewerror={() => void previewFailed(document.fileId)}
+						onpreviewerror={() =>
+							void previewFailed(
+								document.fileId,
+								freshUrls[document.fileId] ?? document.previewUrl
+							)}
 					/>
 				</li>
 			{/each}
@@ -94,7 +98,7 @@
 						preview={upload.objectUrl}
 						status={upload.status === 'failed' ? 'failed' : 'uploading'}
 						error={upload.error}
-						onretry={() => retryUpload(upload.id)}
+						onretry={upload.retryable ? () => retryUpload(upload.id) : undefined}
 						ondismiss={() => dismissUpload(upload.id)}
 					/>
 				</li>

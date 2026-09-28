@@ -23,9 +23,7 @@ export const PUT: RequestHandler = async ({ request, url, platform }) => {
 	if (ticket.maxSize !== undefined && length > ticket.maxSize)
 		return fileResponse('File is too large.', 413);
 	if (request.body === null) return fileResponse('Empty upload.', 400);
-	const body = dev
-		? await request.arrayBuffer()
-		: (request.body as unknown as R2ReadableStream);
+	const body = dev ? await request.arrayBuffer() : (request.body as unknown as R2ReadableStream);
 	await bucket.put(ticket.key, body, {
 		httpMetadata: {
 			contentType: ticket.contentType ?? 'application/octet-stream',

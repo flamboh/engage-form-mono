@@ -117,11 +117,13 @@
 			{#if status === 'failed'}
 				<span class="text-xs text-(--alert)">{error || 'Upload failed.'}</span>
 				<span class="mt-1 flex gap-2">
-					<button
-						class="text-xs font-medium text-(--pine) underline"
-						type="button"
-						onclick={onretry}>Try again</button
-					>
+					{#if onretry}
+						<button
+							class="text-xs font-medium text-(--pine) underline"
+							type="button"
+							onclick={onretry}>Try again</button
+						>
+					{/if}
 					<button class="text-xs text-(--quiet) underline" type="button" onclick={ondismiss}
 						>Dismiss</button
 					>

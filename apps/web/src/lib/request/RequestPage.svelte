@@ -109,9 +109,7 @@
 					reading,
 					purposeMissing,
 					onlyPurposeUnresolved: unresolvedVariables.every((name) => name === 'Purpose')
-				}).filter(
-					(item) => item.target.kind !== 'slot' || !uploadingSlots.has(item.target.slot)
-				)
+				}).filter((item) => item.target.kind !== 'slot' || !uploadingSlots.has(item.target.slot))
 	);
 	const deferReceiptFields = $derived(reading || missingSlots.includes('receipt'));
 	const blocking = $derived(

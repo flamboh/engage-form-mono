@@ -24,15 +24,53 @@ test('while reading, questions that do not need the receipt come first', () => {
 	]);
 });
 
-test('after reading, reviews lead and receipt fields follow', () => {
+test('after reading, reviews lead and replace the matching missing field', () => {
 	const items = whatsLeft({
 		readiness,
-		reviews: [{ field: 'totalAmount', value: '36.18' }],
+		reviews: [{ field: 'totalAmount', value: '36.18', alternatives: [] }],
 		reading: false
 	});
-	expect(items[0]).toMatchObject({ key: 'review-totalAmount', blocking: false });
+	expect(items[0]).toMatchObject({ key: 'review-totalAmount', blocking: true });
 	expect(items[0].detail).toBe('We read $36.18.');
-	expect(items.slice(1, 3).map((item) => item.key)).toEqual(['vendor', 'totalAmount']);
+	expect(items.map((item) => item.key)).not.toContain('totalAmount');
+	expect(items.slice(1, 3).map((item) => item.key)).toEqual(['vendor', 'why']);
+});
+
+test('a review without a confident value asks about the first alternative', () => {
+	const items = whatsLeft({
+		readiness,
+		reviews: [{ field: 'totalAmount', value: '', alternatives: ['19.00', '19.80'] }],
+		reading: false
+	});
+	const review = items.find((item) => item.key === 'review-totalAmount');
+	expect(review?.detail).toBe('Is it $19.00?');
+	expect(items.map((item) => item.key)).not.toContain('totalAmount');
+	expect(items.map((item) => item.detail).join(' ')).not.toMatch(/We read \./);
+});
+
+test('a review with nothing to propose is left to the missing-field item', () => {
+	const items = whatsLeft({
+		readiness,
+		reviews: [{ field: 'totalAmount', value: '', alternatives: [] }],
+		reading: false
+	});
+	expect(items.map((item) => item.key)).toContain('totalAmount');
+	expect(items.map((item) => item.key)).not.toContain('review-totalAmount');
+});
+
+test('a missing purpose asks what it was for instead of the sentence blanks', () => {
+	const items = whatsLeft({
+		readiness: {
+			sections: [
+				{ section: 'Business purpose', reasons: ['Business purpose has unresolved variables.'] }
+			]
+		},
+		reviews: [],
+		reading: false,
+		purposeMissing: true,
+		onlyPurposeUnresolved: true
+	});
+	expect(items.map((item) => item.key)).toEqual(['purpose']);
 });
 
 test('reasons map to plain language without jargon', () => {

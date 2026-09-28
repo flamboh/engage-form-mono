@@ -184,7 +184,11 @@
 	{view}
 	saved={mockSaved}
 	user={mockUser}
-	recentPurposes={['snacks for the general meeting', 'prizes for the bouldering comp', 'gear swap supplies']}
+	recentPurposes={[
+		'snacks for the general meeting',
+		'prizes for the bouldering comp',
+		'gear swap supplies'
+	]}
 	organizationId={mockOrganizationId}
 	{pending}
 	{backend}

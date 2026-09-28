@@ -65,3 +65,7 @@ export function reviewDisplay(field: 'vendor' | 'totalAmount' | 'receiptDate', v
 	if (field === 'receiptDate') return formatDate(value);
 	return value;
 }
+
+export function dateInputValue(value: string | null | undefined) {
+	return value !== null && value !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+}
