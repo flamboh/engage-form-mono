@@ -24,7 +24,6 @@ import type * as extraction_textract from "../extraction/textract.js";
 import type * as fileSigning from "../fileSigning.js";
 import type * as files from "../files.js";
 import type * as internal_purchaseAutosave from "../internal/purchaseAutosave.js";
-import type * as liveTest from "../liveTest.js";
 import type * as purchaseCategories from "../purchaseCategories.js";
 import type * as purchaseModel from "../purchaseModel.js";
 import type * as purchaseReadiness from "../purchaseReadiness.js";
@@ -55,7 +54,6 @@ declare const fullApi: ApiFromModules<{
   fileSigning: typeof fileSigning;
   files: typeof files;
   "internal/purchaseAutosave": typeof internal_purchaseAutosave;
-  liveTest: typeof liveTest;
   purchaseCategories: typeof purchaseCategories;
   purchaseModel: typeof purchaseModel;
   purchaseReadiness: typeof purchaseReadiness;
