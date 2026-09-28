@@ -2,7 +2,8 @@ import { api } from '$convex/_generated/api';
 import type { Id } from '$convex/_generated/dataModel';
 import type { DocumentSlot } from '$convex/requestView';
 import { convexMutation, type ClerkSession } from '$lib/convex-http';
-import { uploadFile } from '$lib/upload';
+import { fileType, prepareForUpload, previewable, UploadProblem } from '$lib/imageConvert';
+import { putFile, type StoredObject } from '$lib/upload';
 
 export type UploadSlot = DocumentSlot | 'auto';
 
@@ -11,63 +12,90 @@ export type PendingUpload = {
 	purchaseRequestId: string;
 	filename: string;
 	contentType: string;
-	objectUrl: string;
+	objectUrl: string | null;
 	slot: UploadSlot;
 	status: 'uploading' | 'attaching' | 'attached' | 'failed';
 	fileId: Id<'files'> | null;
 	error: string;
+	retryable: boolean;
 };
 
 export type UploadTransport = {
-	upload(file: File, slot: UploadSlot): Promise<Id<'files'>>;
+	prepare?(file: File): Promise<File>;
+	put(file: File): Promise<StoredObject>;
 	attach(
 		purchaseRequestId: Id<'purchaseRequests'>,
-		fileIds: Id<'files'>[],
+		stored: StoredObject,
 		slot: UploadSlot
-	): Promise<void>;
+	): Promise<Id<'files'>>;
 };
 
+type Source = {
+	file: File;
+	prepared: File | null;
+	stored: StoredObject | null;
+	transport: UploadTransport;
+	request: Promise<Id<'purchaseRequests'>>;
+};
+
+const attachedLingerMs = 10_000;
 const uploads = $state<PendingUpload[]>([]);
-const sourceFiles: Record<string, { file: File; transport: UploadTransport }> = {};
+const sources: Record<string, Source> = {};
 
 export function convexUploadTransport(session: ClerkSession): UploadTransport {
 	return {
-		upload: (file, slot) => uploadFile(session, slot === 'auto' ? 'receipt' : slot, file),
-		attach: async (purchaseRequestId, fileIds, slot) => {
-			await convexMutation(session, api.authed.documents.attachDocuments, {
+		prepare: prepareForUpload,
+		put: (file) => putFile(session, file),
+		attach: (purchaseRequestId, stored, slot) =>
+			convexMutation(session, api.authed.documents.attachUpload, {
 				purchaseRequestId,
-				fileIds,
-				slot
-			});
-		}
+				slot,
+				...stored
+			})
 	};
 }
 
 export function startUploads(
 	session: ClerkSession,
-	purchaseRequestId: Id<'purchaseRequests'>,
+	purchaseRequestId: Id<'purchaseRequests'> | Promise<Id<'purchaseRequests'>>,
 	files: File[] | FileList,
 	slot: UploadSlot = 'auto',
 	transport: UploadTransport = convexUploadTransport(session)
 ) {
-	const batch = Array.from(files).map((file) => {
+	const request = Promise.resolve(purchaseRequestId);
+	const known = typeof purchaseRequestId === 'string' ? purchaseRequestId : '';
+	const ids = Array.from(files).map((file, index) => {
 		const id = crypto.randomUUID();
-		sourceFiles[id] = { file, transport };
+		const fileSlot = slot === 'auto' || slot === 'receipt' || index === 0 ? slot : 'auto';
+		const type = fileType(file);
+		sources[id] = { file, prepared: null, stored: null, transport, request };
 		uploads.push({
 			id,
-			purchaseRequestId,
+			purchaseRequestId: known,
 			filename: file.name,
-			contentType: file.type,
-			objectUrl: URL.createObjectURL(file),
-			slot,
+			contentType: type,
+			objectUrl: previewable(type) ? URL.createObjectURL(file) : null,
+			slot: fileSlot,
 			status: 'uploading',
 			fileId: null,
-			error: ''
+			error: '',
+			retryable: true
 		});
 		return id;
 	});
-	void runBatch(purchaseRequestId, batch, slot);
-	return batch;
+	request.then(
+		(resolved) => {
+			for (const id of ids) {
+				const upload = find(id);
+				if (upload !== undefined) upload.purchaseRequestId = resolved;
+			}
+		},
+		() => {
+			for (const id of ids) dismissUpload(id);
+		}
+	);
+	for (const id of ids) void send(id, find(id)?.slot ?? slot);
+	return ids;
 }
 
 export function uploadsFor(purchaseRequestId: string) {
@@ -78,73 +106,92 @@ export function localPreviewFor(fileId: string) {
 	return uploads.find((upload) => upload.fileId === fileId)?.objectUrl ?? null;
 }
 
+export function settleUploads(purchaseRequestId: string, serverFileIds: string[]) {
+	for (const upload of uploadsFor(purchaseRequestId)) {
+		if (
+			upload.status === 'attached' &&
+			upload.fileId !== null &&
+			serverFileIds.includes(upload.fileId)
+		) {
+			dismissUpload(upload.id);
+		}
+	}
+}
+
 export function retryUpload(id: string) {
 	const upload = find(id);
-	if (upload === undefined) return;
+	if (upload === undefined || sources[id] === undefined) return;
 	upload.status = 'uploading';
 	upload.error = '';
-	void runBatch(upload.purchaseRequestId as Id<'purchaseRequests'>, [id], upload.slot);
+	void send(id, upload.slot);
 }
 
 export function dismissUpload(id: string) {
 	const index = uploads.findIndex((upload) => upload.id === id);
 	if (index === -1) return;
-	URL.revokeObjectURL(uploads[index].objectUrl);
+	const objectUrl = uploads[index].objectUrl;
+	if (objectUrl !== null) URL.revokeObjectURL(objectUrl);
 	uploads.splice(index, 1);
-	delete sourceFiles[id];
+	delete sources[id];
 }
 
-async function runBatch(
-	purchaseRequestId: Id<'purchaseRequests'>,
-	ids: string[],
-	slot: UploadSlot
-) {
-	const uploaded = await Promise.all(ids.map((id) => uploadOne(id, slot)));
-	const ready = uploaded.filter((item) => item !== null);
-	if (ready.length === 0) return;
-	const transport = ready[0].transport;
+async function send(id: string, slot: UploadSlot) {
+	const source = sources[id];
+	if (source === undefined || find(id) === undefined) return;
+	let stage: 'upload' | 'attach' = 'upload';
 	try {
-		await transport.attach(
-			purchaseRequestId,
-			ready.map((item) => item.fileId),
-			slot
-		);
-		for (const item of ready) setStatus(item.id, 'attached');
-	} catch (err) {
-		for (const item of ready) fail(item.id, err);
-	}
-}
-
-async function uploadOne(id: string, slot: UploadSlot) {
-	const source = sourceFiles[id];
-	const upload = find(id);
-	if (source === undefined || upload === undefined) return null;
-	try {
-		const fileId = upload.fileId ?? (await source.transport.upload(source.file, slot));
+		if (source.stored === null) {
+			source.prepared ??= await (source.transport.prepare?.(source.file) ?? source.file);
+			useConvertedPreview(id, source.prepared);
+			source.stored = await source.transport.put(source.prepared);
+		}
 		const current = find(id);
-		if (current === undefined) return null;
-		current.fileId = fileId;
+		if (current === undefined) return;
 		current.status = 'attaching';
-		return { id, fileId, transport: source.transport };
+		stage = 'attach';
+		const purchaseRequestId = await source.request;
+		const fileId = await source.transport.attach(purchaseRequestId, source.stored, slot);
+		const attached = find(id);
+		if (attached === undefined) return;
+		attached.fileId = fileId;
+		markAttached(id);
 	} catch (err) {
-		fail(id, err);
-		return null;
+		fail(id, err, stage);
 	}
 }
 
-function setStatus(id: string, status: PendingUpload['status']) {
+function useConvertedPreview(id: string, prepared: File) {
 	const upload = find(id);
-	if (upload !== undefined) upload.status = status;
+	const source = sources[id];
+	if (upload === undefined || source === undefined || prepared === source.file) return;
+	if (upload.contentType === prepared.type && upload.objectUrl !== null) return;
+	if (upload.objectUrl !== null) URL.revokeObjectURL(upload.objectUrl);
+	upload.contentType = prepared.type;
+	upload.filename = prepared.name;
+	upload.objectUrl = previewable(prepared.type) ? URL.createObjectURL(prepared) : null;
 }
 
-function fail(id: string, err: unknown) {
+function markAttached(id: string) {
+	const upload = find(id);
+	if (upload === undefined) return;
+	upload.status = 'attached';
+	delete sources[id];
+	setTimeout(() => {
+		if (find(id)?.status === 'attached') dismissUpload(id);
+	}, attachedLingerMs);
+}
+
+function fail(id: string, err: unknown, stage: 'upload' | 'attach') {
 	const upload = find(id);
 	if (upload === undefined) return;
 	upload.status = 'failed';
+	upload.retryable = !(err instanceof UploadProblem);
 	upload.error =
-		err instanceof Error && /attach/i.test(err.message)
-			? 'Uploaded, but couldn’t add it.'
-			: 'Couldn’t upload.';
+		err instanceof UploadProblem
+			? err.message
+			: stage === 'attach'
+				? 'Uploaded, but couldn’t add it.'
+				: 'Couldn’t upload.';
 }
 
 function find(id: string) {

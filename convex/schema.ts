@@ -65,6 +65,7 @@ const businessPurposeVariable = v.union(
 	v.literal('recipientUo95Ids'),
 	v.literal('activityDate'),
 	v.literal('officeLocation'),
+	v.literal('purpose'),
 	// Deprecated Business Purpose variables. Kept until old rows are backfilled.
 	v.literal('eventName'),
 	v.literal('eventDate'),
@@ -240,7 +241,8 @@ export default defineSchema({
 		updatedAt: v.number(),
 		lastFilledAt: v.union(v.number(), v.null()),
 		fieldSources: v.optional(v.record(v.string(), fieldSource)),
-		receiptDate: v.optional(v.string())
+		receiptDate: v.optional(v.string()),
+		purpose: v.optional(v.string())
 	})
 		.index('by_owner_and_organizationSourceId_and_status_and_updatedAt', [
 			'owner',

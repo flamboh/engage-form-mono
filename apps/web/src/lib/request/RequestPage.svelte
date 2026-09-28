@@ -19,6 +19,7 @@
 		view,
 		saved,
 		user,
+		recentPurposes = [],
 		organizationId,
 		pending,
 		backend,
@@ -27,6 +28,7 @@
 		view: RequestView | undefined;
 		saved: SavedData | undefined;
 		user: Doc<'users'> | null;
+		recentPurposes?: string[];
 		organizationId: Id<'organizations'>;
 		pending: PendingUpload[];
 		backend: RequestBackend;
@@ -47,7 +49,7 @@
 	const form = $derived(editor.form);
 	const organization = $derived(saved?.organizations.find((org) => org._id === organizationId));
 	const fundLetter = $derived(
-		organization?.fundLetter ?? purchase?.studentOrganization.fundLetter ?? 'I'
+		purchase?.studentOrganization.fundLetter ?? organization?.fundLetter ?? 'I'
 	);
 	const budgetLines = $derived(
 		organization?.budgetLines ?? purchase?.studentOrganization.budgetLines ?? []
@@ -77,6 +79,9 @@
 				})
 	);
 	const pendingSlots = $derived(new Set(inFlight.map((upload) => upload.slot)));
+	const uploadingSlots = $derived(
+		new Set(inFlight.map((upload) => (upload.slot === 'auto' ? 'receipt' : upload.slot)))
+	);
 	const missingSlots = $derived(
 		panels
 			.filter((panel) => panel.required)
@@ -89,12 +94,22 @@
 			.map(panelSlot)
 			.filter((slot): slot is DocumentSlot => slot !== null && !hasDocument(slot))
 	);
+	const unresolvedVariables = $derived(
+		[...(view?.businessPurposeText ?? '').matchAll(/\{([^{}]+)\}/g)].map((match) => match[1])
+	);
+	const purposeMissing = $derived(
+		form !== null && form.businessPurposeText.includes('{Purpose}') && form.purpose.trim() === ''
+	);
 	const items = $derived(
 		view === undefined
 			? []
-			: whatsLeft({ readiness: view.readiness, reviews: editor.reviews, reading }).filter(
-					(item) => item.target.kind !== 'slot' || missingSlots.includes(item.target.slot)
-				)
+			: whatsLeft({
+					readiness: view.readiness,
+					reviews: editor.reviews,
+					reading,
+					purposeMissing,
+					onlyPurposeUnresolved: unresolvedVariables.every((name) => name === 'Purpose')
+				}).filter((item) => item.target.kind !== 'slot' || !uploadingSlots.has(item.target.slot))
 	);
 	const deferReceiptFields = $derived(reading || missingSlots.includes('receipt'));
 	const blocking = $derived(
@@ -103,6 +118,12 @@
 	const ready = $derived(
 		(view?.readiness.ready ?? false) && inFlight.length === 0 && !(view?.reading ?? false)
 	);
+	const visibleItems = $derived.by((): LeftItem[] => {
+		const shown = deferReceiptFields ? items.filter((item) => !item.waitsForReceipt) : items;
+		if (shown.length > 0 || ready || reading) return shown;
+		return [inFlight.length > 0 ? uploadingItem : (items[0] ?? detailsItem)];
+	});
+	const approved = $derived(purchase?.status === 'approved');
 	const title = $derived(form?.vendor || form?.itemDescription || 'New purchase request');
 
 	function panelSlot(panel: RequirementPanel): DocumentSlot | null {
@@ -117,6 +138,34 @@
 		if (slot === 'receipt') return form.receiptFileIds.length > 0;
 		if (slot === 'recipient_list') return false;
 		return form[slotField[slot]] !== null;
+	}
+
+	const uploadingItem: LeftItem = {
+		key: 'uploading',
+		label: 'Adding your documents',
+		detail: 'This finishes on its own in a moment.',
+		target: { kind: 'field', field: 'documents' },
+		blocking: true,
+		waitsForReceipt: false
+	};
+
+	const detailsItem: LeftItem = {
+		key: 'details',
+		label: 'Look over the details',
+		detail: 'Something still needs a value before Engage.',
+		target: { kind: 'field', field: 'details' },
+		blocking: true,
+		waitsForReceipt: false
+	};
+
+	function flushIfHidden() {
+		if (document.visibilityState === 'hidden') void editor.flush();
+	}
+
+	function warnIfUnsaved(event: BeforeUnloadEvent) {
+		if (!editor.hasUnsaved) return;
+		void editor.flush();
+		event.preventDefault();
 	}
 
 	function upload(files: File[], slot: UploadSlot) {
@@ -146,7 +195,8 @@
 	}
 </script>
 
-<svelte:window onpagehide={() => void editor.flush()} />
+<svelte:window onpagehide={() => void editor.flush()} onbeforeunload={warnIfUnsaved} />
+<svelte:document onvisibilitychange={flushIfHidden} />
 
 <div class="request flex min-h-screen flex-col bg-(--paper) text-(--ink)">
 	<header class="border-b border-(--line)">
@@ -183,7 +233,10 @@
 				{pending}
 				{missingSlots}
 				onfiles={upload}
+				locked={approved}
 				onremove={(fileId) => void editor.removeDocument(fileId)}
+				onretryreading={(fileId) => void editor.retryReading(fileId)}
+				refreshpreview={(fileId) => editor.freshPreview(fileId)}
 			/>
 		</aside>
 
@@ -199,29 +252,39 @@
 				</div>
 			{:else}
 				{#if purchase.status === 'draft'}
-					<WhatsLeft {items} {reading} {deferReceiptFields} onjump={jump} onfiles={upload} />
+					<WhatsLeft items={visibleItems} {reading} {ready} onjump={jump} onfiles={upload} />
 				{/if}
-				<PurchaseSummary {editor} {reading} />
-				<RequestQuestions
-					{editor}
-					{fundLetter}
-					{budgetLines}
-					{purchasers}
-					{templates}
-					userName={user?.name ?? purchase.requester.name}
-					section="why"
-				/>
-				<BusinessPurposeCard {editor} resolvedText={view.businessPurposeText} />
-				<RequestQuestions
-					{editor}
-					{fundLetter}
-					{budgetLines}
-					{purchasers}
-					{templates}
-					userName={user?.name ?? purchase.requester.name}
-					section="funding"
-				/>
-				<EditDetails {editor} {purchase} {optionalSlots} bind:open={detailsOpen} onfiles={upload} />
+				<div class="contents" inert={approved}>
+					<RequestQuestions
+						{editor}
+						{fundLetter}
+						{budgetLines}
+						{purchasers}
+						{templates}
+						{recentPurposes}
+						userName={user?.name ?? purchase.requester.name}
+						section="why"
+					/>
+					<PurchaseSummary {editor} {reading} />
+					<BusinessPurposeCard {editor} resolvedText={view.businessPurposeText} />
+					<RequestQuestions
+						{editor}
+						{fundLetter}
+						{budgetLines}
+						{purchasers}
+						{templates}
+						{recentPurposes}
+						userName={user?.name ?? purchase.requester.name}
+						section="funding"
+					/>
+					<EditDetails
+						{editor}
+						{purchase}
+						{optionalSlots}
+						bind:open={detailsOpen}
+						onfiles={upload}
+					/>
+				</div>
 			{/if}
 		</main>
 	</div>

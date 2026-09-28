@@ -10,6 +10,7 @@ import {
 	type SavedData
 } from '$lib/purchase/draftDetails';
 import { createSingleFlight } from '$lib/singleFlight';
+import { SvelteSet } from 'svelte/reactivity';
 import type { UploadSlot } from '$lib/uploads.svelte';
 import type { ReviewField } from './whatsLeft';
 
@@ -27,6 +28,7 @@ export type FormState = {
 	budgetLineItem: string;
 	businessPurposeText: string;
 	businessPurposeTouched: boolean;
+	purpose: string;
 	receiptFileIds: Id<'files'>[];
 	secondApprovalFileId: Id<'files'> | null;
 	publicityFileId: Id<'files'> | null;
@@ -40,10 +42,12 @@ export type FormState = {
 };
 
 export type RequestBackend = {
-	saveSnapshot(snapshot: FormState): Promise<void>;
+	saveSnapshot(snapshot: FormState, changedFields: (keyof FormState)[]): Promise<void>;
 	applyTemplate(templateId: Id<'businessPurposeTemplates'>): Promise<void>;
 	resolveReview(field: ReviewField, value: string): Promise<void>;
 	removeDocument(fileId: Id<'files'>): Promise<void>;
+	retryReading(fileId: Id<'files'>): Promise<void>;
+	freshPreview(fileId: Id<'files'>): Promise<string | null>;
 	requestFill(): Promise<{ engageUrl: string }>;
 	markApproved(): Promise<void>;
 	reopen(): Promise<void>;
@@ -51,6 +55,7 @@ export type RequestBackend = {
 };
 
 export type FillPhase = 'idle' | 'opening' | 'sent';
+export type FieldSource = 'user' | 'receipt' | 'default';
 
 const textDebounceMs = 450;
 
@@ -61,15 +66,27 @@ export class RequestEditor {
 	fillPhase = $state<FillPhase>('idle');
 	engageUrl = $state('');
 	busy = $state(false);
+	saving = $state(false);
 
 	#getView: () => RequestView | undefined;
 	#getUser: () => Doc<'users'> | null;
 	#backend: () => RequestBackend;
 	#timer: ReturnType<typeof setTimeout> | null = null;
+	#dirty = new SvelteSet<keyof FormState>();
 	#saver = createSingleFlight(async () => {
 		const state = this.form;
-		if (state === null) return;
-		await this.#backend().saveSnapshot($state.snapshot(state));
+		if (state === null || this.#dirty.size === 0) return;
+		const fields = [...this.#dirty];
+		this.#dirty.clear();
+		this.saving = true;
+		try {
+			await this.#backend().saveSnapshot($state.snapshot(state), fields);
+		} catch (err) {
+			for (const field of fields) this.#dirty.add(field);
+			throw err;
+		} finally {
+			this.saving = false;
+		}
 	});
 
 	constructor(
@@ -105,6 +122,7 @@ export class RequestEditor {
 			budgetLineItem: purchase.budgetLineItem,
 			businessPurposeText: formatBusinessPurposeSource(purchase.businessPurposeSource),
 			businessPurposeTouched: purchase.businessPurposeTouched,
+			purpose: purchase.purpose ?? '',
 			receiptFileIds: purchase.receiptFileIds,
 			secondApprovalFileId: purchase.secondApprovalFileId,
 			publicityFileId: purchase.publicityFileId,
@@ -129,8 +147,19 @@ export class RequestEditor {
 
 	receiptDate = $derived(this.resolved.receiptDate ?? this.purchase?.receiptDate ?? '');
 
+	get hasUnsaved() {
+		return this.#timer !== null || this.#dirty.size > 0 || this.saving;
+	}
+
+	sourceOf(field: string, overrideKey: string = field): FieldSource | undefined {
+		if (overrideKey in this.overrides) return 'user';
+		return this.purchase?.fieldSources?.[field];
+	}
+
 	update(patch: Partial<FormState>, options: { debounce?: boolean } = {}) {
+		if (this.purchase?.status === 'approved') return;
 		this.overrides = { ...this.overrides, ...patch };
+		for (const field of Object.keys(patch) as (keyof FormState)[]) this.#dirty.add(field);
 		this.error = '';
 		if (this.#timer !== null) clearTimeout(this.#timer);
 		this.#timer = null;
@@ -187,12 +216,40 @@ export class RequestEditor {
 	}
 
 	async resolveReview(field: ReviewField, value: string) {
+		const key = field === 'receiptDate' ? null : field;
+		const hadOverride = key !== null && key in this.overrides;
+		const previousOverride = key === null ? undefined : this.overrides[key];
+		const previousResolved = this.resolved[field];
 		this.resolved = { ...this.resolved, [field]: value };
 		if (field === 'vendor') this.overrides = { ...this.overrides, vendor: value };
+		if (field === 'itemDescription') this.overrides = { ...this.overrides, itemDescription: value };
 		if (field === 'totalAmount') {
 			this.overrides = { ...this.overrides, totalAmount: parseMoney(value) };
 		}
-		await this.#run(() => this.#backend().resolveReview(field, value));
+		this.error = '';
+		try {
+			await this.#backend().resolveReview(field, value);
+		} catch (err) {
+			const resolved = { ...this.resolved };
+			if (previousResolved === undefined) delete resolved[field];
+			else resolved[field] = previousResolved;
+			this.resolved = resolved;
+			if (key !== null) {
+				const overrides = { ...this.overrides };
+				if (hadOverride) Object.assign(overrides, { [key]: previousOverride });
+				else delete overrides[key];
+				this.overrides = overrides;
+			}
+			this.error = message(err);
+		}
+	}
+
+	freshPreview(fileId: Id<'files'>) {
+		return this.#backend().freshPreview(fileId);
+	}
+
+	async retryReading(fileId: Id<'files'>) {
+		await this.#run(() => this.#backend().retryReading(fileId));
 	}
 
 	upload(files: File[], slot: UploadSlot) {
@@ -212,6 +269,7 @@ export class RequestEditor {
 	}
 
 	async fill() {
+		if (this.fillPhase === 'opening') return;
 		const tab = window.open('', '_blank');
 		if (tab !== null) {
 			tab.opener = null;

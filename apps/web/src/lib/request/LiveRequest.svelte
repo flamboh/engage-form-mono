@@ -2,7 +2,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
-	import { startUploads, uploadsFor } from '$lib/uploads.svelte';
+	import { settleUploads, startUploads, uploadsFor } from '$lib/uploads.svelte';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import type { RequestBackend } from './editor.svelte';
 	import RequestPage from './RequestPage.svelte';
@@ -26,14 +26,23 @@
 	const userQuery = useQuery(api.authed.purchaseBuilder.getCurrentUser, () =>
 		clerkContext.currentSession ? {} : 'skip'
 	);
+	const purposesQuery = useQuery(api.authed.board.recentPurposes, () =>
+		clerkContext.currentSession ? { organizationId, excludeId: purchaseRequestId } : 'skip'
+	);
 
 	const pending = $derived(uploadsFor(purchaseRequestId));
+	const serverFileIds = $derived(viewQuery.data?.documents.map((document) => document.fileId));
+
+	$effect(() => {
+		if (serverFileIds !== undefined) settleUploads(purchaseRequestId, serverFileIds);
+	});
 
 	const backend: RequestBackend = {
-		saveSnapshot: async (snapshot) => {
+		saveSnapshot: async (snapshot, changedFields) => {
 			await client.mutation(api.authed.purchaseBuilder.saveDraftSnapshot, {
 				id: purchaseRequestId,
-				snapshot
+				snapshot,
+				changedFields
 			});
 		},
 		applyTemplate: async (templateId) => {
@@ -49,6 +58,11 @@
 				value
 			});
 		},
+		retryReading: async (fileId) => {
+			await client.mutation(api.authed.documents.retryExtraction, { purchaseRequestId, fileId });
+		},
+		freshPreview: (fileId) =>
+			client.query(api.authed.previews.freshPreviewUrl, { fileId, nonce: Date.now() }),
 		removeDocument: async (fileId) => {
 			await client.mutation(api.authed.documents.removeDocument, { purchaseRequestId, fileId });
 		},
@@ -74,6 +88,7 @@
 	view={viewQuery.data}
 	saved={savedQuery.data}
 	user={userQuery.data ?? null}
+	recentPurposes={purposesQuery.data ?? []}
 	{organizationId}
 	{pending}
 	{backend}

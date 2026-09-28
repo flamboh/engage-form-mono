@@ -146,7 +146,7 @@ test('resolves structured Business Purpose source with plural recipient variable
 	} as Doc<'purchaseRequests'>;
 
 	expect(renderBusinessPurpose(purchase)).toBe(
-		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98. Recipients: Aidan, Maya. UO 95 IDs: 951951840, 950000002. Activity: 2026-05-22.'
+		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98. Recipients: Aidan, Maya. UO 95 IDs: 951951840, 950000002. Activity: May 22, 2026.'
 	);
 });
 

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { dateInputValue } from './labels';
+
 	let {
 		value,
 		display = value,
@@ -54,8 +56,8 @@
 				if (event.key === 'Escape') editing = false;
 			}}
 			{@attach (node) => {
-				draft = value;
-				node.value = value;
+				draft = type === 'date' ? dateInputValue(value) : value;
+				node.value = draft;
 				node.focus();
 				if (type !== 'date') node.select();
 			}}

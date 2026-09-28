@@ -63,7 +63,8 @@ export const businessPurposeVariable = v.union(
 	v.literal('recipients'),
 	v.literal('recipientUo95Ids'),
 	v.literal('activityDate'),
-	v.literal('officeLocation')
+	v.literal('officeLocation'),
+	v.literal('purpose')
 );
 
 export const businessPurposeSource = v.object({
@@ -244,7 +245,8 @@ export const purchaseRequestDoc = v.object({
 	fieldSources: v.optional(
 		v.record(v.string(), v.union(v.literal('user'), v.literal('receipt'), v.literal('default')))
 	),
-	receiptDate: v.optional(v.string())
+	receiptDate: v.optional(v.string()),
+	purpose: v.optional(v.string())
 });
 
 export const savedData = v.object({

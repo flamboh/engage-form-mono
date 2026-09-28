@@ -6,28 +6,41 @@
 		preview,
 		status,
 		error = '',
+		expired = false,
 		onremove,
 		onretry,
-		ondismiss
+		ondismiss,
+		onretryreading,
+		onpreviewerror
 	}: {
 		label: string;
 		filename: string;
 		contentType: string;
 		preview: string | null;
-		status: 'saved' | 'reading' | 'uploading' | 'failed';
+		status: 'saved' | 'reading' | 'uploading' | 'failed' | 'unreadable';
 		error?: string;
+		expired?: boolean;
 		onremove?: () => void;
 		onretry?: () => void;
 		ondismiss?: () => void;
+		onretryreading?: () => void;
+		onpreviewerror?: () => void;
 	} = $props();
 
-	const isImage = $derived(contentType.startsWith('image/') && preview !== null);
+	const isImage = $derived(contentType.startsWith('image/') && preview !== null && !expired);
+	const badge = $derived(
+		contentType === 'application/pdf' ? 'PDF' : contentType.startsWith('image/') ? 'Photo' : 'File'
+	);
 	const statusText = $derived(
 		status === 'uploading' ? 'Uploading' : status === 'reading' ? 'Reading' : ''
 	);
 </script>
 
-<div class="slip-shadow" class:is-failed={status === 'failed'}>
+<div
+	class="slip-shadow"
+	class:is-failed={status === 'failed'}
+	class:is-unreadable={status === 'unreadable'}
+>
 	<div class="slip relative flex flex-col bg-white">
 		<div class="relative aspect-[3/4] overflow-hidden bg-(--paper)">
 			{#if isImage}
@@ -35,11 +48,12 @@
 					class="h-full w-full object-cover object-top"
 					src={preview}
 					alt={`${label}: ${filename}`}
+					onerror={onpreviewerror}
 				/>
 			{:else}
 				<div class="flex h-full flex-col justify-between p-3">
 					<span class="self-start border border-(--ink) px-1.5 text-xs font-semibold text-(--ink)"
-						>PDF</span
+						>{badge}</span
 					>
 					<div class="flex flex-col gap-1.5" aria-hidden="true">
 						<span class="h-1.5 w-4/5 bg-(--line)"></span>
@@ -55,7 +69,7 @@
 					role="status">{statusText}</span
 				>
 			{/if}
-			{#if preview !== null && status === 'saved'}
+			{#if preview !== null && !expired && (status === 'saved' || status === 'unreadable')}
 				<a
 					class="absolute inset-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--pine)"
 					href={preview}
@@ -82,14 +96,34 @@
 			<span class="hidden truncate text-xs text-(--quiet) sm:block" title={filename}
 				>{filename}</span
 			>
+			{#if expired}
+				<span class="text-xs text-(--quiet)">
+					Preview timed out.
+					<button class="text-(--pine) underline" type="button" onclick={() => location.reload()}
+						>Reload</button
+					>
+				</span>
+			{/if}
+			{#if status === 'unreadable'}
+				<span class="text-xs text-(--alert)">Couldn’t read this — fill it in</span>
+				{#if onretryreading}
+					<button
+						class="mt-1 self-start text-xs font-medium text-(--pine) underline"
+						type="button"
+						onclick={onretryreading}>Try again</button
+					>
+				{/if}
+			{/if}
 			{#if status === 'failed'}
 				<span class="text-xs text-(--alert)">{error || 'Upload failed.'}</span>
 				<span class="mt-1 flex gap-2">
-					<button
-						class="text-xs font-medium text-(--pine) underline"
-						type="button"
-						onclick={onretry}>Try again</button
-					>
+					{#if onretry}
+						<button
+							class="text-xs font-medium text-(--pine) underline"
+							type="button"
+							onclick={onretry}>Try again</button
+						>
+					{/if}
 					<button class="text-xs text-(--quiet) underline" type="button" onclick={ondismiss}
 						>Dismiss</button
 					>
@@ -128,7 +162,8 @@
 		);
 	}
 
-	.slip-shadow.is-failed {
+	.slip-shadow.is-failed,
+	.slip-shadow.is-unreadable {
 		filter: drop-shadow(0 0 1px var(--alert));
 	}
 

@@ -24,7 +24,7 @@
 	<input
 		class="sr-only"
 		type="file"
-		accept="image/*,application/pdf"
+		accept="image/*,application/pdf,.heic,.heif"
 		aria-label={label}
 		{multiple}
 		capture={capture ? 'environment' : undefined}

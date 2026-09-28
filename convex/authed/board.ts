@@ -100,6 +100,33 @@ export const organizationBoard = authedQuery({
 	}
 });
 
+export const recentPurposes = authedQuery({
+	args: { organizationId: zid('organizations'), excludeId: zid('purchaseRequests').optional() },
+	returns: z.array(z.string()),
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		const requests = await ctx.db
+			.query('purchaseRequests')
+			.withIndex('by_owner_and_organizationSourceId_and_updatedAt', (q) =>
+				q.eq('owner', owner).eq('organizationSourceId', args.organizationId)
+			)
+			.order('desc')
+			.take(40);
+		const seen = new Set<string>();
+		const purposes: string[] = [];
+		for (const request of requests) {
+			if (request._id === args.excludeId) continue;
+			const purpose = request.purpose?.trim() ?? '';
+			const key = purpose.toLowerCase();
+			if (purpose === '' || seen.has(key)) continue;
+			seen.add(key);
+			purposes.push(purpose);
+			if (purposes.length === 5) break;
+		}
+		return purposes;
+	}
+});
+
 function baseItem(request: Doc<'purchaseRequests'>): BoardItem {
 	return {
 		id: request._id,

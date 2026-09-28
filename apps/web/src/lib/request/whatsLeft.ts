@@ -12,7 +12,7 @@ export type MissingSlot =
 	| 'second_approval'
 	| 'catering_waiver'
 	| 'printing_invoice';
-export type ReviewField = 'vendor' | 'totalAmount' | 'receiptDate';
+export type ReviewField = 'vendor' | 'totalAmount' | 'receiptDate' | 'itemDescription';
 export type LeftField =
 	| 'why'
 	| 'purchaser'
@@ -23,6 +23,7 @@ export type LeftField =
 	| 'totalAmount'
 	| 'officeLocation'
 	| 'businessPurpose'
+	| 'documents'
 	| 'details';
 
 export type LeftItem = {
@@ -182,36 +183,69 @@ const sectionCopy: Record<string, Copy> = {
 	}
 };
 
+const purposeCopy: Copy = {
+	key: 'purpose',
+	label: 'What was it for?',
+	detail: 'A few words, like “prizes for trivia night”.',
+	target: { kind: 'field', field: 'why' },
+	waitsForReceipt: false
+};
+
+const reviewReasonKey: Record<ReviewField, string | null> = {
+	vendor: 'vendor',
+	totalAmount: 'totalAmount',
+	receiptDate: null,
+	itemDescription: 'itemDescription'
+};
+
 const reviewCopy: Record<ReviewField, string> = {
 	vendor: 'Check the store',
 	totalAmount: 'Check the total',
-	receiptDate: 'Check the receipt date'
+	receiptDate: 'Check the receipt date',
+	itemDescription: 'Check the items'
 };
+
+export function reviewProposal(review: { value: string; alternatives: string[] }) {
+	if (review.value.trim() !== '') return review.value;
+	return review.alternatives.find((alternative) => alternative.trim() !== '') ?? '';
+}
 
 export function whatsLeft({
 	readiness,
 	reviews,
-	reading
+	reading,
+	purposeMissing = false,
+	onlyPurposeUnresolved = false
 }: {
 	readiness: { sections: { section: string; reasons: string[] }[] };
-	reviews: { field: ReviewField; value: string }[];
+	reviews: { field: ReviewField; value: string; alternatives: string[] }[];
 	reading: boolean;
+	purposeMissing?: boolean;
+	onlyPurposeUnresolved?: boolean;
 }): LeftItem[] {
 	const items = new Map<string, LeftItem>();
+	if (purposeMissing) items.set(purposeCopy.key, { ...purposeCopy, blocking: true });
 	for (const section of readiness.sections) {
 		for (const reason of section.reasons) {
 			const copy = reasonCopy[reason] ?? sectionCopy[section.section] ?? fallbackCopy(reason);
+			if (copy.key === 'businessPurpose' && purposeMissing && onlyPurposeUnresolved) continue;
 			if (!items.has(copy.key)) items.set(copy.key, { ...copy, blocking: true });
 		}
 	}
 	for (const review of reviews) {
+		const proposal = reviewProposal(review);
+		if (proposal === '') continue;
+		const reasonKey = reviewReasonKey[review.field];
+		const replaced = reasonKey === null ? undefined : items.get(reasonKey);
+		if (reasonKey !== null) items.delete(reasonKey);
 		const key = `review-${review.field}`;
+		const shown = reviewDisplay(review.field, proposal);
 		items.set(key, {
 			key,
 			label: reviewCopy[review.field],
-			detail: `We read ${reviewDisplay(review.field, review.value)}.`,
+			detail: review.value.trim() === '' ? `Is it ${shown}?` : `We read ${shown}.`,
 			target: { kind: 'review', field: review.field },
-			blocking: false,
+			blocking: replaced !== undefined,
 			waitsForReceipt: false
 		});
 	}
@@ -223,6 +257,7 @@ export function whatsLeft({
 
 function rank(item: LeftItem, reading: boolean) {
 	if (item.target.kind === 'review') return 0;
+	if (item.target.kind === 'field' && item.target.field === 'why') return 1;
 	if (reading) {
 		if (item.waitsForReceipt) return 5;
 		if (item.target.kind === 'slot') return 3;

@@ -36,7 +36,7 @@ const organization: Doc<'organizations'> = {
 	fundLetter: 'I',
 	budgetLines: ['Event Expenses', 'Equipment', 'Travel'],
 	businessPurposeTemplate:
-		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.',
+		'{Student Organization} wishes to reimburse {Purchaser} for purchasing {Item Description} from {Vendor} ({Total Amount}) for {Purpose}.',
 	archived: false,
 	updatedAt: now
 };
@@ -133,9 +133,10 @@ function document(
 	filename: string,
 	contentType: string,
 	previewUrl: string | null,
-	reading = false
+	reading = false,
+	readFailed = false
 ): RequestDocument {
-	return { fileId: file(fileId), kind, filename, contentType, previewUrl, reading };
+	return { fileId: file(fileId), kind, filename, contentType, previewUrl, reading, readFailed };
 }
 
 function basePurchase(): Purchase {
@@ -179,10 +180,9 @@ function basePurchase(): Purchase {
 		totalAmount: 0,
 		budgetLineItem: 'Event Expenses',
 		reimbursementReason: 'Other processes are too slow.',
-		businessPurposeSource: parseBusinessPurposeText(
-			mockSaved.businessPurposeTemplates[0].businessPurposeTemplate
-		),
-		businessPurposeTouched: true,
+		businessPurposeSource: parseBusinessPurposeText(organization.businessPurposeTemplate),
+		businessPurposeTouched: false,
+		purpose: '',
 		receiptFileIds: [],
 		secondApprovalFileId: null,
 		publicityFileId: null,
@@ -196,19 +196,33 @@ function basePurchase(): Purchase {
 		createdAt: now,
 		updatedAt: now,
 		lastFilledAt: null,
-		fieldSources: {}
+		fieldSources: {
+			purchaserSource: 'default',
+			budgetLineItem: 'default',
+			businessPurposeSource: 'default'
+		}
 	};
 }
 
-const receiptDoc = (reading = false) =>
+const receiptDoc = (reading = false, readFailed = false) =>
 	document(
 		'mock_receipt',
 		'receipt',
 		'market-of-choice.jpg',
 		'image/svg+xml',
 		mockReceiptImage,
-		reading
+		reading,
+		readFailed
 	);
+const readSources = {
+	purchaserSource: 'default',
+	budgetLineItem: 'default',
+	businessPurposeSource: 'default',
+	vendor: 'receipt',
+	itemDescription: 'receipt',
+	totalAmount: 'receipt',
+	activityDate: 'receipt'
+} as const;
 const approvalDoc = () =>
 	document('mock_approval', 'second_approval', 'approval-email.pdf', 'application/pdf', null);
 const publicityDoc = () =>
@@ -232,6 +246,7 @@ type Scenario = {
 
 const complete = {
 	...readReceipt,
+	purpose: 'snacks for the general meeting',
 	receiptFileIds: [file('mock_receipt')],
 	secondApprovalFileId: file('mock_approval'),
 	publicityFileId: file('mock_publicity'),
@@ -247,9 +262,25 @@ const scenarios: Record<string, () => Scenario> = {
 		documents: [receiptDoc(true)],
 		reading: true
 	}),
+	uncertain: () => ({
+		purchase: {
+			vendor: 'Epic Seconds',
+			itemDescription: 'yosef lattes',
+			receiptFileIds: [file('mock_receipt')],
+			fieldSources: readSources
+		},
+		documents: [receiptDoc()],
+		reviews: [{ field: 'totalAmount', value: '', alternatives: ['19.00', '19.80'] }]
+	}),
+	unreadable: () => ({
+		purchase: { activityDate: '', receiptFileIds: [file('mock_receipt')] },
+		documents: [receiptDoc(false, true)]
+	}),
 	reviews: () => ({
 		purchase: {
 			...readReceipt,
+			fieldSources: readSources,
+			purpose: 'snacks for the general meeting',
 			receiptFileIds: [file('mock_receipt')],
 			cateringWaiverFileId: file('mock_catering')
 		},

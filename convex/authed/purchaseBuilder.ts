@@ -765,6 +765,7 @@ function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {
 			snapshot.typeOfPurchase === 'personal_reimbursement' ? 'Other processes are too slow.' : '',
 		businessPurposeSource: parseBusinessPurposeText(snapshot.businessPurposeText),
 		businessPurposeTouched: snapshot.businessPurposeTouched,
+		...(snapshot.purpose === undefined ? {} : { purpose: snapshot.purpose.trim().slice(0, 200) }),
 		receiptFileIds: snapshot.receiptFileIds,
 		secondApprovalFileId: snapshot.secondApprovalFileId,
 		publicityFileId: snapshot.publicityFileId,
@@ -833,7 +834,8 @@ const currentBusinessPurposeVariables = new Set([
 	'recipients',
 	'recipientUo95Ids',
 	'activityDate',
-	'officeLocation'
+	'officeLocation',
+	'purpose'
 ]);
 
 function legacyBusinessPurposeValue(variable: string, request: Doc<'purchaseRequests'>) {
@@ -880,6 +882,7 @@ function migrateBusinessPurposeTemplate(template: string) {
 			'{Recipient UO 95 IDs}'
 		)
 		.replace(/\{\s*(officeLocation|Office Location)\s*\}/g, '{Office Location}')
+		.replace(/\{\s*(purpose|Purpose)\s*\}/g, '{Purpose}')
 		.replace(/\{\s*(eventDate|Event Date|activityDate|Activity Date)\s*\}/g, '{Activity Date}')
 		.replace(
 			/\{\s*(recipientReason|reason|eventName|Event Name|eventTime|Event Time|activityTime|Activity Time|eventLocation|Event Location|activityLocation|Activity Location|location|Location|eventEstimatedAttendance|Event Estimated Attendance|estimatedAttendance|Estimated Attendance|attendance|Attendance)\s*\}/g,

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { isAcceptableUpload } from '$lib/imageConvert';
+
 	let {
 		onFiles,
 		busy = false,
@@ -21,9 +23,7 @@
 	}
 
 	function acceptable(files: FileList | null | undefined) {
-		return [...(files ?? [])].filter(
-			(file) => file.type.startsWith('image/') || file.type === 'application/pdf'
-		);
+		return [...(files ?? [])].filter(isAcceptableUpload);
 	}
 
 	function handleDragEnter(event: DragEvent) {
@@ -116,14 +116,14 @@
 			class="hidden"
 			type="file"
 			multiple
-			accept="image/*,application/pdf"
+			accept="image/*,application/pdf,.heic,.heif"
 			onchange={(event) => handlePicked(event.currentTarget)}
 		/>
 		<input
 			bind:this={cameraInput}
 			class="hidden"
 			type="file"
-			accept="image/*,application/pdf"
+			accept="image/*,application/pdf,.heic,.heif"
 			capture="environment"
 			onchange={(event) => handlePicked(event.currentTarget)}
 		/>

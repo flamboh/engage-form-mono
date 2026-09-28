@@ -13,6 +13,7 @@ import type * as authed_demo from "../authed/demo.js";
 import type * as authed_documents from "../authed/documents.js";
 import type * as authed_extension from "../authed/extension.js";
 import type * as authed_helpers from "../authed/helpers.js";
+import type * as authed_previews from "../authed/previews.js";
 import type * as authed_purchaseBuilder from "../authed/purchaseBuilder.js";
 import type * as businessPurpose from "../businessPurpose.js";
 import type * as extraction_apply from "../extraction/apply.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "authed/documents": typeof authed_documents;
   "authed/extension": typeof authed_extension;
   "authed/helpers": typeof authed_helpers;
+  "authed/previews": typeof authed_previews;
   "authed/purchaseBuilder": typeof authed_purchaseBuilder;
   businessPurpose: typeof businessPurpose;
   "extraction/apply": typeof extraction_apply;
