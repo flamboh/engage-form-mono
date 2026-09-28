@@ -1,7 +1,9 @@
 import type { PurchaseRequest } from '@engage-form/domain';
-import { detectStep, type FillAction } from '@engage-form/fill-engine';
+import { detectStep, type EngageStep, type FillAction } from '@engage-form/fill-engine';
 import { browser } from 'wxt/browser';
-import { createContentRunner } from '../lib/content-runner';
+import { hideBanner, showBanner } from '../lib/banner';
+import { createContentRunner, fillLabel, type FillRunState } from '../lib/content-runner';
+import { readWebAppUrl } from '../lib/env';
 import {
 	clickNextStep,
 	type FileUploadResult,
@@ -12,9 +14,15 @@ import {
 	setSelect,
 	uploadMiss
 } from '../lib/form-controls';
-import type { FillMessage, FillResponse } from '../lib/messages';
+import type { FillMessage, FillResponse, RuntimeMessage, RuntimeResponse } from '../lib/messages';
+import { autoStartDecision, type PendingFill, type PendingFillState } from '../lib/pending-fill';
 
 const FILL_RUN_KEY = 'engageFormFillRun';
+const SIGN_IN_DISMISSED_KEY = 'engageFormSignInDismissed';
+const STEP_WAIT_MS = 10_000;
+const STEP_CHANGE_WAIT_MS = 20_000;
+const STEP_SETTLE_MS = 750;
+const cancelledMessage = 'Fill cancelled.';
 
 type UploadDocument = {
 	filename: string;
@@ -40,35 +48,238 @@ export default defineContentScript({
 			saveFillRun,
 			clearFillRun
 		});
+		let busy = false;
+		let signInShown = false;
 
 		browser.runtime.onMessage.addListener((message) => {
+			const fillMessage = message as FillMessage;
+			if (fillMessage.type === 'START_FILL_RUN') {
+				showFilling(fillLabel(fillMessage.purchase), fillMessage.purchase.id);
+			}
+			busy = true;
 			return runner
-				.handleMessage(message as FillMessage)
+				.handleMessage(fillMessage)
 				.then((response) => {
-					showToast(response.message);
+					if (fillMessage.type === 'START_FILL_RUN') {
+						void drive(fillMessage.purchase.id, response).finally(() => {
+							busy = false;
+						});
+					} else {
+						busy = false;
+						showBanner({ text: response.message, hideAfterMs: 5_000 });
+					}
 					return response;
 				})
 				.catch((error: unknown) => {
-					const messageText = error instanceof Error ? error.message : 'Unknown fill error.';
+					busy = false;
 					const response: FillResponse = {
 						ok: false,
-						message: messageText,
+						message: error instanceof Error ? error.message : 'Unknown fill error.',
 						step: detectStep(pageHeading()),
 						filled: 0,
 						missed: []
 					};
-					showToast(response.message);
+					showBanner({ text: response.message, tone: 'error', actions: [dismissAction()] });
 					return response;
 				});
 		});
 
-		window.setTimeout(() => {
-			void runner.resumeFillRun().then((response) => {
-				if (response !== null) showToast(response.message);
+		window.setTimeout(() => void checkPage(), 500);
+		document.addEventListener('visibilitychange', () => {
+			if (document.visibilityState === 'visible') void checkPage();
+		});
+
+		async function checkPage() {
+			if (busy) return;
+			busy = true;
+			try {
+				await runPage();
+			} catch (error) {
+				showBanner({
+					text: error instanceof Error ? error.message : 'Engage Form could not fill this page.',
+					tone: 'error',
+					actions: [dismissAction()]
+				});
+			} finally {
+				busy = false;
+			}
+		}
+
+		async function runPage() {
+			const activeRun = loadFillRun();
+			if (activeRun !== null) {
+				showFilling(activeRun.label, activeRun.purchaseId);
+				await waitForKnownStep();
+				await drive(activeRun.purchaseId, await runner.continueFillRun());
+				return;
+			}
+
+			const step = await waitForKnownStep();
+			const pendingFillState = await readPendingFillState();
+			if (pendingFillState === null) return;
+
+			const decision = autoStartDecision({
+				url: window.location.href,
+				step,
+				now: Date.now(),
+				activeRun: loadFillRun() !== null,
+				state: pendingFillState,
+				signInDismissed: window.sessionStorage.getItem(SIGN_IN_DISMISSED_KEY) !== null
 			});
-		}, 500);
+
+			if (decision.type === 'signIn') {
+				showSignIn();
+				return;
+			}
+
+			if (signInShown) {
+				signInShown = false;
+				hideBanner();
+			}
+
+			if (decision.type === 'expire') {
+				await clearPendingFill(decision.pendingFill.purchaseRequestId);
+				return;
+			}
+
+			if (decision.type === 'start') {
+				await startPendingFill(decision.pendingFill);
+			}
+		}
+
+		async function startPendingFill(pendingFill: PendingFill) {
+			showFilling(pendingFill.label, pendingFill.purchaseRequestId);
+			const purchase = await loadPurchaseRequest(pendingFill.purchaseRequestId);
+			if (purchase === null) {
+				await clearPendingFill(pendingFill.purchaseRequestId);
+				showBanner({
+					text: `Couldn’t load “${pendingFill.label}”. Open it in Engage Form and try again.`,
+					tone: 'error',
+					actions: [dismissAction()]
+				});
+				return;
+			}
+			await drive(
+				pendingFill.purchaseRequestId,
+				await runner.startFillRun(purchase, pendingFill.label)
+			);
+		}
+
+		async function drive(purchaseId: string, first: FillResponse) {
+			let response = first;
+			while (response.ok && response.step !== 'review') {
+				const moved = await waitForStepChange(response.step);
+				if (loadFillRun()?.purchaseId !== purchaseId) return;
+				if (!moved) {
+					clearFillRun();
+					response = {
+						...response,
+						ok: false,
+						message: 'Engage didn’t move to the next page. Check this page, then try again.'
+					};
+					break;
+				}
+				response = await runner.continueFillRun();
+			}
+			await showRunResult(purchaseId, response);
+		}
+
+		async function showRunResult(purchaseId: string, response: FillResponse) {
+			if (response.ok && response.step === 'review') {
+				showBanner({
+					text: 'Engage is filled. Review it, then submit.',
+					tone: 'done',
+					hideAfterMs: 10_000
+				});
+				return;
+			}
+			if (response.message === cancelledMessage) return;
+			await clearPendingFill(purchaseId);
+			showBanner({ text: response.message, tone: 'error', actions: [dismissAction()] });
+		}
+
+		function showFilling(label: string, purchaseId: string) {
+			signInShown = false;
+			showBanner({
+				text: `Filling “${label}”…`,
+				actions: [{ label: 'Cancel', onClick: () => void cancel(purchaseId) }]
+			});
+		}
+
+		async function cancel(purchaseId: string) {
+			clearFillRun();
+			showBanner({ text: cancelledMessage, hideAfterMs: 3_000 });
+			await clearPendingFill(purchaseId);
+		}
+
+		function showSignIn() {
+			signInShown = true;
+			showBanner({
+				text: 'Sign in to Engage Form to fill this automatically.',
+				actions: [
+					{ label: 'Sign in', href: `${readWebAppUrl()}/app` },
+					{
+						label: 'Not now',
+						onClick: () => {
+							window.sessionStorage.setItem(SIGN_IN_DISMISSED_KEY, '1');
+							signInShown = false;
+							hideBanner();
+						}
+					}
+				]
+			});
+		}
 	}
 });
+
+function dismissAction() {
+	return { label: 'Dismiss', onClick: hideBanner };
+}
+
+async function waitForKnownStep() {
+	return await pollStep((step) => step !== 'unknown', STEP_WAIT_MS);
+}
+
+async function waitForStepChange(previous: EngageStep) {
+	const step = await pollStep(
+		(current) => current !== 'unknown' && current !== previous,
+		STEP_CHANGE_WAIT_MS
+	);
+	if (step === 'unknown' || step === previous) return false;
+	await wait(STEP_SETTLE_MS);
+	return true;
+}
+
+async function pollStep(done: (step: EngageStep) => boolean, timeoutMs: number) {
+	const startedAt = Date.now();
+	let step = detectStep(pageHeading());
+	while (!done(step) && Date.now() - startedAt < timeoutMs) {
+		await wait(250);
+		step = detectStep(pageHeading());
+	}
+	return step;
+}
+
+function wait(ms: number) {
+	return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function readPendingFillState(): Promise<PendingFillState | null> {
+	const response = await sendRuntimeMessage({ type: 'GET_PENDING_FILL' });
+	return response?.ok === true && 'pendingFillState' in response ? response.pendingFillState : null;
+}
+
+async function clearPendingFill(purchaseId: string) {
+	await sendRuntimeMessage({ type: 'CLEAR_PENDING_FILL', purchaseId });
+}
+
+async function sendRuntimeMessage(message: RuntimeMessage) {
+	try {
+		return (await browser.runtime.sendMessage(message)) as RuntimeResponse | undefined;
+	} catch {
+		return undefined;
+	}
+}
 
 async function applyFillPlan(actions: FillAction[]) {
 	let filled = 0;
@@ -205,7 +416,7 @@ function loadFillRun() {
 	}
 }
 
-function saveFillRun(state: { purchaseId: string; filled: number; pageCount: number }) {
+function saveFillRun(state: FillRunState) {
 	window.sessionStorage.setItem(FILL_RUN_KEY, JSON.stringify(state));
 }
 
@@ -214,50 +425,21 @@ function clearFillRun() {
 	void browser.runtime.sendMessage({ type: 'FILL_RUN_ENDED' });
 }
 
-async function loadPurchaseRequest(purchaseId: string) {
-	const response = (await browser.runtime.sendMessage({
-		type: 'GET_FILL_PAYLOAD',
-		purchaseId
-	})) as { ok: true; purchase: PurchaseRequest } | { ok: false; message: string } | undefined;
-
+async function loadPurchaseRequest(purchaseId: string): Promise<PurchaseRequest | null> {
+	const response = await sendRuntimeMessage({ type: 'GET_FILL_PAYLOAD', purchaseId });
 	return response?.ok === true && 'purchase' in response ? response.purchase : null;
 }
 
-function parseFillRunState(value: unknown) {
+function parseFillRunState(value: unknown): FillRunState | null {
 	if (!isRecord(value) || typeof value.purchaseId !== 'string') return null;
 	return {
 		purchaseId: value.purchaseId,
 		filled: typeof value.filled === 'number' ? value.filled : 0,
-		pageCount: typeof value.pageCount === 'number' ? value.pageCount : 0
+		pageCount: typeof value.pageCount === 'number' ? value.pageCount : 0,
+		label: typeof value.label === 'string' ? value.label : 'purchase request'
 	};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
-}
-
-function showToast(message: string) {
-	const existing = document.querySelector('#engage-form-toast');
-	existing?.remove();
-
-	const toast = document.createElement('div');
-	toast.id = 'engage-form-toast';
-	toast.textContent = message;
-	toast.style.cssText = [
-		'position: fixed',
-		'right: 18px',
-		'bottom: 18px',
-		'z-index: 2147483647',
-		'max-width: 320px',
-		'padding: 12px 14px',
-		'border: 1px solid #171717',
-		'border-radius: 8px',
-		'background: #fffefa',
-		'color: #171717',
-		'font: 14px/1.4 system-ui, sans-serif',
-		'box-shadow: 0 16px 40px rgb(33 30 24 / 18%)'
-	].join(';');
-
-	document.body.append(toast);
-	window.setTimeout(() => toast.remove(), 5000);
 }

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { samplePurchaseRequest } from '@engage-form/domain';
 import type { FillAction } from '@engage-form/fill-engine';
-import { createContentRunner, type FillRunState } from './content-runner';
+import { createContentRunner, fillLabel, type FillRunState } from './content-runner';
 
 test('starts a complete fill run and advances the current step', async () => {
 	let state: FillRunState | null = null;
@@ -36,14 +36,20 @@ test('starts a complete fill run and advances the current step', async () => {
 	expect(result).toMatchObject({ ok: true, step: 'about', filled: 3 });
 	expect(clickedNext).toBe(1);
 	expect(receivedActions.length).toBeGreaterThan(0);
-	expect(state).toEqual({ purchaseId: samplePurchaseRequest.id, filled: 3, pageCount: 1 });
+	expect(state).toEqual({
+		purchaseId: samplePurchaseRequest.id,
+		filled: 3,
+		pageCount: 1,
+		label: 'Amazon · $22.98'
+	});
 });
 
 test('records review reached when a saved run reaches review', async () => {
 	let state: FillRunState | null = {
 		purchaseId: samplePurchaseRequest.id,
 		filled: 18,
-		pageCount: 9
+		pageCount: 9,
+		label: 'Amazon · $22.98'
 	};
 	const reviewMessages: string[] = [];
 	const runner = createContentRunner({
@@ -86,7 +92,8 @@ test('clears a run when the current step cannot be filled', async () => {
 	let state: FillRunState | null = {
 		purchaseId: samplePurchaseRequest.id,
 		filled: 4,
-		pageCount: 2
+		pageCount: 2,
+		label: 'Amazon · $22.98'
 	};
 	const runner = createContentRunner({
 		pageHeading: () => 'Mandatory Claims',
@@ -124,7 +131,8 @@ test('clears a run when the cached purchase is missing', async () => {
 	let state: FillRunState | null = {
 		purchaseId: samplePurchaseRequest.id,
 		filled: 4,
-		pageCount: 2
+		pageCount: 2,
+		label: 'Amazon · $22.98'
 	};
 	const runner = createContentRunner({
 		pageHeading: () => 'Mandatory Claims',
@@ -157,4 +165,44 @@ test('clears a run when the cached purchase is missing', async () => {
 		missed: []
 	});
 	expect(state).toBeNull();
+});
+
+test('does not advance when the run is cancelled mid-page', async () => {
+	let state: FillRunState | null = null;
+	const runner = createContentRunner({
+		pageHeading: () => 'Mandatory Claims',
+		applyFillPlan() {
+			state = null;
+			return Promise.resolve({ filled: 4, missed: [], message: 'Filled current page.' });
+		},
+		clickNextStep() {
+			throw new Error('Cancelled runs should not advance.');
+		},
+		sendReviewReached() {
+			throw new Error('Review should not be reached.');
+		},
+		loadPurchaseRequest: () => Promise.resolve(samplePurchaseRequest),
+		loadFillRun: () => state,
+		saveFillRun(nextState) {
+			state = nextState;
+		},
+		clearFillRun() {
+			state = null;
+		}
+	});
+
+	const result = await runner.startFillRun(samplePurchaseRequest, 'Costco · $45.98');
+
+	expect(result).toMatchObject({ ok: false, message: 'Fill cancelled.', step: 'claims' });
+	expect(state).toBeNull();
+});
+
+test('labels a fill run by vendor and amount', () => {
+	expect(fillLabel({ vendor: 'Costco', itemDescription: 'Snacks', totalAmount: 45.98 })).toBe(
+		'Costco · $45.98'
+	);
+	expect(fillLabel({ vendor: ' ', itemDescription: 'Snacks', totalAmount: 5 })).toBe(
+		'Snacks · $5.00'
+	);
+	expect(fillLabel({ vendor: '', itemDescription: '', totalAmount: 5 })).toBe('$5.00');
 });

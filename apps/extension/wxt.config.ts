@@ -7,6 +7,7 @@ import { defineConfig } from 'wxt';
 const workspaceRoot = resolve(import.meta.dirname, '../..');
 const extensionRoot = import.meta.dirname;
 const engageOrigin = 'https://uoregon.campuslabs.com';
+const productionWebAppOrigin = 'https://forms.oli.boo';
 
 export default defineConfig({
 	srcDir: 'src',
@@ -26,12 +27,22 @@ export default defineConfig({
 			},
 			permissions: ['activeTab', 'cookies', 'scripting', 'storage'],
 			host_permissions: [
-				'https://*.convex.cloud/*',
-				'https://*.convex.site/*',
-				hostPermission(engageOrigin),
-				hostPermission(env.PUBLIC_CLERK_SYNC_HOST ?? env.PUBLIC_WEB_APP_URL ?? 'http://localhost'),
-				clerkFrontendApi ? hostPermission(clerkFrontendApi) : null
-			].filter((value): value is string => value !== null),
+				...new Set(
+					[
+						'https://*.convex.cloud/*',
+						'https://*.convex.site/*',
+						hostPermission(engageOrigin),
+						hostPermission(productionWebAppOrigin),
+						'http://localhost/*',
+						'http://127.0.0.1/*',
+						hostPermission(env.PUBLIC_WEB_APP_URL ?? 'http://localhost'),
+						hostPermission(
+							env.PUBLIC_CLERK_SYNC_HOST ?? env.PUBLIC_WEB_APP_URL ?? 'http://localhost'
+						),
+						clerkFrontendApi ? hostPermission(clerkFrontendApi) : null
+					].filter((value): value is string => value !== null)
+				)
+			],
 			content_security_policy:
 				mode === 'development'
 					? {
@@ -43,9 +54,10 @@ export default defineConfig({
 					: undefined
 		};
 	},
-	vite: () => ({
+	vite: ({ mode, browser }) => ({
 		envDir: workspaceRoot,
 		envPrefix: ['VITE_', 'PUBLIC_'],
+		define: publicEnvDefines(loadBuildEnv(mode, browser)),
 		plugins: [tailwindcss()],
 		resolve: {
 			alias: {
@@ -61,7 +73,19 @@ type BuildEnv = {
 	CRX_PUBLIC_KEY?: string;
 	PUBLIC_CLERK_SYNC_HOST?: string;
 	PUBLIC_WEB_APP_URL?: string;
+	[key: string]: string | undefined;
 };
+
+function publicEnvDefines(env: BuildEnv) {
+	return Object.fromEntries(
+		Object.entries(env)
+			.filter(
+				(entry): entry is [string, string] =>
+					entry[0].startsWith('PUBLIC_') && typeof entry[1] === 'string'
+			)
+			.map(([key, value]) => [`import.meta.env.${key}`, JSON.stringify(value)])
+	);
+}
 
 function loadBuildEnv(mode: string, browser: string): BuildEnv {
 	return {
