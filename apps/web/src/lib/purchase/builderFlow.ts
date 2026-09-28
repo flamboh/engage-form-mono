@@ -1,12 +1,4 @@
-export type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
-
-export type DocumentationCategory =
-	| 'asuo_funds'
-	| 'food'
-	| 'printing_services'
-	| 'office_supplies_goods'
-	| 'merchandise_apparel'
-	| 'gifts_prizes';
+import type { DocumentationCategory, FundLetter } from './draftDetails';
 
 export type RequirementPanel = {
 	id:
@@ -23,29 +15,6 @@ export type RequirementPanel = {
 	title: string;
 	required: boolean;
 };
-
-export const finalBuilderSteps = [
-	'Student Organization',
-	'Type of Purchase',
-	'Documentation Categories',
-	'Common Facts',
-	'Specific Requirements',
-	'Business Purpose',
-	'Readiness Review',
-	'Ready Confirmation'
-] as const;
-
-export const commonFactLabels = [
-	'Student Organization',
-	'Requester',
-	'Type of Purchase',
-	'Fund Letter',
-	'Budget Line Item',
-	'Vendor',
-	'Item Description',
-	'Total Amount',
-	'Business Purpose'
-] as const;
 
 export function requirementPanelsFor({
 	categories,

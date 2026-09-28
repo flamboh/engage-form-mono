@@ -51,8 +51,7 @@ export default defineConfig(
 					path.resolve(workspaceRoot, 'convex/tsconfig.json'),
 					path.resolve(workspaceRoot, 'apps/extension/tsconfig.json'),
 					path.resolve(workspaceRoot, 'packages/domain/tsconfig.json'),
-					path.resolve(workspaceRoot, 'packages/fill-engine/tsconfig.json'),
-					path.resolve(workspaceRoot, 'packages/utils/tsconfig.json')
+					path.resolve(workspaceRoot, 'packages/fill-engine/tsconfig.json')
 				],
 				tsconfigRootDir: workspaceRoot
 			}
