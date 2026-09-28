@@ -1,5 +1,5 @@
 export const DEFAULT_BUSINESS_PURPOSE =
-	'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.';
+	'{Student Organization} wishes to reimburse {Purchaser} for purchasing {Item Description} from {Vendor} ({Total Amount}) for {Purpose}.';
 
 export const SUGGESTED_BUDGET_LINES = [
 	'Event Expenses',

@@ -51,7 +51,7 @@
 	let orgIndex = $state('');
 	let orgBudgetLines = $state<string[]>(['Event Expenses']);
 	let orgTemplate = $state(
-		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.'
+		'{Student Organization} wishes to reimburse {Purchaser} for purchasing {Item Description} from {Vendor} ({Total Amount}) for {Purpose}.'
 	);
 
 	let purchaserName = $state('');
@@ -62,7 +62,7 @@
 
 	let businessPurposeTemplateTitle = $state('');
 	let businessPurposeTemplateText = $state(
-		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.'
+		'{Student Organization} wishes to reimburse {Purchaser} for purchasing {Item Description} from {Vendor} ({Total Amount}) for {Purpose}.'
 	);
 	let businessPurposeTemplateSearch = $state('');
 

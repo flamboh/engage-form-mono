@@ -9,7 +9,8 @@ export const businessPurposeVariables = [
 	{ id: 'recipients', label: 'Recipients' },
 	{ id: 'recipientUo95Ids', label: 'Recipient UO 95 IDs' },
 	{ id: 'activityDate', label: 'Activity Date' },
-	{ id: 'officeLocation', label: 'Office Location' }
+	{ id: 'officeLocation', label: 'Office Location' },
+	{ id: 'purpose', label: 'Purpose' }
 ] as const;
 
 export type BusinessPurposeVariable = (typeof businessPurposeVariables)[number]['id'];
@@ -125,9 +126,11 @@ function valueForVariable(variable: BusinessPurposeVariable, request: BusinessPu
 		case 'recipientUo95Ids':
 			return listValue(request.recipients.map((recipient) => recipient.uo95));
 		case 'activityDate':
-			return textValue(activityDateForPurchase(request));
+			return textValue(formatActivityDate(activityDateForPurchase(request)));
 		case 'officeLocation':
 			return textValue(request.officeLocation);
+		case 'purpose':
+			return textValue(request.purpose ?? '');
 	}
 }
 
@@ -147,4 +150,17 @@ function formatMoney(value: number) {
 
 function activityDateForPurchase(request: BusinessPurposeRequest) {
 	return request.activityDate ?? request.eventDate ?? '';
+}
+
+function formatActivityDate(value: string) {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+	if (match === null) return value;
+	const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+	if (Number.isNaN(date.getTime())) return value;
+	return new Intl.DateTimeFormat('en-US', {
+		month: 'long',
+		day: 'numeric',
+		year: 'numeric',
+		timeZone: 'UTC'
+	}).format(date);
 }
