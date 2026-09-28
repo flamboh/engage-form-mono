@@ -19,6 +19,8 @@ export type BusinessPurposeVariable =
 	| 'recipients'
 	| 'recipientUo95Ids'
 	| 'activityDate'
+	| 'activityTime'
+	| 'activityLocation'
 	| 'officeLocation'
 	| 'purpose';
 
@@ -57,6 +59,8 @@ const businessPurposeVariableLabels: Record<BusinessPurposeVariable, string> = {
 	recipients: 'Recipients',
 	recipientUo95Ids: 'Recipient UO 95 IDs',
 	activityDate: 'Activity Date',
+	activityTime: 'Time',
+	activityLocation: 'Location',
 	officeLocation: 'Office Location',
 	purpose: 'Purpose'
 };

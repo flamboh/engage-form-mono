@@ -63,6 +63,8 @@ export const businessPurposeVariable = v.union(
 	v.literal('recipients'),
 	v.literal('recipientUo95Ids'),
 	v.literal('activityDate'),
+	v.literal('activityTime'),
+	v.literal('activityLocation'),
 	v.literal('officeLocation'),
 	v.literal('purpose')
 );
@@ -246,7 +248,9 @@ export const purchaseRequestDoc = v.object({
 		v.record(v.string(), v.union(v.literal('user'), v.literal('receipt'), v.literal('default')))
 	),
 	receiptDate: v.optional(v.string()),
-	purpose: v.optional(v.string())
+	purpose: v.optional(v.string()),
+	activityTime: v.optional(v.string()),
+	activityLocation: v.optional(v.string())
 });
 
 export const savedData = v.object({

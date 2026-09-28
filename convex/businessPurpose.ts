@@ -9,6 +9,8 @@ export const businessPurposeVariables = [
 	{ id: 'recipients', label: 'Recipients' },
 	{ id: 'recipientUo95Ids', label: 'Recipient UO 95 IDs' },
 	{ id: 'activityDate', label: 'Activity Date' },
+	{ id: 'activityTime', label: 'Time' },
+	{ id: 'activityLocation', label: 'Location' },
 	{ id: 'officeLocation', label: 'Office Location' },
 	{ id: 'purpose', label: 'Purpose' }
 ] as const;
@@ -141,6 +143,10 @@ function valueForVariable(variable: BusinessPurposeVariable, request: BusinessPu
 			return listValue(request.recipients.map((recipient) => recipient.uo95));
 		case 'activityDate':
 			return textValue(formatActivityDate(activityDateForPurchase(request)));
+		case 'activityTime':
+			return textValue(formatActivityTime(request.activityTime ?? request.eventTime ?? ''));
+		case 'activityLocation':
+			return textValue(request.activityLocation ?? request.eventLocation ?? '');
 		case 'officeLocation':
 			return textValue(request.officeLocation);
 		case 'purpose':
@@ -160,6 +166,15 @@ function textValue(value: string) {
 
 function formatMoney(value: number) {
 	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+export function formatActivityTime(value: string) {
+	const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+	if (match === null) return value.trim();
+	const hours = Number(match[1]);
+	if (hours > 23) return value.trim();
+	const suffix = hours < 12 ? 'AM' : 'PM';
+	return `${hours % 12 === 0 ? 12 : hours % 12}:${match[2]} ${suffix}`;
 }
 
 function activityDateForPurchase(request: BusinessPurposeRequest) {

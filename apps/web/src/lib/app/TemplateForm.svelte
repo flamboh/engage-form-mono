@@ -76,7 +76,8 @@
 	<label class={labelClass}>
 		Business purpose
 		<span class={hintClass}>
-			Words in braces, like {'{Vendor}'} or {'{Activity Date}'}, fill in from each request.
+			Words in braces, like {'{Vendor}'}, {'{Activity Date}'}, {'{Time}'}, or {'{Location}'}, fill
+			in from each request.
 		</span>
 		<textarea class={textareaClass} required bind:value={text}></textarea>
 	</label>

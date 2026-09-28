@@ -167,6 +167,29 @@
 					</Chip>
 				{/if}
 			</div>
+			<div class="mt-2 grid gap-3 sm:grid-cols-[10rem_1fr]">
+				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
+					<span>Time <span class="font-normal text-(--quiet)">optional</span></span>
+					<input
+						id="activity-time"
+						class="input"
+						type="time"
+						value={form?.activityTime ?? ''}
+						onchange={(event) => editor.update({ activityTime: event.currentTarget.value })}
+					/>
+				</label>
+				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
+					<span>Location <span class="font-normal text-(--quiet)">optional</span></span>
+					<input
+						id="activity-location"
+						class="input"
+						placeholder="EMU Crater Lake Room"
+						value={form?.activityLocation ?? ''}
+						oninput={(event) =>
+							editor.update({ activityLocation: event.currentTarget.value }, { debounce: true })}
+					/>
+				</label>
+			</div>
 		</div>
 
 		<fieldset id="field-purchaser" class="flex flex-col gap-3">

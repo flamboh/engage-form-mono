@@ -780,6 +780,12 @@ function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {
 		businessPurposeSource: parseBusinessPurposeText(snapshot.businessPurposeText),
 		businessPurposeTouched: snapshot.businessPurposeTouched,
 		...(snapshot.purpose === undefined ? {} : { purpose: snapshot.purpose.trim().slice(0, 200) }),
+		...(snapshot.activityTime === undefined
+			? {}
+			: { activityTime: snapshot.activityTime.trim().slice(0, 40) }),
+		...(snapshot.activityLocation === undefined
+			? {}
+			: { activityLocation: snapshot.activityLocation.trim().slice(0, 200) }),
 		receiptFileIds: snapshot.receiptFileIds,
 		secondApprovalFileId: snapshot.secondApprovalFileId,
 		publicityFileId: snapshot.publicityFileId,
@@ -848,6 +854,8 @@ const currentBusinessPurposeVariables = new Set([
 	'recipients',
 	'recipientUo95Ids',
 	'activityDate',
+	'activityTime',
+	'activityLocation',
 	'officeLocation',
 	'purpose'
 ]);
@@ -863,10 +871,8 @@ function legacyBusinessPurposeValue(variable: string, request: Doc<'purchaseRequ
 		case 'eventName':
 			return legacy.eventName ?? '';
 		case 'eventTime':
-		case 'activityTime':
 			return legacy.eventTime ?? '';
 		case 'eventLocation':
-		case 'activityLocation':
 		case 'location':
 			return legacy.eventLocation ?? '';
 		case 'eventEstimatedAttendance':
@@ -897,9 +903,14 @@ function migrateBusinessPurposeTemplate(template: string) {
 		)
 		.replace(/\{\s*(officeLocation|Office Location)\s*\}/g, '{Office Location}')
 		.replace(/\{\s*(purpose|Purpose)\s*\}/g, '{Purpose}')
+		.replace(/\{\s*(eventTime|Event Time|activityTime|Activity Time|time|Time)\s*\}/g, '{Time}')
+		.replace(
+			/\{\s*(eventLocation|Event Location|activityLocation|Activity Location|location|Location)\s*\}/g,
+			'{Location}'
+		)
 		.replace(/\{\s*(eventDate|Event Date|activityDate|Activity Date)\s*\}/g, '{Activity Date}')
 		.replace(
-			/\{\s*(recipientReason|reason|eventName|Event Name|eventTime|Event Time|activityTime|Activity Time|eventLocation|Event Location|activityLocation|Activity Location|location|Location|eventEstimatedAttendance|Event Estimated Attendance|estimatedAttendance|Estimated Attendance|attendance|Attendance)\s*\}/g,
+			/\{\s*(recipientReason|reason|eventName|Event Name|eventEstimatedAttendance|Event Estimated Attendance|estimatedAttendance|Estimated Attendance|attendance|Attendance)\s*\}/g,
 			''
 		)
 		.replace(/\s+([,.])/g, '$1')

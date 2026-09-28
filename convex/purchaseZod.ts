@@ -72,6 +72,8 @@ export const businessPurposeVariable = z.union([
 	z.literal('recipients'),
 	z.literal('recipientUo95Ids'),
 	z.literal('activityDate'),
+	z.literal('activityTime'),
+	z.literal('activityLocation'),
 	z.literal('officeLocation'),
 	z.literal('purpose')
 ]);
@@ -222,7 +224,9 @@ export const purchaseRequestDoc = z.object({
 	lastFilledAt: z.number().nullable(),
 	fieldSources: z.record(z.string(), z.enum(['user', 'receipt', 'default'])).optional(),
 	receiptDate: z.string().optional(),
-	purpose: z.string().optional()
+	purpose: z.string().optional(),
+	activityTime: z.string().optional(),
+	activityLocation: z.string().optional()
 });
 
 export const savedData = z.object({
@@ -244,6 +248,8 @@ export const wizardSnapshot = z.object({
 	businessPurposeText: z.string(),
 	businessPurposeTouched: z.boolean(),
 	purpose: z.string().optional(),
+	activityTime: z.string().optional(),
+	activityLocation: z.string().optional(),
 	receiptFileIds: z.array(zid('files')),
 	secondApprovalFileId: zid('files').nullable(),
 	publicityFileId: zid('files').nullable(),

@@ -15,6 +15,8 @@
 		'Item Description',
 		'Total Amount',
 		'Activity Date',
+		'Time',
+		'Location',
 		'Recipients',
 		'Office Location'
 	];

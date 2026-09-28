@@ -23,6 +23,8 @@ export type FormState = {
 	purchaserSource: Purchase['purchaserSource'];
 	purchaser: PurchaserDetails;
 	activityDate: string;
+	activityTime: string;
+	activityLocation: string;
 	vendor: string;
 	itemDescription: string;
 	totalAmount: number | null;
@@ -118,6 +120,8 @@ export class RequestEditor {
 			purchaserSource: purchase.purchaserSource,
 			purchaser: purchase.purchaser,
 			activityDate: purchase.activityDate,
+			activityTime: purchase.activityTime ?? '',
+			activityLocation: purchase.activityLocation ?? '',
 			vendor: purchase.vendor,
 			itemDescription: purchase.itemDescription,
 			totalAmount: purchase.totalAmount || null,

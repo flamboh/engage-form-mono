@@ -242,7 +242,9 @@ export default defineSchema({
 		lastFilledAt: v.union(v.number(), v.null()),
 		fieldSources: v.optional(v.record(v.string(), fieldSource)),
 		receiptDate: v.optional(v.string()),
-		purpose: v.optional(v.string())
+		purpose: v.optional(v.string()),
+		activityTime: v.optional(v.string()),
+		activityLocation: v.optional(v.string())
 	})
 		.index('by_owner_and_organizationSourceId_and_status_and_updatedAt', [
 			'owner',
