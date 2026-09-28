@@ -23,7 +23,7 @@
 		"dev:convex": "bunx convex dev",
 		"dev:ext": "bun run --cwd apps/extension dev",
 		"deploy:web": "bun run --cwd apps/web deploy",
-		"deploy:convex": "bunx convex deploy",
+		"deploy:convex": "bunx convex deploy -y",
 		"deploy": "bun run deploy:convex && bun run deploy:web"
 	},
 	"dependencies": {
