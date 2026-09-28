@@ -35,8 +35,19 @@
 
 	let freshUrls = $state<Record<string, string>>({});
 	let expired = $state<Record<string, boolean>>({});
+	let unrenderable = $state<Record<string, boolean>>({});
+
+	function urlExpired(url: string | null) {
+		if (url === null) return false;
+		const expiresAt = Number(URL.parse(url, location.href)?.searchParams.get('exp'));
+		return Number.isFinite(expiresAt) && expiresAt > 0 && expiresAt <= Date.now();
+	}
 
 	async function previewFailed(fileId: Id<'files'>, failedUrl: string | null) {
+		if (!urlExpired(failedUrl)) {
+			unrenderable = { ...unrenderable, [fileId]: true };
+			return;
+		}
 		if (fileId in freshUrls || expired[fileId]) {
 			expired = { ...expired, [fileId]: true };
 			return;
@@ -60,14 +71,16 @@
 	class="flex flex-col gap-3 lg:gap-4"
 	aria-labelledby="documents-heading"
 >
-	<h2 id="documents-heading" class="text-sm font-semibold text-(--ink)">Documents</h2>
+	<h2 id="documents-heading" class="text-sm font-semibold text-(--ink) max-lg:sr-only">
+		Documents
+	</h2>
 
 	{#if !empty}
 		<ul
-			class="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pt-1 pb-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:overflow-visible lg:px-0"
+			class="-mx-4 flex snap-x scroll-px-4 items-stretch gap-2 overflow-x-auto px-4 pt-1 pb-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-3 lg:overflow-visible lg:px-0"
 		>
 			{#each documents as document (document.fileId)}
-				<li class="w-24 shrink-0 snap-start lg:w-auto">
+				<li class="w-48 shrink-0 snap-start lg:w-auto">
 					<DocumentTile
 						label={kindLabels[document.kind] ?? 'Document'}
 						filename={document.filename}
@@ -77,6 +90,7 @@
 							document.previewUrl}
 						status={document.reading ? 'reading' : document.readFailed ? 'unreadable' : 'saved'}
 						expired={expired[document.fileId] ?? false}
+						renderable={!unrenderable[document.fileId]}
 						onremove={locked ? undefined : () => onremove(document.fileId)}
 						onretryreading={document.kind === 'receipt' && !locked
 							? () => onretryreading(document.fileId)
@@ -90,7 +104,7 @@
 				</li>
 			{/each}
 			{#each inFlight as upload (upload.id)}
-				<li class="w-24 shrink-0 snap-start lg:w-auto">
+				<li class="w-48 shrink-0 snap-start lg:w-auto">
 					<DocumentTile
 						label={upload.slot === 'auto' ? 'New document' : slotLabels[upload.slot]}
 						filename={upload.filename}
@@ -103,18 +117,18 @@
 					/>
 				</li>
 			{/each}
-			<li class="flex w-24 shrink-0 flex-col gap-2 lg:hidden">
+			<li class="flex shrink-0 gap-2 lg:hidden">
 				<FilePick
-					class="add-tile flex flex-1 flex-col items-center justify-center gap-1 border border-dashed text-sm font-medium text-(--pine)"
+					class="add-tile flex min-h-14 w-16 items-center justify-center gap-1 border border-dashed text-sm font-medium text-(--pine)"
 					label="Add documents"
 					multiple
 					onfiles={(files) => onfiles(files, 'auto')}
 				>
-					<span class="text-2xl leading-none" aria-hidden="true">+</span>
+					<span class="text-lg leading-none" aria-hidden="true">+</span>
 					Add
 				</FilePick>
 				<FilePick
-					class="add-tile hidden border border-dashed py-2 text-center text-sm font-medium text-(--pine) pointer-coarse:block"
+					class="add-tile hidden min-h-14 w-18 items-center justify-center border border-dashed text-sm font-medium text-(--pine) pointer-coarse:flex"
 					label="Take a photo"
 					capture
 					onfiles={(files) => onfiles(files, 'auto')}

@@ -260,6 +260,22 @@ export const upsertOrganization = authedMutation({
 	}
 });
 
+export const setOrganizationBusinessPurposeTemplate = authedMutation({
+	args: { organizationId: zid('organizations'), businessPurposeTemplate: z.string() },
+	returns: nullReturn,
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
+		requireText(args.businessPurposeTemplate, 'Business Purpose Template missing.');
+		validateBusinessPurposeText(args.businessPurposeTemplate);
+		await ctx.db.patch(args.organizationId, {
+			businessPurposeTemplate: args.businessPurposeTemplate,
+			updatedAt: Date.now()
+		});
+		return null;
+	}
+});
+
 export const upsertPurchaser = authedMutation({
 	args: purchaserArgs,
 	returns: zid('purchasers'),

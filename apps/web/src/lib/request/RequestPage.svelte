@@ -225,7 +225,7 @@
 	</header>
 
 	<div
-		class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-[minmax(0,1fr)] gap-8 px-4 py-6 sm:px-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-14 lg:py-10"
+		class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 sm:gap-8 sm:px-6 sm:py-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-14 lg:py-10"
 	>
 		<aside class="min-w-0">
 			<DocumentsRail
@@ -240,7 +240,7 @@
 			/>
 		</aside>
 
-		<main class="flex max-w-2xl min-w-0 flex-col gap-10 pb-10">
+		<main class="flex max-w-2xl min-w-0 flex-col gap-8 pb-10 lg:gap-10">
 			{#if loadError}
 				<p class="border border-(--alert) bg-white p-4 text-sm text-(--alert)">{loadError}</p>
 			{:else if view === undefined || purchase === undefined}
@@ -262,6 +262,7 @@
 						{purchasers}
 						{templates}
 						{recentPurposes}
+						organizationTemplate={organization?.businessPurposeTemplate ?? null}
 						userName={user?.name ?? purchase.requester.name}
 						section="why"
 					/>

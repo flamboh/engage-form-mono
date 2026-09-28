@@ -75,6 +75,20 @@ export function formatBusinessPurposeSource(source: BusinessPurposeSource) {
 		.join('');
 }
 
+export function mentionsPurpose(text: string) {
+	return parseBusinessPurposeText(text).parts.some(
+		(part) => part.kind === 'variable' && part.variable === 'purpose'
+	);
+}
+
+export function withPurpose(text: string) {
+	if (mentionsPurpose(text)) return text;
+	const trimmed = text.trimEnd();
+	if (trimmed === '') return 'For {Purpose}.';
+	const ending = /[.!]$/.exec(trimmed)?.[0] ?? '';
+	return `${trimmed.slice(0, trimmed.length - ending.length)} for {Purpose}${ending}`;
+}
+
 export function validateBusinessPurposeSource(source: BusinessPurposeSource) {
 	for (const part of source.parts) {
 		if (part.kind === 'variable' && !variablesById.has(part.variable)) {

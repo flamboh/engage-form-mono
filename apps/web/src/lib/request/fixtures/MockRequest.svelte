@@ -112,6 +112,10 @@
 			view.purchase.businessPurposeTouched = true;
 			await refresh();
 		},
+		saveOrganizationTemplate: async (businessPurposeTemplate) => {
+			await wait(150);
+			mockSaved.organizations[0].businessPurposeTemplate = businessPurposeTemplate;
+		},
 		resolveReview: async (field, value) => {
 			await wait(150);
 			if (field === 'totalAmount') view.purchase.totalAmount = Number(value) || 0;

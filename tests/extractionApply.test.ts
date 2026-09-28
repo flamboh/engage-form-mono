@@ -389,7 +389,7 @@ test('failed receipts are left out of totals while successful ones still sum', (
 	expect(receiptFieldsPatch(draft, [bigbox, failed]).totalAmount).toBe(28.48);
 });
 
-test('removing a receipt asks to check user-typed store and items that mention it', () => {
+test('removing a receipt asks to check user-typed store and items', () => {
 	const typed = {
 		...draft,
 		receiptFileIds: [receiptA],
@@ -397,7 +397,7 @@ test('removing a receipt asks to check user-typed store and items that mention i
 		itemDescription: 'New LP for the listening party',
 		fieldSources: { vendor: 'user', itemDescription: 'user' }
 	} as Doc<'purchaseRequests'>;
-	const checks = receiptRemovalChecks(typed, corner);
+	const checks = receiptRemovalChecks(typed);
 	expect(checks).toEqual([
 		{ field: 'vendor', value: 'Bigbox and Corner Records' },
 		{ field: 'itemDescription', value: 'New LP for the listening party' }
@@ -413,20 +413,33 @@ test('removing a receipt asks to check user-typed store and items that mention i
 	]);
 });
 
-test('removal checks skip unrelated, receipt-filled, and already edited fields', () => {
+test('removing a receipt flags any user-typed store, even without shared words', () => {
 	const typed = {
 		...draft,
-		vendor: 'Bigbox Wholesale',
+		receiptFileIds: [receiptA],
+		vendor: 'Test Edited Store',
 		itemDescription: 'Snacks',
 		fieldSources: { vendor: 'user', itemDescription: 'receipt' }
 	} as Doc<'purchaseRequests'>;
-	expect(receiptRemovalChecks(typed, corner)).toEqual([]);
-	expect(receiptRemovalChecks(typed, { status: 'failed', vendor: null, items: [] })).toEqual([
-		{ field: 'vendor', value: 'Bigbox Wholesale' }
-	]);
+	const checks = receiptRemovalChecks(typed);
+	expect(checks).toEqual([{ field: 'vendor', value: 'Test Edited Store' }]);
+	expect(
+		requestReviews({ ...typed, receiptChecks: checks } as Doc<'purchaseRequests'>, [bigbox])
+	).toEqual([{ field: 'vendor', value: 'Test Edited Store', alternatives: ['Bigbox Wholesale'] }]);
+});
+
+test('removal checks skip receipt-filled and already edited fields', () => {
+	const filled = {
+		...draft,
+		vendor: 'Bigbox Wholesale',
+		itemDescription: 'Snacks',
+		fieldSources: { vendor: 'receipt', itemDescription: 'receipt' }
+	} as Doc<'purchaseRequests'>;
+	expect(receiptRemovalChecks(filled)).toEqual([]);
 	const edited = {
-		...typed,
+		...filled,
 		vendor: 'Bigbox',
+		fieldSources: { vendor: 'user' },
 		receiptChecks: [{ field: 'vendor', value: 'Bigbox Wholesale' }]
 	} as Doc<'purchaseRequests'>;
 	expect(requestReviews(edited, [])).toEqual([]);

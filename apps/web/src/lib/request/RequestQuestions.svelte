@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Doc } from '$convex/_generated/dataModel';
+	import { mentionsPurpose } from '$convex/businessPurpose';
 	import type { FundLetter } from '$lib/purchase/draftDetails';
 	import Chip from './Chip.svelte';
 	import type { RequestEditor } from './editor.svelte';
@@ -14,6 +15,7 @@
 		purchasers,
 		templates,
 		recentPurposes = [],
+		organizationTemplate = null,
 		userName,
 		section
 	}: {
@@ -23,11 +25,14 @@
 		purchasers: Doc<'purchasers'>[];
 		templates: Doc<'businessPurposeTemplates'>[];
 		recentPurposes?: string[];
+		organizationTemplate?: string | null;
 		userName: string;
 		section: 'why' | 'funding';
 	} = $props();
 
 	let showAllTemplates = $state(false);
+	let addedPurpose = $state(false);
+	let savedForFuture = $state(false);
 
 	const form = $derived(editor.form);
 	const categories = $derived(new Set(form?.documentationCategories ?? []));
@@ -49,14 +54,21 @@
 	const purposeChips = $derived(
 		recentPurposes.filter((item) => item.toLowerCase() !== purpose.trim().toLowerCase())
 	);
-	const usesPurpose = $derived((form?.businessPurposeText ?? '').includes('{Purpose}'));
+	const usesPurpose = $derived(mentionsPurpose(form?.businessPurposeText ?? ''));
+	const offerForFuture = $derived(
+		addedPurpose &&
+			usesPurpose &&
+			purpose.trim() !== '' &&
+			organizationTemplate !== null &&
+			!mentionsPurpose(organizationTemplate)
+	);
 
-	function addPurposeToSentence() {
-		const text = (form?.businessPurposeText ?? '').trim();
-		editor.update({
-			businessPurposeText: `${text}${text === '' ? '' : ' '}It was for {Purpose}.`,
-			businessPurposeTouched: true
-		});
+	function setPurpose(value: string, options: { debounce?: boolean } = {}) {
+		if (editor.setPurpose(value, options)) addedPurpose = true;
+	}
+
+	async function saveForFuture() {
+		savedForFuture = await editor.saveSentenceForFuture();
 	}
 
 	const selectedPurchaserId = $derived(
@@ -75,21 +87,34 @@
 				autocomplete="off"
 				placeholder="Prizes for trivia night"
 				value={purpose}
-				oninput={(event) =>
-					editor.update({ purpose: event.currentTarget.value }, { debounce: true })}
+				oninput={(event) => setPurpose(event.currentTarget.value, { debounce: true })}
 			/>
 			{#if purposeChips.length > 0}
 				<div class="flex flex-wrap items-center gap-2" aria-label="Recent answers">
 					<span class="text-xs text-(--quiet)">Recent</span>
 					{#each purposeChips as item (item)}
-						<Chip onclick={() => editor.update({ purpose: item })}>{item}</Chip>
+						<Chip onclick={() => setPurpose(item)}>{item}</Chip>
 					{/each}
 				</div>
 			{/if}
-			{#if purpose.trim() !== '' && !usesPurpose}
+			{#if savedForFuture}
+				<p class="text-sm text-(--quiet)" role="status">
+					New requests will say what they were for, too.
+				</p>
+			{:else if offerForFuture}
+				<p class="text-sm text-(--quiet)">
+					Added “for {purpose.trim()}” to this Business Purpose.
+					<button
+						class="text-(--pine) underline disabled:opacity-60"
+						type="button"
+						disabled={editor.busy}
+						onclick={saveForFuture}>Use this for future requests</button
+					>
+				</p>
+			{:else if purpose.trim() !== '' && !usesPurpose}
 				<p class="text-sm text-(--quiet)">
 					Your Business Purpose sentence doesn’t mention this yet.
-					<button class="text-(--pine) underline" type="button" onclick={addPurposeToSentence}
+					<button class="text-(--pine) underline" type="button" onclick={() => setPurpose(purpose)}
 						>Add it</button
 					>
 				</p>
