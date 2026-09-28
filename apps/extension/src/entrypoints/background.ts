@@ -19,12 +19,14 @@ import {
 	type RuntimeResponse,
 	runtimeError
 } from '../lib/messages';
+import { isConvexAuthError, isTokenUsable } from '../lib/convex-token';
 import type { PendingFillState } from '../lib/pending-fill';
 import { withTimeout } from '../lib/timeout';
 import { readWebAppConvexToken } from '../lib/web-app-token';
 
 let clerk: ReturnType<typeof createSyncedClerk> | null = null;
 const clerkTokenTimeoutMs = 4_000;
+const signedOutKey = 'engageFormSignedOut';
 const documentDataUrls = new Map<string, string>();
 let activePurchaseId: string | null = null;
 let activeConvexToken: string | null = null;
@@ -53,6 +55,9 @@ export default defineBackground(() => {
 function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeResponse, Error> {
 	if (message.type === 'AUTH_STATE') {
 		return Effect.gen(function* () {
+			if (yield* Effect.promise(isSignedOut)) {
+				return { ok: true, signedIn: false, email: null } as const;
+			}
 			const client = yield* refreshClerkEffect();
 			const signedIn =
 				client.session !== null ||
@@ -66,21 +71,34 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 	}
 
 	if (message.type === 'GET_CONVEX_TOKEN') {
-		return Effect.gen(function* () {
-			const token = yield* getConvexTokenEffect();
-			return { ok: true, token } as const;
+		return Effect.tryPromise({
+			try: async () =>
+				({ ok: true, token: await getConvexToken(message.forceRefresh === true) }) as const,
+			catch: toError
+		});
+	}
+
+	if (message.type === 'SIGN_IN') {
+		return Effect.tryPromise({
+			try: async () => {
+				await browser.storage.local.remove(signedOutKey);
+				await browser.tabs.create({ url: `${readWebAppUrl()}/app` });
+				return { ok: true, message: 'Opening sign in.' } as const;
+			},
+			catch: toError
 		});
 	}
 
 	if (message.type === 'SIGN_OUT') {
 		return Effect.gen(function* () {
+			clearActiveFillRun();
+			yield* Effect.promise(() => browser.storage.local.set({ [signedOutKey]: true }));
 			const client = yield* getClerkEffect();
 			yield* Effect.tryPromise({
 				try: () => client.signOut(),
 				catch: toError
 			});
 			yield* refreshClerkEffect();
-			clearActiveFillRun();
 			return { ok: true, message: 'Signed out.' } as const;
 		});
 	}
@@ -103,10 +121,11 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 	if (message.type === 'REVIEW_REACHED') {
 		return Effect.tryPromise({
 			try: async () => {
-				const convex = await authedConvex();
-				await convex.mutation(api.authed.extension.markReviewReached, {
-					id: message.purchaseId as Id<'purchaseRequests'>
-				});
+				await withConvex((convex) =>
+					convex.mutation(api.authed.extension.markReviewReached, {
+						id: message.purchaseId as Id<'purchaseRequests'>
+					})
+				);
 				clearActiveFillRun();
 				return { ok: true, message: 'Marked review reached.' } as const;
 			},
@@ -121,15 +140,16 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 		});
 	}
 
-	if (message.type === 'CLEAR_PENDING_FILL') {
+	if (message.type === 'CLAIM_PENDING_FILL') {
 		return Effect.tryPromise({
-			try: async () => {
-				const convex = await authedConvex();
-				await convex.mutation(api.authed.extension.clearPendingFill, {
-					purchaseRequestId: message.purchaseId as Id<'purchaseRequests'>
-				});
-				return { ok: true, message: 'Pending fill cleared.' } as const;
-			},
+			try: async () => ({
+				ok: true as const,
+				claimedFill: await withConvex((convex) =>
+					convex.mutation(api.authed.extension.claimPendingFill, {
+						purchaseRequestId: message.purchaseId as Id<'purchaseRequests'>
+					})
+				)
+			}),
 			catch: toError
 		});
 	}
@@ -144,25 +164,33 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 	return Effect.succeed({ ok: false, message: 'Unknown extension operation.' });
 }
 
-function getConvexTokenEffect() {
-	return Effect.gen(function* () {
-		const webToken = yield* Effect.promise(() => readWebAppConvexToken(readWebAppUrl()));
-		if (webToken !== null) return webToken;
+async function isSignedOut() {
+	const stored = await browser.storage.local.get(signedOutKey);
+	return stored[signedOutKey] === true;
+}
 
-		const client = yield* refreshClerkEffect();
-		if (client.session === null) return null;
+async function getConvexToken(preferClerk = false) {
+	if (await isSignedOut()) return null;
+	if (preferClerk) {
+		const clerkToken = await getClerkConvexToken(true).catch(() => null);
+		if (clerkToken !== null) return clerkToken;
+	}
+	const webToken = await readWebAppConvexToken(readWebAppUrl());
+	if (webToken !== null) return webToken;
+	return await getClerkConvexToken(false);
+}
 
-		const token = yield* Effect.tryPromise({
-			try: () =>
-				withTimeout(
-					client.session!.getToken({ template: 'convex' }),
-					`Clerk Convex token did not respond within ${clerkTokenTimeoutMs / 1_000}s.`,
-					clerkTokenTimeoutMs
-				),
-			catch: toError
-		});
-		return token;
-	});
+async function getClerkConvexToken(skipCache: boolean) {
+	if (await isSignedOut()) return null;
+	const client = await refreshClerk();
+	const session = client.session;
+	if (!session) return null;
+	const token = await withTimeout(
+		session.getToken({ template: 'convex', skipCache }),
+		`Clerk Convex token did not respond within ${clerkTokenTimeoutMs / 1_000}s.`,
+		clerkTokenTimeoutMs
+	);
+	return isTokenUsable(token, Date.now()) ? token : null;
 }
 
 function createSyncedClerk() {
@@ -225,26 +253,45 @@ async function sendFillMessage(tabId: number, message: FillMessage): Promise<Fil
 	}
 }
 
-async function authedConvex(token?: string) {
-	const convexToken =
-		token ?? activeConvexToken ?? (await Effect.runPromise(getConvexTokenEffect()));
-	if (convexToken === null) throw new Error('Signed in session missing Convex token.');
+async function withConvex<T>(
+	run: (convex: ConvexHttpClient) => Promise<T>,
+	token?: string
+): Promise<T> {
+	const now = Date.now();
+	const firstToken =
+		(isTokenUsable(token, now) ? token : null) ??
+		(isTokenUsable(activeConvexToken, now) ? activeConvexToken : null) ??
+		(await getConvexToken());
+	if (firstToken === null) throw new Error('Sign in to Engage Form first.');
+	try {
+		return await run(convexClient(firstToken));
+	} catch (error) {
+		if (!isConvexAuthError(error)) throw error;
+		const retryToken = await getClerkConvexToken(true).catch(() => null);
+		if (retryToken === null || retryToken === firstToken) throw error;
+		if (activeConvexToken !== null) activeConvexToken = retryToken;
+		return await run(convexClient(retryToken));
+	}
+}
+
+function convexClient(token: string) {
 	const convex = new ConvexHttpClient(readConvexUrl());
-	convex.setAuth(convexToken);
+	convex.setAuth(token);
 	return convex;
 }
 
 async function getPendingFillState(): Promise<PendingFillState> {
-	const token = await Effect.runPromise(getConvexTokenEffect()).catch(() => null);
+	const token = await getConvexToken().catch(() => null);
 	if (token === null) return { signedIn: false };
 
-	const convex = new ConvexHttpClient(readConvexUrl());
-	convex.setAuth(token);
 	try {
-		const pendingFill = await convex.query(api.authed.extension.getPendingFill, {});
+		const pendingFill = await withConvex(
+			(convex) => convex.query(api.authed.extension.getPendingFill, {}),
+			token
+		);
 		return { signedIn: true, pendingFill };
 	} catch (error) {
-		if (toError(error).message.includes('Unauthorized')) return { signedIn: false };
+		if (isConvexAuthError(error)) return { signedIn: false };
 		throw error;
 	}
 }
@@ -254,12 +301,15 @@ async function getPreparedPurchase(purchaseId: string, token?: string): Promise<
 		clearActiveFillRun();
 		activePurchaseId = purchaseId;
 	}
-	activeConvexToken = token ?? activeConvexToken;
+	if (isTokenUsable(token, Date.now())) activeConvexToken = token;
 
-	const convex = await authedConvex(token);
-	const purchase = (await convex.query(api.authed.extension.getReadyPurchaseForFill, {
-		id: purchaseId as Id<'purchaseRequests'>
-	})) as unknown as PurchaseRequest;
+	const purchase = (await withConvex(
+		(convex) =>
+			convex.query(api.authed.extension.getReadyPurchaseForFill, {
+				id: purchaseId as Id<'purchaseRequests'>
+			}),
+		token
+	)) as unknown as PurchaseRequest;
 
 	return {
 		...purchase,
@@ -317,6 +367,7 @@ function summarizeResponse(response: RuntimeResponse) {
 	if ('signedIn' in response)
 		return { ok: true, signedIn: response.signedIn, emailPresent: response.email !== null };
 	if ('purchase' in response) return { ok: true, purchasePresent: true };
+	if ('claimedFill' in response) return { ok: true, claimed: response.claimedFill !== null };
 	if ('pendingFillState' in response)
 		return {
 			ok: true,

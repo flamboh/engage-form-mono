@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest';
-import { autoStartDecision, isPendingFillFresh, pendingFillMaxAgeMs } from './pending-fill';
+import { autoStartDecision, isFirstFormStep } from './pending-fill';
 
 const formUrl = 'https://uoregon.campuslabs.com/engage/submitter/form/start/730239';
-const now = 1_800_000_000_000;
+const stepUrl = 'https://uoregon.campuslabs.com/engage/submitter/form/step/1?Guid=abc';
 const pendingFill = {
 	purchaseRequestId: 'purchase_1',
-	requestedAt: now - 5_000,
+	requestedAt: 1_800_000_000_000,
 	label: 'Costco · $45.98',
 	engageUrl: formUrl
 };
@@ -14,16 +14,39 @@ function decide(overrides: Partial<Parameters<typeof autoStartDecision>[0]> = {}
 	return autoStartDecision({
 		url: formUrl,
 		step: 'formStart',
-		now,
 		activeRun: false,
 		state: { signedIn: true, pendingFill },
 		signInDismissed: false,
+		confirmDismissed: false,
 		...overrides
 	});
 }
 
-test('starts a fresh pending fill on an Engage form page', () => {
+test('starts a pending fill on the form start page', () => {
 	expect(decide()).toEqual({ type: 'start', pendingFill });
+	expect(decide({ step: 'about' })).toEqual({ type: 'start', pendingFill });
+});
+
+test('starts on the first detected step of a new form', () => {
+	expect(decide({ url: stepUrl, step: 'organizationRepresentation' })).toEqual({
+		type: 'start',
+		pendingFill
+	});
+	expect(decide({ url: stepUrl, step: 'formStart' })).toEqual({ type: 'start', pendingFill });
+});
+
+test('asks before filling a later step', () => {
+	expect(decide({ url: stepUrl, step: 'about' })).toEqual({ type: 'confirm', pendingFill });
+	expect(decide({ url: stepUrl, step: 'documentation' })).toEqual({
+		type: 'confirm',
+		pendingFill
+	});
+});
+
+test('stays quiet on later steps after Not now', () => {
+	expect(decide({ url: stepUrl, step: 'about', confirmDismissed: true })).toEqual({
+		type: 'idle'
+	});
 });
 
 test('ignores pages outside the Engage submitter form', () => {
@@ -35,7 +58,6 @@ test('ignores pages outside the Engage submitter form', () => {
 test('waits for a recognized purchase request step and never starts on review', () => {
 	expect(decide({ step: 'unknown' })).toEqual({ type: 'idle' });
 	expect(decide({ step: 'review' })).toEqual({ type: 'idle' });
-	expect(decide({ step: 'about' })).toEqual({ type: 'start', pendingFill });
 });
 
 test('lets an active fill run resume instead of starting again', () => {
@@ -51,16 +73,8 @@ test('asks to sign in when the extension has no session', () => {
 	expect(decide({ state: { signedIn: false }, signInDismissed: true })).toEqual({ type: 'idle' });
 });
 
-test('expires pending fills older than thirty minutes', () => {
-	const stale = { ...pendingFill, requestedAt: now - pendingFillMaxAgeMs - 1 };
-	expect(decide({ state: { signedIn: true, pendingFill: stale } })).toEqual({
-		type: 'expire',
-		pendingFill: stale
-	});
-});
-
-test('treats small clock skew as fresh', () => {
-	expect(isPendingFillFresh({ requestedAt: now + 30_000 }, now)).toBe(true);
-	expect(isPendingFillFresh({ requestedAt: now + 5 * 60_000 }, now)).toBe(false);
-	expect(isPendingFillFresh({ requestedAt: now - pendingFillMaxAgeMs }, now)).toBe(true);
+test('recognizes the first form step by URL or heading', () => {
+	expect(isFirstFormStep(formUrl, 'about')).toBe(true);
+	expect(isFirstFormStep(stepUrl, 'organizationRepresentation')).toBe(true);
+	expect(isFirstFormStep(stepUrl, 'purchaseType')).toBe(false);
 });

@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { isTokenUsable } from './convex-token';
 import { withTimeout } from './timeout';
 import {
 	readConvexTokenFromWebAppStorage,
@@ -25,7 +26,8 @@ export async function readWebAppConvexToken(webAppUrl: string) {
 			bridgeTimeoutMs
 		);
 		const result: unknown = injection?.result;
-		return isWebTokenResponse(result) && result.ok ? result.token : null;
+		if (!isWebTokenResponse(result) || !result.ok) return null;
+		return isTokenUsable(result.token, Date.now()) ? result.token : null;
 	} catch {
 		return null;
 	}

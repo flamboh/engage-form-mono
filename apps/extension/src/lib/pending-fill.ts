@@ -1,7 +1,5 @@
 import { type EngageStep, isEngageFormUrl } from '@engage-form/fill-engine';
 
-export const pendingFillMaxAgeMs = 30 * 60_000;
-
 export type PendingFill = {
 	purchaseRequestId: string;
 	requestedAt: number;
@@ -16,16 +14,23 @@ export type PendingFillState =
 export type AutoStartDecision =
 	| { type: 'idle' }
 	| { type: 'signIn' }
-	| { type: 'expire'; pendingFill: PendingFill }
+	| { type: 'confirm'; pendingFill: PendingFill }
 	| { type: 'start'; pendingFill: PendingFill };
+
+const formStartPath = '/engage/submitter/form/start/';
+const firstSteps: EngageStep[] = ['formStart', 'organizationRepresentation'];
+
+export function isFirstFormStep(url: string, step: EngageStep) {
+	return new URL(url).pathname.startsWith(formStartPath) || firstSteps.includes(step);
+}
 
 export function autoStartDecision(input: {
 	url: string;
 	step: EngageStep;
-	now: number;
 	activeRun: boolean;
 	state: PendingFillState;
 	signInDismissed: boolean;
+	confirmDismissed: boolean;
 }): AutoStartDecision {
 	if (!isEngageFormUrl(input.url) || input.activeRun) return { type: 'idle' };
 	if (input.step === 'unknown' || input.step === 'review') return { type: 'idle' };
@@ -33,11 +38,6 @@ export function autoStartDecision(input: {
 
 	const { pendingFill } = input.state;
 	if (pendingFill === null) return { type: 'idle' };
-	if (!isPendingFillFresh(pendingFill, input.now)) return { type: 'expire', pendingFill };
-	return { type: 'start', pendingFill };
-}
-
-export function isPendingFillFresh(pendingFill: Pick<PendingFill, 'requestedAt'>, now: number) {
-	const age = now - pendingFill.requestedAt;
-	return age >= -60_000 && age <= pendingFillMaxAgeMs;
+	if (isFirstFormStep(input.url, input.step)) return { type: 'start', pendingFill };
+	return input.confirmDismissed ? { type: 'idle' } : { type: 'confirm', pendingFill };
 }

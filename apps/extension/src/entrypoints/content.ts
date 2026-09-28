@@ -3,7 +3,6 @@ import { detectStep, type EngageStep, type FillAction } from '@engage-form/fill-
 import { browser } from 'wxt/browser';
 import { hideBanner, showBanner } from '../lib/banner';
 import { createContentRunner, fillLabel, type FillRunState } from '../lib/content-runner';
-import { readWebAppUrl } from '../lib/env';
 import {
 	clickNextStep,
 	type FileUploadResult,
@@ -19,10 +18,12 @@ import { autoStartDecision, type PendingFill, type PendingFillState } from '../l
 
 const FILL_RUN_KEY = 'engageFormFillRun';
 const SIGN_IN_DISMISSED_KEY = 'engageFormSignInDismissed';
+const CONFIRM_DISMISSED_KEY = 'engageFormConfirmDismissed';
 const STEP_WAIT_MS = 10_000;
 const STEP_CHANGE_WAIT_MS = 20_000;
 const STEP_SETTLE_MS = 750;
 const cancelledMessage = 'Fill cancelled.';
+const runActiveMessage = 'Engage Form is already filling this page.';
 
 type UploadDocument = {
 	filename: string;
@@ -49,29 +50,43 @@ export default defineContentScript({
 			clearFillRun
 		});
 		let busy = false;
-		let signInShown = false;
+		let runActive = false;
+		let promptShown = false;
 
 		browser.runtime.onMessage.addListener((message) => {
 			const fillMessage = message as FillMessage;
+			if (runActive || loadFillRun() !== null) {
+				return Promise.resolve<FillResponse>({
+					ok: false,
+					message: runActiveMessage,
+					step: detectStep(pageHeading()),
+					filled: 0,
+					missed: []
+				});
+			}
 			if (fillMessage.type === 'START_FILL_RUN') {
 				showFilling(fillLabel(fillMessage.purchase), fillMessage.purchase.id);
 			}
 			busy = true;
+			runActive = true;
 			return runner
 				.handleMessage(fillMessage)
 				.then((response) => {
 					if (fillMessage.type === 'START_FILL_RUN') {
 						void drive(fillMessage.purchase.id, response).finally(() => {
 							busy = false;
+							runActive = false;
 						});
 					} else {
 						busy = false;
+						runActive = false;
 						showBanner({ text: response.message, hideAfterMs: 5_000 });
 					}
 					return response;
 				})
 				.catch((error: unknown) => {
 					busy = false;
+					runActive = false;
 					const response: FillResponse = {
 						ok: false,
 						message: error instanceof Error ? error.message : 'Unknown fill error.',
@@ -90,10 +105,14 @@ export default defineContentScript({
 		});
 
 		async function checkPage() {
+			await checkPageWith(runPage);
+		}
+
+		async function checkPageWith(run: () => Promise<void>) {
 			if (busy) return;
 			busy = true;
 			try {
-				await runPage();
+				await run();
 			} catch (error) {
 				showBanner({
 					text: error instanceof Error ? error.message : 'Engage Form could not fill this page.',
@@ -108,9 +127,11 @@ export default defineContentScript({
 		async function runPage() {
 			const activeRun = loadFillRun();
 			if (activeRun !== null) {
-				showFilling(activeRun.label, activeRun.purchaseId);
-				await waitForKnownStep();
-				await drive(activeRun.purchaseId, await runner.continueFillRun());
+				await runExclusive(async () => {
+					showFilling(activeRun.label, activeRun.purchaseId);
+					await waitForKnownStep();
+					await drive(activeRun.purchaseId, await runner.continueFillRun());
+				});
 				return;
 			}
 
@@ -121,10 +142,14 @@ export default defineContentScript({
 			const decision = autoStartDecision({
 				url: window.location.href,
 				step,
-				now: Date.now(),
-				activeRun: loadFillRun() !== null,
+				activeRun: runActive || loadFillRun() !== null,
 				state: pendingFillState,
-				signInDismissed: window.sessionStorage.getItem(SIGN_IN_DISMISSED_KEY) !== null
+				signInDismissed: window.sessionStorage.getItem(SIGN_IN_DISMISSED_KEY) !== null,
+				confirmDismissed:
+					pendingFillState.signedIn &&
+					pendingFillState.pendingFill !== null &&
+					window.sessionStorage.getItem(CONFIRM_DISMISSED_KEY) ===
+						pendingFillState.pendingFill.purchaseRequestId
 			});
 
 			if (decision.type === 'signIn') {
@@ -132,14 +157,14 @@ export default defineContentScript({
 				return;
 			}
 
-			if (signInShown) {
-				signInShown = false;
-				hideBanner();
+			if (decision.type === 'confirm') {
+				showConfirm(decision.pendingFill);
+				return;
 			}
 
-			if (decision.type === 'expire') {
-				await clearPendingFill(decision.pendingFill.purchaseRequestId);
-				return;
+			if (promptShown) {
+				promptShown = false;
+				hideBanner();
 			}
 
 			if (decision.type === 'start') {
@@ -147,22 +172,57 @@ export default defineContentScript({
 			}
 		}
 
-		async function startPendingFill(pendingFill: PendingFill) {
-			showFilling(pendingFill.label, pendingFill.purchaseRequestId);
-			const purchase = await loadPurchaseRequest(pendingFill.purchaseRequestId);
-			if (purchase === null) {
-				await clearPendingFill(pendingFill.purchaseRequestId);
-				showBanner({
-					text: `Couldn’t load “${pendingFill.label}”. Open it in Engage Form and try again.`,
-					tone: 'error',
-					actions: [dismissAction()]
-				});
-				return;
+		async function runExclusive(run: () => Promise<void>) {
+			if (runActive) return;
+			runActive = true;
+			try {
+				await run();
+			} finally {
+				runActive = false;
 			}
-			await drive(
-				pendingFill.purchaseRequestId,
-				await runner.startFillRun(purchase, pendingFill.label)
-			);
+		}
+
+		async function startPendingFill(pendingFill: PendingFill) {
+			if (runActive || loadFillRun() !== null) return;
+			await runExclusive(async () => {
+				const claimed = await claimPendingFill(pendingFill.purchaseRequestId);
+				if (claimed === null) return;
+				showFilling(claimed.label, claimed.purchaseRequestId);
+				const purchase = await loadPurchaseRequest(claimed.purchaseRequestId);
+				if (purchase === null) {
+					showBanner({
+						text: `Couldn’t load “${claimed.label}”. Open it in Engage Form and try again.`,
+						tone: 'error',
+						actions: [dismissAction()]
+					});
+					return;
+				}
+				await drive(claimed.purchaseRequestId, await runner.startFillRun(purchase, claimed.label));
+			});
+		}
+
+		function showConfirm(pendingFill: PendingFill) {
+			promptShown = true;
+			showBanner({
+				text: `Fill this form with “${pendingFill.label}”?`,
+				actions: [
+					{
+						label: 'Fill',
+						onClick: () => {
+							promptShown = false;
+							void checkPageWith(() => startPendingFill(pendingFill));
+						}
+					},
+					{
+						label: 'Not now',
+						onClick: () => {
+							window.sessionStorage.setItem(CONFIRM_DISMISSED_KEY, pendingFill.purchaseRequestId);
+							promptShown = false;
+							hideBanner();
+						}
+					}
+				]
+			});
 		}
 
 		async function drive(purchaseId: string, first: FillResponse) {
@@ -181,10 +241,10 @@ export default defineContentScript({
 				}
 				response = await runner.continueFillRun();
 			}
-			await showRunResult(purchaseId, response);
+			showRunResult(response);
 		}
 
-		async function showRunResult(purchaseId: string, response: FillResponse) {
+		function showRunResult(response: FillResponse) {
 			if (response.ok && response.step === 'review') {
 				showBanner({
 					text: 'Engage is filled. Review it, then submit.',
@@ -194,35 +254,37 @@ export default defineContentScript({
 				return;
 			}
 			if (response.message === cancelledMessage) return;
-			await clearPendingFill(purchaseId);
 			showBanner({ text: response.message, tone: 'error', actions: [dismissAction()] });
 		}
 
 		function showFilling(label: string, purchaseId: string) {
-			signInShown = false;
+			promptShown = false;
 			showBanner({
 				text: `Filling “${label}”…`,
-				actions: [{ label: 'Cancel', onClick: () => void cancel(purchaseId) }]
+				actions: [{ label: 'Cancel', onClick: () => cancel(purchaseId) }]
 			});
 		}
 
-		async function cancel(purchaseId: string) {
+		function cancel(purchaseId: string) {
+			if (loadFillRun()?.purchaseId !== purchaseId) return;
 			clearFillRun();
 			showBanner({ text: cancelledMessage, hideAfterMs: 3_000 });
-			await clearPendingFill(purchaseId);
 		}
 
 		function showSignIn() {
-			signInShown = true;
+			promptShown = true;
 			showBanner({
 				text: 'Sign in to Engage Form to fill this automatically.',
 				actions: [
-					{ label: 'Sign in', href: `${readWebAppUrl()}/app` },
+					{
+						label: 'Sign in',
+						onClick: () => void sendRuntimeMessage({ type: 'SIGN_IN' })
+					},
 					{
 						label: 'Not now',
 						onClick: () => {
 							window.sessionStorage.setItem(SIGN_IN_DISMISSED_KEY, '1');
-							signInShown = false;
+							promptShown = false;
 							hideBanner();
 						}
 					}
@@ -269,8 +331,11 @@ async function readPendingFillState(): Promise<PendingFillState | null> {
 	return response?.ok === true && 'pendingFillState' in response ? response.pendingFillState : null;
 }
 
-async function clearPendingFill(purchaseId: string) {
-	await sendRuntimeMessage({ type: 'CLEAR_PENDING_FILL', purchaseId });
+async function claimPendingFill(purchaseId: string): Promise<PendingFill | null> {
+	const response = await sendRuntimeMessage({ type: 'CLAIM_PENDING_FILL', purchaseId });
+	if (response?.ok === true && 'claimedFill' in response) return response.claimedFill;
+	if (response?.ok === false) throw new Error(response.message);
+	return null;
 }
 
 async function sendRuntimeMessage(message: RuntimeMessage) {

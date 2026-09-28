@@ -16,6 +16,7 @@ export default defineConfig({
 	manifest: ({ mode, browser }) => {
 		const env = loadBuildEnv(mode, browser);
 		const clerkFrontendApi = env.CLERK_FRONTEND_API ?? env.CLERK_FRONTEND_API_URL;
+		const allowLocalHosts = mode !== 'prod';
 
 		return {
 			name: 'Engage Form',
@@ -40,7 +41,10 @@ export default defineConfig({
 							env.PUBLIC_CLERK_SYNC_HOST ?? env.PUBLIC_WEB_APP_URL ?? 'http://localhost'
 						),
 						clerkFrontendApi ? hostPermission(clerkFrontendApi) : null
-					].filter((value): value is string => value !== null)
+					].filter(
+						(value): value is string =>
+							value !== null && (allowLocalHosts || !isLocalHostPermission(value))
+					)
 				)
 			],
 			content_security_policy:
@@ -110,6 +114,11 @@ function loadEnvFiles(root: string, mode: string, browser: string): Record<strin
 		if (!existsSync(path)) return env;
 		return { ...env, ...(parseEnv(readFileSync(path, 'utf8')) as Record<string, string>) };
 	}, {});
+}
+
+function isLocalHostPermission(permission: string) {
+	const hostname = new URL(permission.replace(/\*$/, '')).hostname;
+	return hostname === 'localhost' || hostname === '127.0.0.1';
 }
 
 function hostPermission(value: string) {

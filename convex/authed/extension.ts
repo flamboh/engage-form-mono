@@ -16,6 +16,8 @@ import { authedMutation, authedQuery } from './helpers';
 export const engagePurchaseRequestUrl =
 	'https://uoregon.campuslabs.com/engage/submitter/form/start/730239';
 
+export const pendingFillMaxAgeMs = 30 * 60_000;
+
 const pendingFillView = z.object({
 	purchaseRequestId: zid('purchaseRequests'),
 	requestedAt: z.number(),
@@ -104,10 +106,13 @@ export const requestFill = authedMutation({
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
+		if (request.status === 'approved') {
+			throw new Error('This purchase request is already approved and can’t be filled again.');
+		}
 		await assertReady(ctx, request);
 		const user = await requireUserProfile(ctx, owner);
 		const now = Date.now();
-		if (request.status !== 'ready') {
+		if (request.status === 'draft') {
 			await ctx.db.patch(request._id, { status: 'ready', updatedAt: now });
 		}
 		await ctx.db.patch(user._id, {
@@ -124,15 +129,29 @@ export const getPendingFill = authedQuery({
 		const owner = ownerFromIdentity(ctx.identity);
 		const user = await getUserProfile(ctx, owner);
 		const pendingFill = user?.pendingFill ?? null;
-		if (pendingFill === null) return null;
+		if (pendingFill === null || !isPendingFillFresh(pendingFill.requestedAt, Date.now())) {
+			return null;
+		}
 		const request = await ctx.db.get(pendingFill.purchaseRequestId);
 		if (request === null || request.owner !== owner || request.status !== 'ready') return null;
-		return {
-			purchaseRequestId: request._id,
-			requestedAt: pendingFill.requestedAt,
-			label: pendingFillLabel(request),
-			engageUrl: engagePurchaseRequestUrl
-		};
+		return pendingFillResult(request, pendingFill.requestedAt);
+	}
+});
+
+export const claimPendingFill = authedMutation({
+	args: { purchaseRequestId: zid('purchaseRequests') },
+	returns: pendingFillView.nullable(),
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		const user = await getUserProfile(ctx, owner);
+		const pendingFill = user?.pendingFill ?? null;
+		if (user === null || pendingFill === null) return null;
+		if (pendingFill.purchaseRequestId !== args.purchaseRequestId) return null;
+		await ctx.db.patch(user._id, { pendingFill: null });
+		if (!isPendingFillFresh(pendingFill.requestedAt, Date.now())) return null;
+		const request = await ctx.db.get(pendingFill.purchaseRequestId);
+		if (request === null || request.owner !== owner || request.status !== 'ready') return null;
+		return pendingFillResult(request, pendingFill.requestedAt);
 	}
 });
 
@@ -153,6 +172,19 @@ async function clearPendingFillFor(
 	const user = await getUserProfile(ctx, owner);
 	if (user?.pendingFill?.purchaseRequestId !== purchaseRequestId) return;
 	await ctx.db.patch(user._id, { pendingFill: null });
+}
+
+function isPendingFillFresh(requestedAt: number, now: number) {
+	return now - requestedAt <= pendingFillMaxAgeMs;
+}
+
+function pendingFillResult(request: Doc<'purchaseRequests'>, requestedAt: number) {
+	return {
+		purchaseRequestId: request._id,
+		requestedAt,
+		label: pendingFillLabel(request),
+		engageUrl: engagePurchaseRequestUrl
+	};
 }
 
 function pendingFillLabel(request: Doc<'purchaseRequests'>) {
