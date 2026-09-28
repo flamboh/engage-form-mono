@@ -29,7 +29,8 @@ export const requestDocument = z.object({
 export const requestReview = z.object({
 	field: reviewField,
 	value: z.string(),
-	alternatives: z.array(z.string())
+	alternatives: z.array(z.string()),
+	receiptRemoved: z.boolean().optional()
 });
 
 export const requestView = z.object({

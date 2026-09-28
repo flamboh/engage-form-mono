@@ -218,7 +218,12 @@ export function whatsLeft({
 	onlyPurposeUnresolved = false
 }: {
 	readiness: { sections: { section: string; reasons: string[] }[] };
-	reviews: { field: ReviewField; value: string; alternatives: string[] }[];
+	reviews: {
+		field: ReviewField;
+		value: string;
+		alternatives: string[];
+		receiptRemoved?: boolean;
+	}[];
 	reading: boolean;
 	purposeMissing?: boolean;
 	onlyPurposeUnresolved?: boolean;
@@ -243,7 +248,12 @@ export function whatsLeft({
 		items.set(key, {
 			key,
 			label: reviewCopy[review.field],
-			detail: review.value.trim() === '' ? `Is it ${shown}?` : `We read ${shown}.`,
+			detail:
+				review.value.trim() === ''
+					? `Is it ${shown}?`
+					: review.receiptRemoved
+						? `You removed a receipt. Is ${shown} still right?`
+						: `We read ${shown}.`,
 			target: { kind: 'review', field: review.field },
 			blocking: replaced !== undefined,
 			waitsForReceipt: false

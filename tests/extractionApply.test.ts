@@ -404,11 +404,17 @@ test('removing a receipt asks to check user-typed store and items', () => {
 	]);
 	const removed = { ...typed, receiptChecks: checks } as Doc<'purchaseRequests'>;
 	expect(requestReviews(removed, [bigbox])).toEqual([
-		{ field: 'vendor', value: 'Bigbox and Corner Records', alternatives: ['Bigbox Wholesale'] },
+		{
+			field: 'vendor',
+			value: 'Bigbox and Corner Records',
+			alternatives: ['Bigbox Wholesale'],
+			receiptRemoved: true
+		},
 		{
 			field: 'itemDescription',
 			value: 'New LP for the listening party',
-			alternatives: ['KS Trail Mix, KS Cocoa Bites']
+			alternatives: ['KS Trail Mix, KS Cocoa Bites'],
+			receiptRemoved: true
 		}
 	]);
 });
@@ -425,7 +431,14 @@ test('removing a receipt flags any user-typed store, even without shared words',
 	expect(checks).toEqual([{ field: 'vendor', value: 'Test Edited Store' }]);
 	expect(
 		requestReviews({ ...typed, receiptChecks: checks } as Doc<'purchaseRequests'>, [bigbox])
-	).toEqual([{ field: 'vendor', value: 'Test Edited Store', alternatives: ['Bigbox Wholesale'] }]);
+	).toEqual([
+		{
+			field: 'vendor',
+			value: 'Test Edited Store',
+			alternatives: ['Bigbox Wholesale'],
+			receiptRemoved: true
+		}
+	]);
 });
 
 test('removal checks skip receipt-filled and already edited fields', () => {

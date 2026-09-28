@@ -188,7 +188,12 @@ export function receiptFieldsPatch(request: Request, extractions: Extraction[]):
 	return patch;
 }
 
-export type Review = { field: ReviewField; value: string; alternatives: string[] };
+export type Review = {
+	field: ReviewField;
+	value: string;
+	alternatives: string[];
+	receiptRemoved?: boolean;
+};
 
 export function requestReviews(request: Request, extractions: Extraction[]): Review[] {
 	const receipts = receiptExtractions(request, extractions);
@@ -222,7 +227,7 @@ export function requestReviews(request: Request, extractions: Extraction[]): Rev
 	for (const check of activeReceiptChecks(request)) {
 		const suggestion = suggestions[check.field];
 		const alternatives = suggestion === '' || suggestion === check.value ? [] : [suggestion];
-		reviews.push({ field: check.field, value: check.value, alternatives });
+		reviews.push({ field: check.field, value: check.value, alternatives, receiptRemoved: true });
 	}
 	return reviews;
 }

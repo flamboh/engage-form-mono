@@ -60,7 +60,8 @@
 				<div
 					class="flex h-full flex-col justify-between p-3 max-lg:items-center max-lg:justify-center"
 				>
-					<span class="border border-(--ink) px-1.5 text-xs font-semibold text-(--ink)"
+					<span
+						class="self-start border border-(--ink) px-1.5 text-xs font-semibold text-(--ink) max-lg:self-center"
 						>{badge}</span
 					>
 					<div class="flex flex-col gap-1.5 max-lg:hidden" aria-hidden="true">
