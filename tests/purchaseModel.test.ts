@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
 import {
 	applyDraftPatch,
@@ -15,6 +15,9 @@ import {
 	validateBusinessPurposeText
 } from '../convex/purchaseModel';
 import { evaluatePurchaseReadiness } from '../convex/purchaseReadiness';
+
+vi.stubEnv('FILES_BASE_URL', 'https://files.example');
+vi.stubEnv('FILES_SIGNING_SECRET', 'test-secret');
 
 const businessPurposeTemplate =
 	'{Student Organization} reimburses {Purchaser} for {Item Description} from {Vendor} for {Total Amount} on {Activity Date}.';
@@ -786,12 +789,9 @@ function fileCtx() {
 				filename: `${id}.pdf`,
 				contentType: 'application/pdf',
 				size: 1,
-				storageId: `storage_${id}`,
+				r2Key: `owner/${id}`,
 				createdAt: 1
 			})
-		},
-		storage: {
-			getUrl: async (storageId: string) => `https://files.example/${storageId}`
 		}
 	} as never;
 }

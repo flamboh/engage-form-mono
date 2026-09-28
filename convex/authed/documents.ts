@@ -44,7 +44,7 @@ export const getRequestView = authedQuery({
 			const file = await ctx.db.get(fileId);
 			if (file === null || file.owner !== owner) continue;
 			const extraction = extractionsByFile.get(fileId) ?? null;
-			const url = await previewUrl(ctx, file);
+			const url = await previewUrl(file);
 			documents.push({
 				fileId,
 				kind: file.kind,
@@ -258,9 +258,9 @@ async function extractionForFile(ctx: MutationCtx, fileId: Id<'files'>) {
 		.first();
 }
 
-async function previewUrl(ctx: Parameters<typeof fileDownloadUrl>[0], file: Doc<'files'>) {
+async function previewUrl(file: Doc<'files'>) {
 	try {
-		return await fileDownloadUrl(ctx, file);
+		return await fileDownloadUrl(file);
 	} catch {
 		return null;
 	}

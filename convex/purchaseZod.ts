@@ -156,8 +156,7 @@ export const fileDoc = z.object({
 	_creationTime: z.number(),
 	owner: z.string(),
 	kind: fileKind,
-	storageId: zid('_storage').optional(),
-	r2Key: z.string().optional(),
+	r2Key: z.string(),
 	filename: z.string(),
 	contentType: z.string(),
 	size: z.number(),
@@ -268,8 +267,7 @@ export const documentPayload = z.object({
 	filename: z.string(),
 	contentType: z.string(),
 	size: z.number(),
-	storageKey: z.string(),
-	url: z.string().nullable()
+	url: z.string()
 });
 
 export const assembledPurchase = z.object({

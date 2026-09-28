@@ -138,7 +138,7 @@ The item description is global for the purchase. Recipient values should sum to 
 
 ## Documents
 
-MVP accepts any document type and records filename, content type, size, and Convex storage ID.
+MVP accepts any document type and records filename, content type, size, and R2 key.
 
 Reusable documents:
 

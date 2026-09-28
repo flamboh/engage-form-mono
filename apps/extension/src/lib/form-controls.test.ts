@@ -13,7 +13,7 @@ test('uploads through hidden file inputs and tagged drop targets', async () => {
 
 	const result = await setFiles(
 		'UO ID CARD',
-		[{ filename: 'id.jpg', contentType: 'image/jpeg', storageKey: 'sample/id.jpg' }],
+		[{ filename: 'id.jpg', contentType: 'image/jpeg' }],
 		async (selector, _files, dropSelector) => {
 			expect(selector).toContain('data-engage-form-upload');
 			expect(dropSelector).toContain('data-engage-form-drop');
@@ -37,7 +37,7 @@ test('returns a clear upload message when Engage exposes no file input', async (
 
 	const result = await setFiles(
 		'UO ID CARD',
-		[{ filename: 'id.jpg', contentType: 'image/jpeg', storageKey: 'sample/id.jpg' }],
+		[{ filename: 'id.jpg', contentType: 'image/jpeg' }],
 		async () => ({ ok: true })
 	);
 
@@ -63,7 +63,7 @@ test('distinguishes the optional second ID upload label', async () => {
 
 	const result = await setFiles(
 		'UO ID CARD : Optional second upload',
-		[{ filename: 'id-back.jpg', contentType: 'image/jpeg', storageKey: 'sample/id-back.jpg' }],
+		[{ filename: 'id-back.jpg', contentType: 'image/jpeg' }],
 		async () => {
 			fileInput.files = { length: 1 };
 			return { ok: true };
@@ -94,7 +94,7 @@ test('distinguishes optional receipt upload labels', async () => {
 
 	const result = await setFiles(
 		'RECEIPT : Optional second upload',
-		[{ filename: 'receipt-2.jpg', contentType: 'image/jpeg', storageKey: 'sample/receipt-2.jpg' }],
+		[{ filename: 'receipt-2.jpg', contentType: 'image/jpeg' }],
 		async () => {
 			fileInput.files = { length: 1 };
 			return { ok: true };

@@ -1,9 +1,12 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
 import { getReadyPurchaseForFill, listReadyPurchases } from '../convex/authed/extension';
 import { getDraft } from '../convex/authed/purchaseBuilder';
 import { saveDraftPatch } from '../convex/internal/purchaseAutosave';
 import { parseBusinessPurposeText } from '../convex/purchaseModel';
+
+vi.stubEnv('FILES_BASE_URL', 'https://files.example');
+vi.stubEnv('FILES_SIGNING_SECRET', 'test-secret');
 
 const readyRequest = {
 	_id: 'purchase_1',
@@ -193,9 +196,6 @@ function extensionGetCtx(request: Doc<'purchaseRequests'>) {
 				if (id.startsWith('file_')) return file(id);
 				return null;
 			}
-		},
-		storage: {
-			getUrl: async (storageId: string) => `https://files.example/${storageId}`
 		}
 	};
 }
@@ -226,7 +226,7 @@ function file(id: string) {
 		filename: `${id}.pdf`,
 		contentType: 'application/pdf',
 		size: 1,
-		storageId: `storage_${id}`,
+		r2Key: `owner/${id}`,
 		createdAt: 1
 	};
 }

@@ -148,8 +148,7 @@ export default defineSchema({
 	files: defineTable({
 		owner: v.string(),
 		kind: fileKind,
-		storageId: v.optional(v.id('_storage')),
-		r2Key: v.optional(v.string()),
+		r2Key: v.string(),
 		filename: v.string(),
 		contentType: v.string(),
 		size: v.number(),

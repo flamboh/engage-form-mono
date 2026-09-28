@@ -500,8 +500,7 @@ async function documentPayload(ctx: Ctx, id: Id<'files'>, owner: string) {
 		filename: doc.filename,
 		contentType: doc.contentType,
 		size: doc.size,
-		storageKey: doc.r2Key ?? doc.storageId ?? '',
-		url: await fileDownloadUrl(ctx, doc)
+		url: await fileDownloadUrl(doc)
 	};
 }
 
