@@ -4,7 +4,10 @@ import type { DocumentKind } from './jev';
 
 export type FieldSource = 'user' | 'receipt' | 'default';
 export type FieldSources = Record<string, FieldSource>;
-export type ReviewField = 'vendor' | 'totalAmount' | 'receiptDate';
+export type ExtractedReviewField = 'vendor' | 'totalAmount' | 'receiptDate';
+export type CheckField = 'vendor' | 'itemDescription';
+export type ReviewField = ExtractedReviewField | CheckField;
+export type ReceiptCheck = { field: CheckField; value: string };
 export type Slot =
 	| 'receipt'
 	| 'second_approval'
@@ -21,6 +24,7 @@ type Extraction = Pick<
 	Doc<'extractions'>,
 	'fileId' | 'status' | 'vendor' | 'totalAmount' | 'receiptDate' | 'items'
 >;
+type RemovedExtraction = Pick<Doc<'extractions'>, 'status' | 'vendor' | 'items'>;
 type ExtractedField = NonNullable<Doc<'extractions'>['vendor']>;
 type ReceiptFacts = { vendor: string; totalAmount: string; receiptDate: string; items: string[] };
 
@@ -119,7 +123,7 @@ function combineDate(receipts: ReceiptFacts[]) {
 	return dates.sort()[0] ?? '';
 }
 
-const combiners: Record<ReviewField, (receipts: ReceiptFacts[]) => string> = {
+const combiners: Record<ExtractedReviewField, (receipts: ReceiptFacts[]) => string> = {
 	vendor: combineVendor,
 	totalAmount: combineTotal,
 	receiptDate: combineDate
@@ -212,10 +216,68 @@ export function requestReviews(request: Request, extractions: Extraction[]): Rev
 		if (!unsure || (value === '' && alternatives.length === 0)) continue;
 		reviews.push({ field, value, alternatives: alternatives.slice(0, 3) });
 	}
+	const suggestions: Record<CheckField, string> = {
+		vendor: combineVendor(receipts.map(factsOf)),
+		itemDescription: describeItems(receipts.flatMap((row) => row.items))
+	};
+	for (const check of activeReceiptChecks(request)) {
+		const suggestion = suggestions[check.field];
+		const alternatives = suggestion === '' || suggestion === check.value ? [] : [suggestion];
+		reviews.push({ field: check.field, value: check.value, alternatives });
+	}
 	return reviews;
 }
 
-function currentValue(request: Request, field: ReviewField) {
+export function activeReceiptChecks(request: Request): ReceiptCheck[] {
+	const sources = request.fieldSources ?? {};
+	return (request.receiptChecks ?? []).filter(
+		(check) =>
+			sources[check.field] === 'user' &&
+			request[check.field] === check.value &&
+			check.value.trim() !== ''
+	);
+}
+
+export function receiptRemovalChecks(
+	request: Request,
+	removed: RemovedExtraction | null
+): ReceiptCheck[] {
+	const sources = request.fieldSources ?? {};
+	const checks = activeReceiptChecks(request);
+	for (const field of ['vendor', 'itemDescription'] as const) {
+		const value = request[field];
+		if (sources[field] !== 'user' || value.trim() === '') continue;
+		if (checks.some((check) => check.field === field)) continue;
+		if (mayReference(value, removedMentions(field, removed))) checks.push({ field, value });
+	}
+	return checks;
+}
+
+function removedMentions(field: CheckField, removed: RemovedExtraction | null) {
+	if (removed === null || removed.status !== 'done') return null;
+	if (field === 'itemDescription') return removed.items;
+	if (removed.vendor === null) return [];
+	return [removed.vendor.value, ...removed.vendor.alternatives];
+}
+
+function mayReference(value: string, mentions: string[] | null) {
+	if (mentions === null) return true;
+	const words = wordsOf(value);
+	return mentions.some((mention) =>
+		wordsOf(mention).some((word) =>
+			words.some((other) => word.startsWith(other) || other.startsWith(word))
+		)
+	);
+}
+
+function wordsOf(text: string) {
+	return text
+		.toLowerCase()
+		.split(/[^a-z0-9]+/)
+		.filter((word) => word.length >= 3 && !/^\d+$/.test(word));
+}
+
+function currentValue(request: Request, field: ExtractedReviewField) {
 	if (field === 'totalAmount') return request.totalAmount > 0 ? request.totalAmount.toFixed(2) : '';
 	if (field === 'receiptDate') return request.receiptDate ?? '';
 	return request.vendor;
@@ -228,9 +290,16 @@ export function resolveReviewPatch(
 ): Partial<Request> {
 	const sources: FieldSources = { ...(request.fieldSources ?? {}), [field]: 'user' };
 	const text = value.trim();
-	if (field === 'vendor') {
-		if (text === '') throw new Error('Vendor missing.');
-		return { vendor: text, fieldSources: sources };
+	if (field === 'vendor' || field === 'itemDescription') {
+		if (text === '') throw new Error(field === 'vendor' ? 'Vendor missing.' : 'Items missing.');
+		const checks = request.receiptChecks ?? [];
+		return {
+			[field]: text,
+			fieldSources: sources,
+			...(checks.length === 0
+				? {}
+				: { receiptChecks: checks.filter((check) => check.field !== field) })
+		};
 	}
 	if (field === 'totalAmount') {
 		const amount = Number(text.replace(/[$,\s]/g, ''));

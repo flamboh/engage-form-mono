@@ -14,7 +14,7 @@ export const documentSlot = z.enum([
 	'recipient_list'
 ]);
 
-export const reviewField = z.enum(['vendor', 'totalAmount', 'receiptDate']);
+export const reviewField = z.enum(['vendor', 'totalAmount', 'receiptDate', 'itemDescription']);
 
 export const requestDocument = z.object({
 	fileId: zid('files'),
