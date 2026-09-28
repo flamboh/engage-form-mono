@@ -1,431 +1,288 @@
 <script lang="ts">
 	import { api } from '$convex/_generated/api';
-	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import { getClerkContext } from '$lib/stores/clerk.svelte';
-	import { uploadFile } from '$lib/upload';
+	import type { Id } from '$convex/_generated/dataModel';
+	import AppShell from '$lib/app/AppShell.svelte';
+	import PurchaserForm from '$lib/app/PurchaserForm.svelte';
+	import TemplateForm from '$lib/app/TemplateForm.svelte';
+	import { errorMessage, secondaryButtonClass } from '$lib/app/styles';
+	import OrganizationForm from '$lib/welcome/OrganizationForm.svelte';
+	import ProfileForm from '$lib/welcome/ProfileForm.svelte';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 
-	type Fund = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
+	type Table = 'organizations' | 'purchasers' | 'businessPurposeTemplates';
 
-	const clerkContext = getClerkContext();
 	const client = useConvexClient();
+	let showArchived = $state(false);
+	const savedQuery = useQuery(api.authed.purchaseBuilder.listSaved, () => ({
+		includeArchived: showArchived
+	}));
+	const currentUserQuery = useQuery(api.authed.purchaseBuilder.getCurrentUser, {});
 
-	let includeArchived = $state(false);
-	const savedQuery = useQuery(api.authed.purchaseBuilder.listSaved, () =>
-		clerkContext.currentSession ? { includeArchived } : 'skip'
-	);
-	const currentUserQuery = useQuery(api.authed.purchaseBuilder.getCurrentUser, () =>
-		clerkContext.currentSession ? {} : 'skip'
-	);
-	const savedData = $derived<
-		| {
-				organizations: Doc<'organizations'>[];
-				purchasers: Doc<'purchasers'>[];
-				businessPurposeTemplates: Doc<'businessPurposeTemplates'>[];
-		  }
-		| undefined
-	>(savedQuery.data);
-	const currentUser = $derived(currentUserQuery.data ?? null);
-
-	let orgId = $state<Id<'organizations'> | null>(null);
-	let orgName = $state('');
-	let orgIndex = $state('');
-	let orgFund = $state<Fund>('I');
-	let orgBudgetLines = $state<string[]>(['Event Expenses']);
-	let orgTemplate = $state(
-		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.'
+	const saved = $derived(savedQuery.data);
+	const user = $derived(currentUserQuery.data ?? null);
+	const activeOrganizations = $derived(saved?.organizations.filter((org) => !org.archived) ?? []);
+	const organizationName = $derived(
+		new Map(saved?.organizations.map((org) => [org._id as string, org.name]) ?? [])
 	);
 
-	let purchaserOrgId = $state<Id<'organizations'> | ''>('');
-	let purchaserId = $state<Id<'purchasers'> | null>(null);
-	let purchaserName = $state('');
-	let purchaserUo95 = $state('');
-	let purchaserAddress = $state('');
-	let idFrontFileId = $state<Id<'files'> | null>(null);
-	let idBackFileId = $state<Id<'files'> | null>(null);
-
-	let templateOrgId = $state<Id<'organizations'> | ''>('');
-	let templateId = $state<Id<'businessPurposeTemplates'> | null>(null);
-	let templateTitle = $state('');
-	let templateText = $state(
-		'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.'
-	);
+	let editing = $state<string | null>(null);
 	let error = $state('');
 
-	function editOrg(org: Doc<'organizations'>) {
-		orgId = org._id;
-		orgName = org.name;
-		orgIndex = org.indexNumber;
-		orgFund = org.fundLetter;
-		orgBudgetLines = org.budgetLines.length > 0 ? [...org.budgetLines] : [''];
-		orgTemplate = org.businessPurposeTemplate;
-	}
-
-	function editPurchaser(purchaser: Doc<'purchasers'>) {
-		purchaserId = purchaser._id;
-		purchaserOrgId = purchaser.organizationId;
-		purchaserName = purchaser.name;
-		purchaserUo95 = purchaser.uo95;
-		purchaserAddress = purchaser.permanentAddress;
-		idFrontFileId = purchaser.idCardFrontFileId;
-		idBackFileId = purchaser.idCardBackFileId;
-	}
-
-	function editBusinessPurposeTemplate(template: Doc<'businessPurposeTemplates'>) {
-		templateId = template._id;
-		templateOrgId = template.organizationId;
-		templateTitle = template.title;
-		templateText = template.businessPurposeTemplate;
-	}
-
-	function addBudgetLine() {
-		orgBudgetLines = [...orgBudgetLines, ''];
-	}
-
-	function removeBudgetLine(i: number) {
-		orgBudgetLines = orgBudgetLines.filter((_, index) => index !== i);
-	}
-
-	async function upload(kind: 'id_front' | 'id_back', input: HTMLInputElement) {
-		const session = clerkContext.currentSession;
-		const file = input.files?.[0];
-		if (!session || !file) return;
-		const fileId = await uploadFile(session, kind, file);
-		if (kind === 'id_front') idFrontFileId = fileId;
-		if (kind === 'id_back') idBackFileId = fileId;
-	}
-
-	async function saveOrg(event: SubmitEvent) {
-		event.preventDefault();
+	function toggle(key: string) {
+		editing = editing === key ? null : key;
 		error = '';
-		try {
-			await client.mutation(api.authed.purchaseBuilder.upsertOrganization, {
-				id: orgId,
-				name: orgName,
-				indexNumber: orgIndex,
-				fundLetter: orgFund,
-				budgetLines: orgBudgetLines,
-				businessPurposeTemplate: orgTemplate
-			});
-			orgId = null;
-			orgName = '';
-			orgIndex = '';
-			orgBudgetLines = ['Event Expenses'];
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
 	}
 
-	async function archiveRecord(
-		table: 'organizations' | 'purchasers' | 'businessPurposeTemplates',
+	function closeEditor() {
+		editing = null;
+	}
+
+	async function setArchived(
+		table: Table,
 		id: Id<'organizations'> | Id<'purchasers'> | Id<'businessPurposeTemplates'>,
 		archived: boolean
 	) {
 		error = '';
 		try {
-			await client.mutation(api.authed.purchaseBuilder.setArchived, {
-				table,
-				id,
-				archived
-			});
+			await client.mutation(api.authed.purchaseBuilder.setArchived, { table, id, archived });
+			editing = null;
 		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
+			error = errorMessage(err);
 		}
 	}
 
-	async function savePurchaser(event: SubmitEvent) {
-		event.preventDefault();
-		error = '';
-		if (!purchaserOrgId || idFrontFileId === null) {
-			error = 'Student organization and ID card document required.';
-			return;
-		}
-		try {
-			await client.mutation(api.authed.purchaseBuilder.upsertPurchaser, {
-				id: purchaserId,
-				organizationId: purchaserOrgId,
-				name: purchaserName,
-				uo95: purchaserUo95,
-				permanentAddress: purchaserAddress,
-				idCardFrontFileId: idFrontFileId,
-				idCardBackFileId: idBackFileId
-			});
-			purchaserId = null;
-			purchaserName = '';
-			purchaserUo95 = '';
-			purchaserAddress = '';
-			idFrontFileId = null;
-			idBackFileId = null;
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
+	function fundDescription(fundLetter: string) {
+		return fundLetter === 'I' ? 'ASUO funded' : `Fund ${fundLetter}`;
 	}
 
-	async function saveBusinessPurposeTemplate(event: SubmitEvent) {
-		event.preventDefault();
-		error = '';
-		if (!templateOrgId) {
-			error = 'Student organization required.';
-			return;
-		}
-		try {
-			await client.mutation(api.authed.purchaseBuilder.upsertBusinessPurposeTemplate, {
-				id: templateId,
-				organizationId: templateOrgId,
-				title: templateTitle,
-				businessPurposeTemplate: templateText
-			});
-			templateId = null;
-			templateTitle = '';
-			templateText =
-				'{Student Organization} wishes to reimburse {Purchaser} because they purchased {Item Description} from {Vendor} for {Total Amount}.';
-		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-		}
+	function preview(text: string) {
+		return text.replace(/\{([^}]+)\}/g, '$1').slice(0, 140);
 	}
 </script>
 
-{#if !clerkContext.currentSession}
-	<div class="flex min-h-screen items-center justify-center bg-stone-50">
-		<div
-			{@attach (el) => {
-				clerkContext.clerk.mountSignIn(el, {});
-			}}
-		></div>
+<svelte:head>
+	<title>Saved info · Engage Form</title>
+</svelte:head>
+
+{#snippet rowActions(key: string, table: Table, id: Id<Table>, archived: boolean)}
+	<div class="flex shrink-0 items-center gap-1">
+		{#if !archived}
+			<button
+				class="rounded-full px-3 py-1.5 text-sm font-medium text-[#154733] hover:bg-[#154733]/10"
+				type="button"
+				aria-expanded={editing === key}
+				onclick={() => toggle(key)}
+			>
+				{editing === key ? 'Close' : 'Edit'}
+			</button>
+		{/if}
+		<button
+			class="rounded-full px-3 py-1.5 text-sm text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+			type="button"
+			onclick={() => setArchived(table, id, !archived)}
+		>
+			{archived ? 'Restore' : 'Archive'}
+		</button>
 	</div>
-{:else}
-	<div class="min-h-screen bg-stone-50 text-stone-950">
-		<header class="border-b border-stone-200 bg-white">
-			<div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-				<div class="flex items-center gap-3">
-					<a class="text-sm text-stone-500 hover:text-stone-900" href="/app">Back</a>
-					<h1 class="text-lg font-semibold">Saved</h1>
-				</div>
-				<label class="flex items-center gap-2 text-sm text-stone-600">
-					<input type="checkbox" bind:checked={includeArchived} />
-					Show archived
-				</label>
-			</div>
-		</header>
+{/snippet}
 
-		<main class="mx-auto max-w-6xl space-y-6 px-6 py-8">
-			{#if error}<p class="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>{/if}
+<AppShell>
+	<main class="mx-auto flex max-w-2xl flex-col gap-12 px-4 pt-10 pb-16 sm:px-6">
+		<div class="flex flex-col gap-2">
+			<h1 class="text-2xl font-semibold tracking-tight">Saved info</h1>
+			<p class="text-sm text-stone-600">Everything here fills in new requests automatically.</p>
+		</div>
 
-			<section class="rounded-lg border border-stone-200 bg-white p-5">
-				<div class="flex items-center justify-between gap-3">
-					<div>
-						<h2 class="text-sm font-semibold">Your profile</h2>
-						{#if currentUser}
-							<p class="mt-1 text-sm text-stone-500">
-								{currentUser.name} · {currentUser.uo95} · {currentUser.studentEmail}
-							</p>
-						{:else}
-							<p class="mt-1 text-sm text-stone-500">Profile not set.</p>
-						{/if}
+		{#if error}<p class="text-sm text-red-700" role="alert">{error}</p>{/if}
+
+		<section class="flex flex-col gap-3">
+			<h2 class="text-lg font-semibold">You</h2>
+			<div class="border-y border-stone-200 py-4">
+				<div class="flex items-center justify-between gap-4">
+					<div class="min-w-0">
+						<p class="truncate font-medium">{user?.name ?? ' '}</p>
+						<p class="truncate text-sm text-stone-500">
+							{user ? `${user.studentEmail} · ${user.phone}` : ''}
+						</p>
 					</div>
-					<a class="secondary" href="/app/welcome/profile">Edit profile</a>
+					<button
+						class="shrink-0 rounded-full px-3 py-1.5 text-sm font-medium text-[#154733] hover:bg-[#154733]/10"
+						type="button"
+						aria-expanded={editing === 'profile'}
+						onclick={() => toggle('profile')}
+					>
+						{editing === 'profile' ? 'Close' : 'Edit'}
+					</button>
 				</div>
-			</section>
-
-			<div class="grid gap-6 lg:grid-cols-3">
-				<section class="rounded-lg border border-stone-200 bg-white p-5">
-					<h2 class="text-sm font-semibold">Student Organizations</h2>
-					<form class="mt-4 space-y-3" onsubmit={saveOrg}>
-						<input
-							class="field"
-							placeholder="Student organization name"
-							required
-							bind:value={orgName}
-						/>
-						<input class="field" placeholder="Index number" required bind:value={orgIndex} />
-						<select class="field" bind:value={orgFund}>
-							<option>I</option><option>E</option><option>G</option><option>N</option><option
-								>U</option
-							><option>D</option><option>T</option>
-						</select>
-						<div>
-							<span class="text-xs font-medium text-stone-500">Budget Line Items</span>
-							{#each orgBudgetLines as _line, i (i)}
-								<div class="mt-1 flex items-center gap-2">
-									<input class="field flex-1" required bind:value={orgBudgetLines[i]} />
-									{#if orgBudgetLines.length > 1}
-										<button class="link-button" type="button" onclick={() => removeBudgetLine(i)}>
-											Remove
-										</button>
-									{/if}
-								</div>
-							{/each}
-							<button class="link-button mt-2" type="button" onclick={addBudgetLine}
-								>Add line</button
-							>
-						</div>
-						<textarea class="field min-h-32" bind:value={orgTemplate}></textarea>
-						<button class="button" type="submit">Save student organization</button>
-					</form>
-					<ul class="mt-5 divide-y divide-stone-200">
-						{#each savedData?.organizations ?? [] as org (org._id)}
-							<li class="py-3 text-sm">
-								<p class="font-medium">{org.name}</p>
-								<p class="text-stone-500">{org.indexNumber} · Fund {org.fundLetter}</p>
-								<div class="mt-2 flex gap-2">
-									<button class="link-button" type="button" onclick={() => editOrg(org)}
-										>Edit</button
-									>
-									<button
-										class="link-button"
-										type="button"
-										onclick={() => archiveRecord('organizations', org._id, !org.archived)}
-									>
-										{org.archived ? 'Unarchive' : 'Archive'}
-									</button>
-								</div>
-							</li>
-						{/each}
-					</ul>
-				</section>
-
-				<section class="rounded-lg border border-stone-200 bg-white p-5">
-					<h2 class="text-sm font-semibold">Purchasers</h2>
-					<p class="mt-1 text-xs text-stone-500">Other people who paid (not you).</p>
-					<form class="mt-4 space-y-3" onsubmit={savePurchaser}>
-						<select class="field" bind:value={purchaserOrgId}>
-							<option value="">Student Organization</option>
-							{#each savedData?.organizations ?? [] as org (org._id)}
-								<option value={org._id}>{org.name}</option>
-							{/each}
-						</select>
-						<input class="field" placeholder="Name" required bind:value={purchaserName} />
-						<input class="field" placeholder="UO 95" required bind:value={purchaserUo95} />
-						<input
-							class="field"
-							placeholder="Permanent address"
-							autocomplete="street-address"
-							required
-							bind:value={purchaserAddress}
-						/>
-						<label class="block text-xs font-medium text-stone-500">
-							ID card document
-							<input
-								class="mt-1 block text-sm"
-								type="file"
-								onchange={(e) => upload('id_front', e.currentTarget)}
-							/>
-						</label>
-						<label class="block text-xs font-medium text-stone-500">
-							Second ID card document
-							<input
-								class="mt-1 block text-sm"
-								type="file"
-								onchange={(e) => upload('id_back', e.currentTarget)}
-							/>
-						</label>
-						<button class="button" type="submit">Save purchaser</button>
-					</form>
-					<ul class="mt-5 divide-y divide-stone-200">
-						{#each savedData?.purchasers ?? [] as purchaser (purchaser._id)}
-							<li class="py-3 text-sm">
-								<p class="font-medium">{purchaser.name}</p>
-								<p class="text-stone-500">{purchaser.uo95}</p>
-								<div class="mt-2 flex gap-2">
-									<button
-										class="link-button"
-										type="button"
-										onclick={() => editPurchaser(purchaser)}
-									>
-										Edit
-									</button>
-									<button
-										class="link-button"
-										type="button"
-										onclick={() => archiveRecord('purchasers', purchaser._id, !purchaser.archived)}
-									>
-										{purchaser.archived ? 'Unarchive' : 'Archive'}
-									</button>
-								</div>
-							</li>
-						{/each}
-					</ul>
-				</section>
-
-				<section class="rounded-lg border border-stone-200 bg-white p-5">
-					<h2 class="text-sm font-semibold">Business Purpose Templates</h2>
-					<form class="mt-4 space-y-3" onsubmit={saveBusinessPurposeTemplate}>
-						<select class="field" bind:value={templateOrgId}>
-							<option value="">Student Organization</option>
-							{#each savedData?.organizations ?? [] as org (org._id)}
-								<option value={org._id}>{org.name}</option>
-							{/each}
-						</select>
-						<input class="field" placeholder="Template title" required bind:value={templateTitle} />
-						<textarea class="field min-h-32" required bind:value={templateText}></textarea>
-						<button class="button" type="submit">Save Business Purpose Template</button>
-					</form>
-					<ul class="mt-5 divide-y divide-stone-200">
-						{#each savedData?.businessPurposeTemplates ?? [] as template (template._id)}
-							<li class="py-3 text-sm">
-								<p class="font-medium">{template.title}</p>
-								<p class="text-stone-500">{template.businessPurposeTemplate}</p>
-								<div class="mt-2 flex gap-2">
-									<button
-										class="link-button"
-										type="button"
-										onclick={() => editBusinessPurposeTemplate(template)}
-									>
-										Edit
-									</button>
-									<button
-										class="link-button"
-										type="button"
-										onclick={() =>
-											archiveRecord('businessPurposeTemplates', template._id, !template.archived)}
-									>
-										{template.archived ? 'Unarchive' : 'Archive'}
-									</button>
-								</div>
-							</li>
-						{/each}
-					</ul>
-				</section>
+				{#if editing === 'profile' && currentUserQuery.data !== undefined}
+					<div class="pt-5">
+						<ProfileForm {user} submitLabel="Save" onSaved={closeEditor} />
+					</div>
+				{/if}
 			</div>
-		</main>
-	</div>
-{/if}
+		</section>
 
-<style>
-	.field {
-		width: 100%;
-		border-radius: 0.375rem;
-		border: 1px solid rgb(214 211 209);
-		padding: 0.5rem 0.75rem;
-		font-size: 0.875rem;
-	}
+		<section id="organizations" class="flex scroll-mt-20 flex-col gap-3">
+			<div class="flex items-center justify-between gap-4">
+				<h2 class="text-lg font-semibold">Organizations</h2>
+				<button class={secondaryButtonClass} type="button" onclick={() => toggle('org:new')}>
+					Add organization
+				</button>
+			</div>
+			<ul class="divide-y divide-stone-200 border-y border-stone-200">
+				{#if editing === 'org:new'}
+					<li class="py-5">
+						<OrganizationForm
+							organization={null}
+							submitLabel="Add organization"
+							showTemplate
+							onSaved={closeEditor}
+							onCancel={closeEditor}
+						/>
+					</li>
+				{/if}
+				{#each saved?.organizations ?? [] as org (org._id)}
+					{@const key = `org:${org._id}`}
+					<li class="py-4" class:opacity-60={org.archived}>
+						<div class="flex items-center justify-between gap-4">
+							<div class="min-w-0">
+								<p class="truncate font-medium">{org.name}</p>
+								<p class="text-sm text-stone-500">
+									{fundDescription(org.fundLetter)} · {org.budgetLines.length}
+									{org.budgetLines.length === 1 ? 'budget line' : 'budget lines'}
+								</p>
+							</div>
+							{@render rowActions(key, 'organizations', org._id, org.archived)}
+						</div>
+						{#if editing === key}
+							<div class="pt-5">
+								<OrganizationForm
+									organization={org}
+									submitLabel="Save"
+									showTemplate
+									onSaved={closeEditor}
+									onCancel={closeEditor}
+								/>
+							</div>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		</section>
 
-	.button {
-		border-radius: 0.375rem;
-		background: rgb(28 25 23);
-		padding: 0.5rem 0.75rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: white;
-	}
+		<section class="flex flex-col gap-3">
+			<div class="flex items-center justify-between gap-4">
+				<div>
+					<h2 class="text-lg font-semibold">Purchasers</h2>
+					<p class="text-sm text-stone-500">Other people who pay for things and get paid back.</p>
+				</div>
+				<button
+					class={secondaryButtonClass}
+					type="button"
+					disabled={activeOrganizations.length === 0}
+					onclick={() => toggle('purchaser:new')}
+				>
+					Add purchaser
+				</button>
+			</div>
+			<ul class="divide-y divide-stone-200 border-y border-stone-200">
+				{#if editing === 'purchaser:new'}
+					<li class="py-5">
+						<PurchaserForm
+							purchaser={null}
+							organizations={activeOrganizations}
+							onDone={closeEditor}
+						/>
+					</li>
+				{/if}
+				{#each saved?.purchasers ?? [] as purchaser (purchaser._id)}
+					{@const key = `purchaser:${purchaser._id}`}
+					<li class="py-4" class:opacity-60={purchaser.archived}>
+						<div class="flex items-center justify-between gap-4">
+							<div class="min-w-0">
+								<p class="truncate font-medium">{purchaser.name}</p>
+								<p class="truncate text-sm text-stone-500">
+									{organizationName.get(purchaser.organizationId) ?? ''}
+								</p>
+							</div>
+							{@render rowActions(key, 'purchasers', purchaser._id, purchaser.archived)}
+						</div>
+						{#if editing === key}
+							<div class="pt-5">
+								<PurchaserForm
+									{purchaser}
+									organizations={activeOrganizations}
+									onDone={closeEditor}
+								/>
+							</div>
+						{/if}
+					</li>
+				{:else}
+					{#if editing !== 'purchaser:new'}
+						<li class="py-4 text-sm text-stone-500">
+							When someone else pays, add them here so their details fill in.
+						</li>
+					{/if}
+				{/each}
+			</ul>
+		</section>
 
-	.secondary {
-		display: inline-flex;
-		align-items: center;
-		border-radius: 0.375rem;
-		border: 1px solid rgb(214 211 209);
-		padding: 0.45rem 0.75rem;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		text-decoration: none;
-		color: inherit;
-	}
+		<section class="flex flex-col gap-3">
+			<div class="flex items-center justify-between gap-4">
+				<div>
+					<h2 class="text-lg font-semibold">Business purpose templates</h2>
+					<p class="text-sm text-stone-500">Reasons you use again and again.</p>
+				</div>
+				<button
+					class={secondaryButtonClass}
+					type="button"
+					disabled={activeOrganizations.length === 0}
+					onclick={() => toggle('template:new')}
+				>
+					Add template
+				</button>
+			</div>
+			<ul class="divide-y divide-stone-200 border-y border-stone-200">
+				{#if editing === 'template:new'}
+					<li class="py-5">
+						<TemplateForm
+							template={null}
+							organizations={activeOrganizations}
+							onDone={closeEditor}
+						/>
+					</li>
+				{/if}
+				{#each saved?.businessPurposeTemplates ?? [] as template (template._id)}
+					{@const key = `template:${template._id}`}
+					<li class="py-4" class:opacity-60={template.archived}>
+						<div class="flex items-center justify-between gap-4">
+							<div class="min-w-0">
+								<p class="truncate font-medium">{template.title}</p>
+								<p class="line-clamp-2 text-sm text-stone-500">
+									{preview(template.businessPurposeTemplate)}
+								</p>
+							</div>
+							{@render rowActions(key, 'businessPurposeTemplates', template._id, template.archived)}
+						</div>
+						{#if editing === key}
+							<div class="pt-5">
+								<TemplateForm {template} organizations={activeOrganizations} onDone={closeEditor} />
+							</div>
+						{/if}
+					</li>
+				{:else}
+					{#if editing !== 'template:new'}
+						<li class="py-4 text-sm text-stone-500">
+							Save a reason once, like weekly meeting snacks, and pick it on any request.
+						</li>
+					{/if}
+				{/each}
+			</ul>
+		</section>
 
-	.link-button {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: rgb(87 83 78);
-		text-decoration: underline;
-		text-underline-offset: 3px;
-	}
-</style>
+		<label class="flex items-center gap-2 self-start text-sm text-stone-600">
+			<input class="h-4 w-4 accent-[#154733]" type="checkbox" bind:checked={showArchived} />
+			Show archived
+		</label>
+	</main>
+</AppShell>
