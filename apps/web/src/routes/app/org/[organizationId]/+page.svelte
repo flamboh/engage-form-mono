@@ -9,7 +9,7 @@
 	import ReceiptDrop from '$lib/board/ReceiptDrop.svelte';
 	import RequestRow from '$lib/board/RequestRow.svelte';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
-	import { startUploads } from '$lib/uploads.svelte';
+	import { pendingUploadsFor, startUploads } from '$lib/uploads.svelte';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 
 	const clerkContext = getClerkContext();
@@ -121,7 +121,12 @@
 					<ul class="divide-y divide-stone-200 border-y border-stone-200">
 						{#each board.needsInfo as item (item.id)}
 							<RequestRow {item} href={requestHref(item.id)}>
-								{#if item.reading}
+								{@const uploads = pendingUploadsFor(item.id)}
+								{#if uploads.some((upload) => upload.error)}
+									<span class="text-sm text-red-700">Receipt didn't upload</span>
+								{:else if uploads.length > 0}
+									<span class="text-sm text-stone-500">Uploading receipt…</span>
+								{:else if item.reading}
 									<span class="text-sm text-stone-500">Reading receipt…</span>
 								{:else if item.nextStep}
 									<span class="flex items-center gap-2 text-sm text-stone-700">

@@ -22,3 +22,9 @@ export function requestFacts(item: { vendor: string; totalAmount: number; date: 
 		item.date ? formatShortDate(item.date) : ''
 	].filter((part) => part !== '');
 }
+
+const dayTime = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+
+export function formatDay(timestamp: number) {
+	return dayTime.format(new Date(timestamp));
+}

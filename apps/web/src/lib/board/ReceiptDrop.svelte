@@ -65,67 +65,69 @@
 	ondrop={handleDrop}
 />
 
-<div class="receipt" class:dragging aria-busy={busy}>
-	<button
-		class="flex w-full flex-col items-start gap-4 px-6 pt-7 pb-9 text-left sm:flex-row sm:items-center sm:gap-6 sm:px-8"
-		type="button"
-		disabled={busy}
-		onclick={() => pickerInput?.click()}
-	>
-		<span class="glyph" aria-hidden="true">
-			<svg viewBox="0 0 32 40" width="32" height="40" fill="none">
-				<path
-					d="M3 2h26v34l-3.25-2.5L22.5 36l-3.25-2.5L16 36l-3.25-2.5L9.5 36l-3.25-2.5L3 36V2Z"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linejoin="round"
-				/>
-				<path
-					d="M9 11h14M9 17h10M9 23h14"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-				/>
-			</svg>
-		</span>
-		<span class="flex flex-col gap-1.5">
-			<span class="text-xl leading-tight font-semibold tracking-tight sm:text-2xl">
-				{busy ? 'Starting your request…' : dragging ? 'Let go to start' : title}
-			</span>
-			<span class="max-w-md text-sm text-stone-600">{hint}</span>
-		</span>
-		<span
-			class="mt-1 inline-flex h-10 shrink-0 items-center rounded-full border border-stone-900 px-4 text-sm font-medium sm:mt-0 sm:ml-auto"
-		>
-			Choose files
-		</span>
-	</button>
-	<div class="px-6 pb-8 sm:hidden">
+<div class="receipt-frame">
+	<div class="receipt" class:dragging aria-busy={busy}>
 		<button
-			class="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#154733] text-sm font-medium text-white"
+			class="flex w-full flex-col items-start gap-4 px-6 pt-7 pb-10 text-left sm:flex-row sm:items-center sm:gap-6 sm:px-8"
 			type="button"
 			disabled={busy}
-			onclick={() => cameraInput?.click()}
+			onclick={() => pickerInput?.click()}
 		>
-			Take a photo of a receipt
+			<span class="glyph" aria-hidden="true">
+				<svg viewBox="0 0 32 40" width="32" height="40" fill="none">
+					<path
+						d="M3 2h26v34l-3.25-2.5L22.5 36l-3.25-2.5L16 36l-3.25-2.5L9.5 36l-3.25-2.5L3 36V2Z"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linejoin="round"
+					/>
+					<path
+						d="M9 11h14M9 17h10M9 23h14"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+					/>
+				</svg>
+			</span>
+			<span class="flex flex-col gap-1.5">
+				<span class="text-xl leading-tight font-semibold tracking-tight sm:text-2xl">
+					{busy ? 'Starting your request…' : dragging ? 'Let go to start' : title}
+				</span>
+				<span class="max-w-md text-sm text-stone-600">{hint}</span>
+			</span>
+			<span
+				class="mt-1 inline-flex h-10 shrink-0 items-center rounded-full border border-stone-900 px-4 text-sm font-medium sm:mt-0 sm:ml-auto"
+			>
+				Choose files
+			</span>
 		</button>
+		<div class="px-6 pb-10 sm:hidden">
+			<button
+				class="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#154733] text-sm font-medium text-white"
+				type="button"
+				disabled={busy}
+				onclick={() => cameraInput?.click()}
+			>
+				Take a photo of a receipt
+			</button>
+		</div>
+		<input
+			bind:this={pickerInput}
+			class="hidden"
+			type="file"
+			multiple
+			accept="image/*,application/pdf"
+			onchange={(event) => handlePicked(event.currentTarget)}
+		/>
+		<input
+			bind:this={cameraInput}
+			class="hidden"
+			type="file"
+			accept="image/*,application/pdf"
+			capture="environment"
+			onchange={(event) => handlePicked(event.currentTarget)}
+		/>
 	</div>
-	<input
-		bind:this={pickerInput}
-		class="hidden"
-		type="file"
-		multiple
-		accept="image/*,application/pdf"
-		onchange={(event) => handlePicked(event.currentTarget)}
-	/>
-	<input
-		bind:this={cameraInput}
-		class="hidden"
-		type="file"
-		accept="image/*,application/pdf"
-		capture="environment"
-		onchange={(event) => handlePicked(event.currentTarget)}
-	/>
 </div>
 
 {#if dragging}
@@ -141,24 +143,25 @@
 
 <style>
 	.receipt {
-		--tooth: 10px;
 		position: relative;
 		background: #fffef9;
 		color: #1c1917;
-		border: 1px solid #d6d3d1;
-		border-bottom: none;
-		box-shadow: 0 1px 0 #e7e5e4;
-		mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% /
-			var(--tooth) 100%;
+		mask:
+			linear-gradient(#000 0 0) top / 100% calc(100% - 8px) no-repeat,
+			conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 16px 8px
+				repeat-x;
 		transition:
 			background-color 120ms ease,
 			border-color 120ms ease;
 	}
 
+	.receipt-frame {
+		filter: drop-shadow(0 0 1px rgb(120 113 108 / 0.9)) drop-shadow(0 3px 4px rgb(0 0 0 / 0.06));
+	}
+
 	.receipt:has(button:hover:not(:disabled)),
 	.receipt.dragging {
 		background: #fef9d7;
-		border-color: #154733;
 	}
 
 	.receipt button:focus-visible {

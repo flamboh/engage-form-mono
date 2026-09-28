@@ -266,11 +266,7 @@
 						</div>
 						{#if editing === key}
 							<div class="pt-5">
-								<TemplateForm
-									{template}
-									organizations={activeOrganizations}
-									onDone={closeEditor}
-								/>
+								<TemplateForm {template} organizations={activeOrganizations} onDone={closeEditor} />
 							</div>
 						{/if}
 					</li>

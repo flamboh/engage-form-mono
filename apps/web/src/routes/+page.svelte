@@ -73,35 +73,37 @@
 			</div>
 
 			<div class="relative mx-auto w-full max-w-md" aria-hidden="true">
-				<div class="receipt w-[62%] -rotate-2 px-5 pt-5 pb-8 font-mono text-[11px] text-stone-700">
-					<p class="text-center font-semibold tracking-wide text-stone-900">
-						<mark class="hl hl-1">EUGENE PARTY SUPPLY</mark>
-					</p>
-					<p class="mt-1 text-center">
-						<mark class="hl hl-3">10/14/2026</mark> 14:02
-					</p>
-					<div class="my-3 border-t border-dashed border-stone-300"></div>
-					{#each receiptLines as line (line.label)}
-						<p class="flex justify-between gap-2">
-							<span>{line.label}</span><span>{line.amount}</span>
+				<div class="receipt-frame w-[64%] -rotate-2">
+					<div class="receipt px-5 pt-5 pb-8 font-mono text-[11px] text-stone-700">
+						<p class="text-center font-semibold tracking-wide text-stone-900">
+							<mark class="hl hl-1">EUGENE PARTY SUPPLY</mark>
 						</p>
-					{/each}
-					<div class="my-3 border-t border-dashed border-stone-300"></div>
-					<p class="flex justify-between"><span>SUBTOTAL</span><span>18.98</span></p>
-					<p class="flex justify-between"><span>TAX</span><span>0.00</span></p>
-					<p class="mt-1 flex justify-between font-semibold text-stone-900">
-						<span>TOTAL</span><mark class="hl hl-2">$18.98</mark>
-					</p>
+						<p class="mt-1 text-center">
+							<mark class="hl hl-3">10/14/2026</mark> 14:02
+						</p>
+						<div class="my-3 border-t border-dashed border-stone-300"></div>
+						{#each receiptLines as line (line.label)}
+							<p class="flex justify-between gap-2">
+								<span>{line.label}</span><span>{line.amount}</span>
+							</p>
+						{/each}
+						<div class="my-3 border-t border-dashed border-stone-300"></div>
+						<p class="flex justify-between"><span>SUBTOTAL</span><span>18.98</span></p>
+						<p class="flex justify-between"><span>TAX</span><span>0.00</span></p>
+						<p class="mt-1 flex justify-between font-semibold text-stone-900">
+							<span>TOTAL</span><mark class="hl hl-2">$18.98</mark>
+						</p>
+					</div>
 				</div>
 
 				<div
-					class="relative z-10 -mt-24 ml-auto w-[78%] border border-stone-200 bg-white p-4 shadow-[0_12px_40px_-12px_rgba(21,71,51,0.35)] sm:-mt-28"
+					class="relative z-10 -mt-6 ml-auto w-[92%] border border-stone-200 bg-white p-4 shadow-[0_12px_40px_-12px_rgba(21,71,51,0.35)] sm:w-[80%]"
 				>
 					<p class="mb-3 text-xs font-semibold text-[#154733]">Engage purchase request</p>
 					<dl class="flex flex-col gap-2 text-[13px]">
 						{#each filled as field, i (field.label)}
 							<div
-								class="field flex items-baseline justify-between gap-3 border-b border-stone-100 pb-1.5"
+								class="filled-row flex items-baseline justify-between gap-3 border-b border-stone-100 pb-1.5"
 								style={`--delay: ${400 + i * 120}ms`}
 							>
 								<dt class="shrink-0 text-stone-500">{field.label}</dt>
@@ -144,11 +146,16 @@
 </div>
 
 <style>
+	.receipt-frame {
+		filter: drop-shadow(0 0 1px rgb(120 113 108 / 0.7)) drop-shadow(0 4px 6px rgb(0 0 0 / 0.06));
+	}
+
 	.receipt {
 		background: #fffef9;
-		border: 1px solid #e7e5e4;
-		border-bottom: none;
-		mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 10px 100%;
+		mask:
+			linear-gradient(#000 0 0) top / 100% calc(100% - 8px) no-repeat,
+			conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 16px 8px
+				repeat-x;
 	}
 
 	.hl {
@@ -170,7 +177,7 @@
 		animation-delay: 600ms;
 	}
 
-	.field {
+	.filled-row {
 		opacity: 0;
 		animation: appear 300ms ease-out forwards;
 		animation-delay: var(--delay);
@@ -190,7 +197,7 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.hl,
-		.field {
+		.filled-row {
 			animation: none;
 			opacity: 1;
 			background-size: 100% 80%;

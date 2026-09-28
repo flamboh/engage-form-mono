@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { BoardItem } from '$convex/authed/board';
-	import { requestFacts } from '$lib/board/format';
+	import { formatDay, requestFacts } from '$lib/board/format';
 
 	let {
 		item,
@@ -36,7 +36,7 @@
 			{#each detail as part (part)}
 				<span>{part}</span>
 			{:else}
-				<span>Nothing read yet</span>
+				<span>Started {formatDay(item.updatedAt)}</span>
 			{/each}
 		</span>
 	</a>
