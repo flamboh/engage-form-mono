@@ -78,3 +78,11 @@ export const markReviewReached = authedMutation({
 		return null;
 	}
 });
+
+export const requestFill = authedMutation({
+	args: { purchaseRequestId: zid('purchaseRequests') },
+	returns: z.object({ engageUrl: z.string() }),
+	handler: async () => {
+		throw new Error('requestFill is not implemented yet.');
+	}
+});

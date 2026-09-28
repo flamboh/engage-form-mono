@@ -630,7 +630,7 @@ export const discardDraft = authedMutation({
 		].filter((id): id is Id<'files'> => id !== null);
 		for (const fileId of fileIds) {
 			const file = await requireOwnedDoc(ctx, 'files', fileId, owner);
-			await ctx.storage.delete(file.storageId);
+			if (file.storageId !== undefined) await ctx.storage.delete(file.storageId);
 			await ctx.db.delete(fileId);
 		}
 		await ctx.db.delete(args.id);

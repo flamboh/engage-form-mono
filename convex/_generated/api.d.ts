@@ -9,16 +9,19 @@
  */
 
 import type * as authed_demo from "../authed/demo.js";
+import type * as authed_documents from "../authed/documents.js";
 import type * as authed_extension from "../authed/extension.js";
 import type * as authed_helpers from "../authed/helpers.js";
 import type * as authed_purchaseBuilder from "../authed/purchaseBuilder.js";
 import type * as businessPurpose from "../businessPurpose.js";
+import type * as fileSigning from "../fileSigning.js";
 import type * as internal_purchaseAutosave from "../internal/purchaseAutosave.js";
 import type * as purchaseCategories from "../purchaseCategories.js";
 import type * as purchaseModel from "../purchaseModel.js";
 import type * as purchaseReadiness from "../purchaseReadiness.js";
 import type * as purchaseValidators from "../purchaseValidators.js";
 import type * as purchaseZod from "../purchaseZod.js";
+import type * as requestView from "../requestView.js";
 
 import type {
   ApiFromModules,
@@ -28,16 +31,19 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "authed/demo": typeof authed_demo;
+  "authed/documents": typeof authed_documents;
   "authed/extension": typeof authed_extension;
   "authed/helpers": typeof authed_helpers;
   "authed/purchaseBuilder": typeof authed_purchaseBuilder;
   businessPurpose: typeof businessPurpose;
+  fileSigning: typeof fileSigning;
   "internal/purchaseAutosave": typeof internal_purchaseAutosave;
   purchaseCategories: typeof purchaseCategories;
   purchaseModel: typeof purchaseModel;
   purchaseReadiness: typeof purchaseReadiness;
   purchaseValidators: typeof purchaseValidators;
   purchaseZod: typeof purchaseZod;
+  requestView: typeof requestView;
 }>;
 
 /**

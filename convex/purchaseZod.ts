@@ -128,6 +128,10 @@ export const userDoc = z.object({
 	phone: z.string(),
 	idCardFrontFileId: zid('files'),
 	idCardBackFileId: zid('files').nullable(),
+	pendingFill: z
+		.object({ purchaseRequestId: zid('purchaseRequests'), requestedAt: z.number() })
+		.nullable()
+		.optional(),
 	updatedAt: z.number()
 });
 
@@ -149,7 +153,8 @@ export const fileDoc = z.object({
 	_creationTime: z.number(),
 	owner: z.string(),
 	kind: fileKind,
-	storageId: zid('_storage'),
+	storageId: zid('_storage').optional(),
+	r2Key: z.string().optional(),
 	filename: z.string(),
 	contentType: z.string(),
 	size: z.number(),
@@ -213,7 +218,9 @@ export const purchaseRequestDoc = z.object({
 	recipients: z.array(recipient),
 	createdAt: z.number(),
 	updatedAt: z.number(),
-	lastFilledAt: z.number().nullable()
+	lastFilledAt: z.number().nullable(),
+	fieldSources: z.record(z.string(), z.enum(['user', 'receipt', 'default'])).optional(),
+	receiptDate: z.string().optional()
 });
 
 export const savedData = z.object({

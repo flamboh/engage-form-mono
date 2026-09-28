@@ -381,8 +381,8 @@ async function documentPayload(ctx: Ctx, id: Id<'files'>, owner: string) {
 		filename: doc.filename,
 		contentType: doc.contentType,
 		size: doc.size,
-		storageKey: doc.storageId,
-		url: await ctx.storage.getUrl(doc.storageId)
+		storageKey: doc.r2Key ?? doc.storageId ?? '',
+		url: doc.storageId === undefined ? null : await ctx.storage.getUrl(doc.storageId)
 	};
 }
 

@@ -115,6 +115,14 @@ const purchaserDetails = v.object({
 	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
+const fieldSource = v.union(v.literal('user'), v.literal('receipt'), v.literal('default'));
+
+const extractedField = v.object({
+	value: v.string(),
+	confident: v.boolean(),
+	alternatives: v.array(v.string())
+});
+
 export default defineSchema({
 	users: defineTable({
 		owner: v.string(),
@@ -125,6 +133,12 @@ export default defineSchema({
 		phone: v.string(),
 		idCardFrontFileId: v.id('files'),
 		idCardBackFileId: v.union(v.id('files'), v.null()),
+		pendingFill: v.optional(
+			v.union(
+				v.object({ purchaseRequestId: v.id('purchaseRequests'), requestedAt: v.number() }),
+				v.null()
+			)
+		),
 		updatedAt: v.number()
 	}).index('by_owner', ['owner']),
 	organizations: defineTable({
@@ -142,7 +156,8 @@ export default defineSchema({
 	files: defineTable({
 		owner: v.string(),
 		kind: fileKind,
-		storageId: v.id('_storage'),
+		storageId: v.optional(v.id('_storage')),
+		r2Key: v.optional(v.string()),
 		filename: v.string(),
 		contentType: v.string(),
 		size: v.number(),
@@ -215,7 +230,9 @@ export default defineSchema({
 		recipients: v.array(recipient),
 		createdAt: v.number(),
 		updatedAt: v.number(),
-		lastFilledAt: v.union(v.number(), v.null())
+		lastFilledAt: v.union(v.number(), v.null()),
+		fieldSources: v.optional(v.record(v.string(), fieldSource)),
+		receiptDate: v.optional(v.string())
 	})
 		.index('by_owner_and_organizationSourceId_and_status_and_updatedAt', [
 			'owner',
@@ -230,5 +247,27 @@ export default defineSchema({
 		])
 		.index('by_owner_and_status_and_updatedAt', ['owner', 'status', 'updatedAt'])
 		.index('by_owner_and_status', ['owner', 'status'])
-		.index('by_owner', ['owner'])
+		.index('by_owner', ['owner']),
+	extractions: defineTable({
+		owner: v.string(),
+		fileId: v.id('files'),
+		purchaseRequestId: v.union(v.id('purchaseRequests'), v.null()),
+		status: v.union(
+			v.literal('pending'),
+			v.literal('running'),
+			v.literal('done'),
+			v.literal('failed')
+		),
+		textSource: v.union(v.literal('text_layer'), v.literal('textract'), v.null()),
+		documentKind: v.union(fileKind, v.literal('other'), v.null()),
+		vendor: v.union(extractedField, v.null()),
+		totalAmount: v.union(extractedField, v.null()),
+		receiptDate: v.union(extractedField, v.null()),
+		items: v.array(v.string()),
+		error: v.union(v.string(), v.null()),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_fileId', ['fileId'])
+		.index('by_purchaseRequestId', ['purchaseRequestId'])
 });

@@ -148,6 +148,12 @@ export const userDoc = v.object({
 	phone: v.string(),
 	idCardFrontFileId: v.id('files'),
 	idCardBackFileId: v.union(v.id('files'), v.null()),
+	pendingFill: v.optional(
+		v.union(
+			v.object({ purchaseRequestId: v.id('purchaseRequests'), requestedAt: v.number() }),
+			v.null()
+		)
+	),
 	updatedAt: v.number()
 });
 
@@ -169,7 +175,8 @@ export const fileDoc = v.object({
 	_creationTime: v.number(),
 	owner: v.string(),
 	kind: fileKind,
-	storageId: v.id('_storage'),
+	storageId: v.optional(v.id('_storage')),
+	r2Key: v.optional(v.string()),
 	filename: v.string(),
 	contentType: v.string(),
 	size: v.number(),
@@ -233,7 +240,11 @@ export const purchaseRequestDoc = v.object({
 	recipients: v.array(recipient),
 	createdAt: v.number(),
 	updatedAt: v.number(),
-	lastFilledAt: v.union(v.number(), v.null())
+	lastFilledAt: v.union(v.number(), v.null()),
+	fieldSources: v.optional(
+		v.record(v.string(), v.union(v.literal('user'), v.literal('receipt'), v.literal('default')))
+	),
+	receiptDate: v.optional(v.string())
 });
 
 export const savedData = v.object({
