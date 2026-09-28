@@ -1,10 +1,6 @@
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
-import {
-	evaluatePurchaseReadiness,
-	formatReadinessBlockers,
-	unresolvedToken
-} from './purchaseReadiness';
+import { evaluatePurchaseReadiness, formatReadinessBlockers } from './purchaseReadiness';
 import { effectiveDocumentationCategories } from './purchaseCategories';
 import { fileDownloadUrl } from './files';
 import {
@@ -21,16 +17,10 @@ export {
 	validateBusinessPurposeText
 } from './businessPurpose';
 
-export { evaluatePurchaseReadiness, unresolvedToken } from './purchaseReadiness';
+export { evaluatePurchaseReadiness } from './purchaseReadiness';
 export { effectiveDocumentationCategories } from './purchaseCategories';
 
 export type Recipient = { name: string; uo95: string; reason: string; value: number };
-type BusinessPurposeRequest = Omit<Doc<'purchaseRequests'>, 'businessPurposeSource'> & {
-	businessPurposeSource?: BusinessPurposeSource;
-	businessPurposeText?: string;
-	activityDate?: string;
-	eventDate?: string;
-};
 
 export type PurchaserRef = { kind: 'self' } | { kind: 'purchaser'; purchaserId: Id<'purchasers'> };
 export type TypeOfPurchase =
@@ -188,8 +178,7 @@ export function userFieldSources(
 	let changed = false;
 	for (const field of userTrackedFields) {
 		if (!fields.includes(field) || !(field in next)) continue;
-		const previous = field === 'activityDate' ? activityDateForPurchase(request) : request[field];
-		if (JSON.stringify(next[field]) === JSON.stringify(previous)) continue;
+		if (JSON.stringify(next[field]) === JSON.stringify(request[field])) continue;
 		if (sources[field] === 'user') continue;
 		sources[field] = 'user';
 		changed = true;
@@ -229,11 +218,7 @@ export function keepFilledFields<Patch extends Partial<Doc<'purchaseRequests'>>>
 	if (kept.totalAmount === 0 && request.totalAmount > 0 && automatic('totalAmount')) {
 		delete kept.totalAmount;
 	}
-	if (
-		kept.activityDate === '' &&
-		activityDateForPurchase(request) !== '' &&
-		automatic('activityDate')
-	) {
+	if (kept.activityDate === '' && request.activityDate !== '' && automatic('activityDate')) {
 		delete kept.activityDate;
 	}
 	return kept;
@@ -246,7 +231,8 @@ export type PreviousRequestDefaults = Pick<
 	| 'documentationCategories'
 	| 'reimbursementReason'
 	| 'businessPurposeTouched'
-> & { businessPurposeSource: BusinessPurposeSource };
+	| 'businessPurposeSource'
+>;
 
 export function previousRequestDefaults(
 	previous: PreviousRequestDefaults | null,
@@ -313,7 +299,7 @@ function draftPatchFields(
 		requester: patch.requester !== undefined ? patch.requester : purchase.requester,
 		purchaser: patch.purchaser !== undefined ? patch.purchaser : purchase.purchaser,
 		activityDate:
-			patch.activityDate !== undefined ? patch.activityDate : activityDateForPurchase(purchase),
+			patch.activityDate !== undefined ? patch.activityDate : purchase.activityDate,
 		vendor: patch.vendor !== undefined ? patch.vendor : purchase.vendor,
 		itemDescription:
 			patch.itemDescription !== undefined ? patch.itemDescription : purchase.itemDescription,
@@ -421,27 +407,8 @@ export function filterBusinessPurposeTemplates<
 	});
 }
 
-export function renderBusinessPurpose(request: BusinessPurposeRequest) {
-	if (request.businessPurposeSource !== undefined) {
-		return resolveBusinessPurpose(request.businessPurposeSource, request).text;
-	}
-	const firstRecipient = request.recipients[0];
-	const values: Record<string, string> = {
-		org: request.studentOrganization.name || '{org}',
-		requester: request.requester.name || '{requester}',
-		purchaser: request.purchaser.name || '{purchaser}',
-		vendor: request.vendor || '{vendor}',
-		item: request.itemDescription || '{item}',
-		amount: request.totalAmount > 0 ? formatMoney(request.totalAmount) : '{amount}',
-		recipient: firstRecipient?.name || 'N/A',
-		recipientUo95: firstRecipient?.uo95 || 'N/A',
-		recipientReason: firstRecipient?.reason || 'N/A',
-		activityDate: activityDateForPurchase(request) || '{activityDate}'
-	};
-	return Object.entries(values).reduce(
-		(text, [key, value]) => text.replaceAll(`{${key}}`, value),
-		request.studentOrganization.businessPurposeTemplate
-	);
+export function renderBusinessPurpose(request: Doc<'purchaseRequests'>) {
+	return resolveBusinessPurpose(request.businessPurposeSource, request).text;
 }
 
 export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'>) {
@@ -478,13 +445,13 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		organization: orgPayload(request),
 		requester: request.requester,
 		purchaser: request.purchaser,
-		activityDate: activityDateForPurchase(request),
+		activityDate: request.activityDate,
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
 		budgetLineItem: request.budgetLineItem,
 		reimbursementReason: reimbursementReasonFor(request.typeOfPurchase),
-		businessPurposeText: renderBusinessPurpose(request as BusinessPurposeRequest),
+		businessPurposeText: renderBusinessPurpose(request),
 		requesterIsPurchaser: purchaserIsSelf,
 		receiptFileIds: request.receiptFileIds,
 		secondApprovalFileId: purchaserIsSelf ? request.secondApprovalFileId : null,
@@ -583,12 +550,6 @@ export function studentOrganizationDetails(org: Doc<'organizations'>): StudentOr
 	};
 }
 
-export function activityDateForPurchase(
-	request: Pick<Doc<'purchaseRequests'>, 'activityDate'> & { eventDate?: string }
-) {
-	return request.activityDate ?? request.eventDate ?? '';
-}
-
 function orgPayload(request: Doc<'purchaseRequests'>) {
 	return {
 		id: request.organizationSourceId,
@@ -601,10 +562,6 @@ function orgPayload(request: Doc<'purchaseRequests'>) {
 
 function numberInput(value: number | null) {
 	return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-}
-
-function formatMoney(value: number) {
-	return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
 function reimbursementReasonFor(typeOfPurchase: TypeOfPurchase) {

@@ -20,10 +20,7 @@ export type BusinessPurposePart =
 	| { kind: 'text'; text: string }
 	| { kind: 'variable'; variable: BusinessPurposeVariable };
 export type BusinessPurposeSource = { parts: BusinessPurposePart[] };
-type BusinessPurposeRequest = Omit<Doc<'purchaseRequests'>, 'businessPurposeSource'> & {
-	activityDate?: string;
-	eventDate?: string;
-};
+type BusinessPurposeRequest = Omit<Doc<'purchaseRequests'>, 'businessPurposeSource'>;
 
 const variablesByLabel: Map<string, (typeof businessPurposeVariables)[number]> = new Map(
 	businessPurposeVariables.map((variable) => [variable.label, variable])
@@ -142,11 +139,11 @@ function valueForVariable(variable: BusinessPurposeVariable, request: BusinessPu
 		case 'recipientUo95Ids':
 			return listValue(request.recipients.map((recipient) => recipient.uo95));
 		case 'activityDate':
-			return textValue(formatActivityDate(activityDateForPurchase(request)));
+			return textValue(formatActivityDate(request.activityDate));
 		case 'activityTime':
-			return textValue(formatActivityTime(request.activityTime ?? request.eventTime ?? ''));
+			return textValue(formatActivityTime(request.activityTime ?? ''));
 		case 'activityLocation':
-			return textValue(request.activityLocation ?? request.eventLocation ?? '');
+			return textValue(request.activityLocation ?? '');
 		case 'officeLocation':
 			return textValue(request.officeLocation);
 		case 'purpose':
@@ -175,10 +172,6 @@ export function formatActivityTime(value: string) {
 	if (hours > 23) return value.trim();
 	const suffix = hours < 12 ? 'AM' : 'PM';
 	return `${hours % 12 === 0 ? 12 : hours % 12}:${match[2]} ${suffix}`;
-}
-
-function activityDateForPurchase(request: BusinessPurposeRequest) {
-	return request.activityDate ?? request.eventDate ?? '';
 }
 
 function formatActivityDate(value: string) {

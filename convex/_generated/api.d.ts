@@ -29,7 +29,6 @@ import type * as internal_purchaseAutosave from "../internal/purchaseAutosave.js
 import type * as purchaseCategories from "../purchaseCategories.js";
 import type * as purchaseModel from "../purchaseModel.js";
 import type * as purchaseReadiness from "../purchaseReadiness.js";
-import type * as purchaseValidators from "../purchaseValidators.js";
 import type * as purchaseZod from "../purchaseZod.js";
 import type * as requestView from "../requestView.js";
 
@@ -61,7 +60,6 @@ declare const fullApi: ApiFromModules<{
   purchaseCategories: typeof purchaseCategories;
   purchaseModel: typeof purchaseModel;
   purchaseReadiness: typeof purchaseReadiness;
-  purchaseValidators: typeof purchaseValidators;
   purchaseZod: typeof purchaseZod;
   requestView: typeof requestView;
 }>;

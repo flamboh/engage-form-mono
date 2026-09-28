@@ -27,7 +27,6 @@ import {
 } from '../extraction/apply';
 import { applyReceiptFields, extractionTimeoutMs } from '../extraction/jobs';
 import { authedMutation, authedQuery } from './helpers';
-import { presentPurchaseRequest } from './purchaseBuilder';
 
 export const getRequestView = authedQuery({
 	args: { id: zid('purchaseRequests') },
@@ -58,14 +57,13 @@ export const getRequestView = authedQuery({
 					(slot === 'receipt' && url === null && extraction?.status !== 'done')
 			});
 		}
-		const purchase = presentPurchaseRequest(request);
 		return {
-			purchase,
+			purchase: request,
 			documents,
 			reading: documents.some((document) => document.reading),
 			reviews: requestReviews(request, extractions),
 			readiness: await purchaseReadiness(ctx, request),
-			businessPurposeText: renderBusinessPurpose(purchase)
+			businessPurposeText: renderBusinessPurpose(request)
 		};
 	}
 });

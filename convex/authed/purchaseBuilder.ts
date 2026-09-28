@@ -4,7 +4,6 @@ import type { Doc, Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
 import { authedMutation, authedQuery } from './helpers';
 import { deleteStoredFile, issueUploadTicket, requireOwnedKey } from '../files';
-import type { BusinessPurposePart, BusinessPurposeSource } from '../businessPurpose';
 import {
 	applyDraftPatch,
 	assertReady,
@@ -173,7 +172,7 @@ export const listPurchases = authedQuery({
 			.withIndex('by_owner', (q) => q.eq('owner', owner))
 			.order('desc')
 			.take(50);
-		return purchases.map(presentPurchaseRequest);
+		return purchases;
 	}
 });
 
@@ -190,7 +189,7 @@ export const listOrganizationPurchases = authedQuery({
 			)
 			.order('desc')
 			.take(100);
-		return purchases.map(presentPurchaseRequest);
+		return purchases;
 	}
 });
 
@@ -199,7 +198,7 @@ export const getDraft = authedQuery({
 	returns: purchaseRequestDoc,
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
-		return presentPurchaseRequest(await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner));
+		return await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
 	}
 });
 
@@ -395,18 +394,8 @@ export const applyBusinessPurposeTemplate = authedMutation({
 		) {
 			throw new Error('Business Purpose Template belongs to another Student Organization.');
 		}
-		const businessPurposeTemplate = migrateBusinessPurposeTemplate(
-			template.businessPurposeTemplate
-		);
-		if (businessPurposeTemplate !== template.businessPurposeTemplate) {
-			await ctx.db.patch(template._id, {
-				businessPurposeTemplate,
-				searchText: `${template.title} ${businessPurposeTemplate}`,
-				updatedAt: Date.now()
-			});
-		}
 		await ctx.db.patch(args.draftId, {
-			...businessPurposeTemplateDraftPatch({ ...template, businessPurposeTemplate }),
+			...businessPurposeTemplateDraftPatch(template),
 			fieldSources: { ...(draft.fieldSources ?? {}), businessPurposeSource: 'user' }
 		});
 		if (draft.status === 'draft' && draft.receiptFileIds.length > 0) {
@@ -414,83 +403,7 @@ export const applyBusinessPurposeTemplate = authedMutation({
 				purchaseRequestId: args.draftId
 			});
 		}
-		return presentPurchaseRequest(
-			await requireOwnedDoc(ctx, 'purchaseRequests', args.draftId, owner)
-		);
-	}
-});
-
-export const backfillMyPurchaseData = authedMutation({
-	args: {},
-	returns: z.object({
-		organizations: z.number(),
-		businessPurposeTemplates: z.number(),
-		purchaseRequests: z.number()
-	}),
-	handler: async (ctx) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const now = Date.now();
-		let organizations = 0;
-		let businessPurposeTemplates = 0;
-		let purchaseRequests = 0;
-
-		const orgs = await ctx.db
-			.query('organizations')
-			.withIndex('by_owner', (q) => q.eq('owner', owner))
-			.take(200);
-		for (const org of orgs) {
-			const businessPurposeTemplate = migrateBusinessPurposeTemplate(org.businessPurposeTemplate);
-			if (businessPurposeTemplate !== org.businessPurposeTemplate) {
-				await ctx.db.patch(org._id, {
-					businessPurposeTemplate,
-					updatedAt: now
-				});
-				organizations += 1;
-			}
-		}
-
-		const templates = await ctx.db
-			.query('businessPurposeTemplates')
-			.withIndex('by_owner', (q) => q.eq('owner', owner))
-			.take(500);
-		for (const template of templates) {
-			const businessPurposeTemplate = migrateBusinessPurposeTemplate(
-				template.businessPurposeTemplate
-			);
-			if (businessPurposeTemplate !== template.businessPurposeTemplate) {
-				await ctx.db.patch(template._id, {
-					businessPurposeTemplate,
-					searchText: `${template.title} ${businessPurposeTemplate}`,
-					updatedAt: now
-				});
-				businessPurposeTemplates += 1;
-			}
-		}
-
-		const requests = await ctx.db
-			.query('purchaseRequests')
-			.withIndex('by_owner', (q) => q.eq('owner', owner))
-			.take(500);
-		for (const request of requests) {
-			const businessPurposeSource = sanitizeBusinessPurposeSource(
-				request.businessPurposeSource,
-				request
-			);
-			const activityDate = activityDateForBackfill(request);
-			const shouldPatch =
-				request.activityDate === undefined ||
-				!sameBusinessPurposeSource(businessPurposeSource, request.businessPurposeSource);
-			if (shouldPatch) {
-				await ctx.db.patch(request._id, {
-					activityDate,
-					businessPurposeSource,
-					updatedAt: now
-				});
-				purchaseRequests += 1;
-			}
-		}
-
-		return { organizations, businessPurposeTemplates, purchaseRequests };
+		return await requireOwnedDoc(ctx, 'purchaseRequests', args.draftId, owner);
 	}
 });
 
@@ -533,15 +446,6 @@ export const createDraftForOrganization = authedMutation({
 		const organization = await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
 		const now = Date.now();
 		const draft = emptyDraft(owner, requester, now);
-		const businessPurposeTemplate = migrateBusinessPurposeTemplate(
-			organization.businessPurposeTemplate
-		);
-		if (businessPurposeTemplate !== organization.businessPurposeTemplate) {
-			await ctx.db.patch(organization._id, {
-				businessPurposeTemplate,
-				updatedAt: now
-			});
-		}
 		const previous = await ctx.db
 			.query('purchaseRequests')
 			.withIndex('by_owner_and_organizationSourceId_and_updatedAt', (q) =>
@@ -556,11 +460,11 @@ export const createDraftForOrganization = authedMutation({
 		return await ctx.db.insert('purchaseRequests', {
 			...draft,
 			organizationSourceId: organization._id,
-			studentOrganization: studentOrganizationDetails({ ...organization, businessPurposeTemplate }),
+			studentOrganization: studentOrganizationDetails(organization),
 			budgetLineItem: organization.budgetLines[0] ?? '',
-			businessPurposeSource: parseBusinessPurposeText(businessPurposeTemplate),
+			businessPurposeSource: parseBusinessPurposeText(organization.businessPurposeTemplate),
 			...previousRequestDefaults(
-				previous === null ? null : presentPurchaseRequest(previous),
+				previous,
 				organization,
 				previousPurchaser !== null && previousPurchaser.owner === owner ? previousPurchaser : null
 			)
@@ -798,126 +702,4 @@ function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {
 		recipients: snapshot.recipients,
 		updatedAt: Date.now()
 	};
-}
-
-export function presentPurchaseRequest(request: Doc<'purchaseRequests'>) {
-	return {
-		...request,
-		activityDate: activityDateForBackfill(request),
-		businessPurposeSource: sanitizeBusinessPurposeSource(request.businessPurposeSource, request)
-	};
-}
-
-function activityDateForBackfill(request: Doc<'purchaseRequests'> & { eventDate?: string }) {
-	return request.activityDate ?? request.eventDate ?? '';
-}
-
-function sanitizeBusinessPurposeSource(
-	source: unknown,
-	request: Doc<'purchaseRequests'>
-): BusinessPurposeSource {
-	if (!isBusinessPurposeSource(source)) return { parts: [] };
-	const parts: BusinessPurposePart[] = [];
-	for (const part of source.parts) {
-		if (part.kind === 'text') {
-			parts.push(part);
-			continue;
-		}
-		if (currentBusinessPurposeVariables.has(part.variable)) {
-			parts.push(part as BusinessPurposePart);
-			continue;
-		}
-		if (part.variable === 'eventDate') {
-			parts.push({ kind: 'variable', variable: 'activityDate' });
-			continue;
-		}
-		const text = legacyBusinessPurposeValue(part.variable, request);
-		if (text !== '') parts.push({ kind: 'text', text });
-	}
-	return { parts };
-}
-
-function isBusinessPurposeSource(source: unknown): source is {
-	parts: ({ kind: 'text'; text: string } | { kind: 'variable'; variable: string })[];
-} {
-	if (typeof source !== 'object' || source === null || !('parts' in source)) return false;
-	const parts = (source as { parts: unknown }).parts;
-	return Array.isArray(parts);
-}
-
-const currentBusinessPurposeVariables = new Set([
-	'studentOrganization',
-	'purchaser',
-	'vendor',
-	'itemDescription',
-	'totalAmount',
-	'recipients',
-	'recipientUo95Ids',
-	'activityDate',
-	'activityTime',
-	'activityLocation',
-	'officeLocation',
-	'purpose'
-]);
-
-function legacyBusinessPurposeValue(variable: string, request: Doc<'purchaseRequests'>) {
-	const legacy = request as Doc<'purchaseRequests'> & {
-		eventName?: string;
-		eventTime?: string;
-		eventLocation?: string;
-		eventEstimatedAttendance?: number;
-	};
-	switch (variable) {
-		case 'eventName':
-			return legacy.eventName ?? '';
-		case 'eventTime':
-			return legacy.eventTime ?? '';
-		case 'eventLocation':
-		case 'location':
-			return legacy.eventLocation ?? '';
-		case 'eventEstimatedAttendance':
-		case 'estimatedAttendance':
-		case 'attendance':
-			return legacy.eventEstimatedAttendance === undefined
-				? ''
-				: String(legacy.eventEstimatedAttendance);
-		default:
-			return '';
-	}
-}
-
-function migrateBusinessPurposeTemplate(template: string) {
-	return template
-		.replace(
-			/\{\s*(org|studentOrg|studentOrganization|Student Organization)\s*\}/g,
-			'{Student Organization}'
-		)
-		.replace(/\{\s*(purchaser|Purchaser)\s*\}/g, '{Purchaser}')
-		.replace(/\{\s*(vendor|Vendor)\s*\}/g, '{Vendor}')
-		.replace(/\{\s*(item|itemDescription|Item Description)\s*\}/g, '{Item Description}')
-		.replace(/\{\s*(amount|totalAmount|Total Amount)\s*\}/g, '{Total Amount}')
-		.replace(/\{\s*(recipient|recipientName|recipients|Recipients)\s*\}/g, '{Recipients}')
-		.replace(
-			/\{\s*(recipientUo95|recipientUo95Ids|Recipient UO 95 IDs)\s*\}/g,
-			'{Recipient UO 95 IDs}'
-		)
-		.replace(/\{\s*(officeLocation|Office Location)\s*\}/g, '{Office Location}')
-		.replace(/\{\s*(purpose|Purpose)\s*\}/g, '{Purpose}')
-		.replace(/\{\s*(eventTime|Event Time|activityTime|Activity Time|time|Time)\s*\}/g, '{Time}')
-		.replace(
-			/\{\s*(eventLocation|Event Location|activityLocation|Activity Location|location|Location)\s*\}/g,
-			'{Location}'
-		)
-		.replace(/\{\s*(eventDate|Event Date|activityDate|Activity Date)\s*\}/g, '{Activity Date}')
-		.replace(
-			/\{\s*(recipientReason|reason|eventName|Event Name|eventEstimatedAttendance|Event Estimated Attendance|estimatedAttendance|Estimated Attendance|attendance|Attendance)\s*\}/g,
-			''
-		)
-		.replace(/\s+([,.])/g, '$1')
-		.replace(/[ \t]{2,}/g, ' ')
-		.trim();
-}
-
-function sameBusinessPurposeSource(left: BusinessPurposeSource, right: unknown) {
-	return JSON.stringify(left) === JSON.stringify(right);
 }

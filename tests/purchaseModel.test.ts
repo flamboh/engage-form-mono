@@ -16,6 +16,9 @@ import {
 } from '../convex/purchaseModel';
 import { evaluatePurchaseReadiness } from '../convex/purchaseReadiness';
 
+const businessPurposeTemplate =
+	'{Student Organization} reimburses {Purchaser} for {Item Description} from {Vendor} for {Total Amount} on {Activity Date}.';
+
 const request = {
 	_id: 'purchase_1',
 	_creationTime: 1,
@@ -30,8 +33,7 @@ const request = {
 		indexNumber: 'OS353i',
 		fundLetter: 'I',
 		budgetLines: ['Event Expenses'],
-		businessPurposeTemplate:
-			'{org} reimburses {purchaser} for {item} from {vendor} for {amount} on {activityDate}. Recipient: {recipient} ({recipientUo95}) for {recipientReason}.'
+		businessPurposeTemplate
 	},
 	requester: {
 		id: 'user_1',
@@ -57,7 +59,7 @@ const request = {
 	totalAmount: 22.98,
 	budgetLineItem: 'Event Expenses',
 	reimbursementReason: 'Other processes are too slow.',
-	businessPurposeText: '',
+	businessPurposeSource: parseBusinessPurposeText(businessPurposeTemplate),
 	businessPurposeTouched: false,
 	receiptFileIds: ['file_receipt'],
 	secondApprovalFileId: 'file_approval',
@@ -99,14 +101,18 @@ test('uses the fixed Personal Reimbursement reason for draft patches', () => {
 
 test('renders business purpose from current recorded facts', () => {
 	expect(renderBusinessPurpose(request)).toBe(
-		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 on 2026-05-22. Recipient: Aidan (951951840) for winning trivia.'
+		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 on May 22, 2026.'
 	);
 });
 
-test('renders optional recipient tokens without unresolved placeholders when absent', () => {
-	expect(renderBusinessPurpose({ ...request, recipients: [] })).toBe(
-		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 on 2026-05-22. Recipient: N/A (N/A) for N/A.'
-	);
+test('keeps missing variables as placeholders', () => {
+	expect(
+		renderBusinessPurpose({
+			...request,
+			businessPurposeSource: parseBusinessPurposeText('Prizes for {Recipients}.'),
+			recipients: []
+		})
+	).toBe('Prizes for {Recipients}.');
 });
 
 test('keeps unknown Business Purpose tokens as literal text', () => {
@@ -169,8 +175,7 @@ test('freeform Business Purpose text stays allowed', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
-			businessPurposeSource: parseBusinessPurposeText('Reimburse Oliver for records.'),
-			businessPurposeText: ''
+			businessPurposeSource: parseBusinessPurposeText('Reimburse Oliver for records.')
 		} as Doc<'purchaseRequests'>)
 	).resolves.toEqual({
 		ready: true,
@@ -196,8 +201,7 @@ test('fill payload resolves Business Purpose at read time', async () => {
 			...request,
 			businessPurposeSource: parseBusinessPurposeText(
 				'Reimburse {Purchaser} for {Item Description}.'
-			),
-			businessPurposeText: ''
+			)
 		} as Doc<'purchaseRequests'>)
 	).resolves.toMatchObject({
 		businessPurposeText: 'Reimburse Oliver Boorstein for record.'
@@ -352,9 +356,7 @@ test('Requester-as-Purchaser uses Requester details without a Purchaser Profile'
 });
 
 test('reports a complete Personal Reimbursement purchase request as Ready', async () => {
-	await expect(
-		evaluatePurchaseReadiness({ ...request, businessPurposeText: renderBusinessPurpose(request) })
-	).resolves.toEqual({
+	await expect(evaluatePurchaseReadiness(request)).resolves.toEqual({
 		ready: true,
 		sections: []
 	});
@@ -367,8 +369,7 @@ test('final common facts do not require Activity Date for Ready', async () => {
 			activityDate: '',
 			businessPurposeSource: parseBusinessPurposeText(
 				'Reimburse {Purchaser} for {Item Description} from {Vendor} for {Total Amount}.'
-			),
-			businessPurposeText: ''
+			)
 		} as Doc<'purchaseRequests'>)
 	).resolves.toEqual({
 		ready: true,
@@ -384,8 +385,7 @@ test('requires both sides of the ID card for Personal Reimbursement', async () =
 				...request.purchaser,
 				idCardFrontFileId: 'file_id_document',
 				idCardBackFileId: null as never
-			},
-			businessPurposeText: renderBusinessPurpose(request)
+			}
 		})
 	).resolves.toEqual({
 		ready: false,
@@ -397,8 +397,7 @@ test('requires one to three Receipts for Personal Reimbursement', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
-			receiptFileIds: [],
-			businessPurposeText: renderBusinessPurpose(request)
+			receiptFileIds: []
 		})
 	).resolves.toEqual({
 		ready: false,
@@ -408,8 +407,7 @@ test('requires one to three Receipts for Personal Reimbursement', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
-			receiptFileIds: ['file_receipt_1', 'file_receipt_2', 'file_receipt_3'],
-			businessPurposeText: renderBusinessPurpose(request)
+			receiptFileIds: ['file_receipt_1', 'file_receipt_2', 'file_receipt_3']
 		})
 	).resolves.toEqual({
 		ready: true,
@@ -419,8 +417,7 @@ test('requires one to three Receipts for Personal Reimbursement', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
-			receiptFileIds: ['file_receipt_1', 'file_receipt_2', 'file_receipt_3', 'file_receipt_4'],
-			businessPurposeText: renderBusinessPurpose(request)
+			receiptFileIds: ['file_receipt_1', 'file_receipt_2', 'file_receipt_3', 'file_receipt_4']
 		})
 	).resolves.toEqual({
 		ready: false,
@@ -436,8 +433,7 @@ test('Someone-else purchaser readiness uses a Purchaser Profile scoped to the se
 				organizationSourceId: 'org_1',
 				purchaserSource: { kind: 'purchaser', purchaserId: 'purchaser_1' },
 				purchaser: { ...request.purchaser, id: 'purchaser_1' },
-				secondApprovalFileId: null,
-				businessPurposeText: renderBusinessPurpose(request)
+				secondApprovalFileId: null
 			},
 			{
 				purchaserBelongsToOrganization: async () => false
@@ -460,8 +456,7 @@ test('does not require Publicity Proof when ASUO Funds does not apply', async ()
 			...request,
 			documentationCategories: [],
 			studentOrganization: { ...request.studentOrganization, fundLetter: 'E' },
-			publicityFileId: null,
-			businessPurposeText: renderBusinessPurpose(request)
+			publicityFileId: null
 		})
 	).resolves.toEqual({
 		ready: true,
@@ -493,8 +488,7 @@ test('manual ASUO Funds selection requires Publicity Proof', async () => {
 			...request,
 			documentationCategories: ['asuo_funds'],
 			studentOrganization: { ...request.studentOrganization, fundLetter: 'E' },
-			publicityFileId: null,
-			businessPurposeText: renderBusinessPurpose(request)
+			publicityFileId: null
 		})
 	).resolves.toEqual({
 		ready: false,
@@ -507,8 +501,7 @@ test('Food requires Catering Waiver', async () => {
 		evaluatePurchaseReadiness({
 			...request,
 			documentationCategories: ['food'],
-			cateringWaiverFileId: null,
-			businessPurposeText: renderBusinessPurpose(request)
+			cateringWaiverFileId: null
 		})
 	).resolves.toEqual({
 		ready: false,
@@ -521,8 +514,7 @@ test('Printing Services requires Printing Invoice', async () => {
 		evaluatePurchaseReadiness({
 			...request,
 			documentationCategories: ['printing_services'],
-			printingInvoiceFileId: null,
-			businessPurposeText: renderBusinessPurpose(request)
+			printingInvoiceFileId: null
 		})
 	).resolves.toEqual({
 		ready: false,
@@ -535,8 +527,7 @@ test('Office Supplies/Goods requires Office Location', async () => {
 		evaluatePurchaseReadiness({
 			...request,
 			documentationCategories: ['office_supplies_goods'],
-			officeLocation: '',
-			businessPurposeText: renderBusinessPurpose(request)
+			officeLocation: ''
 		})
 	).resolves.toEqual({
 		ready: false,
@@ -551,8 +542,7 @@ test('Office Supplies/Goods optional documents do not block Ready', async () => 
 			documentationCategories: ['office_supplies_goods'],
 			officeLocation: 'EMU 123',
 			buildingManagerApprovalFileId: null,
-			computerPriceQuoteFileId: null,
-			businessPurposeText: renderBusinessPurpose(request)
+			computerPriceQuoteFileId: null
 		})
 	).resolves.toEqual({
 		ready: true,
@@ -566,8 +556,7 @@ test('Merchandise/Apparel and Gifts/Prizes require recipients', async () => {
 			evaluatePurchaseReadiness({
 				...request,
 				documentationCategories: [category],
-				recipients: [],
-				businessPurposeText: renderBusinessPurpose(request)
+				recipients: []
 			})
 		).resolves.toEqual({
 			ready: false,
@@ -578,8 +567,7 @@ test('Merchandise/Apparel and Gifts/Prizes require recipients', async () => {
 			evaluatePurchaseReadiness({
 				...request,
 				documentationCategories: [category],
-				recipients: [{ name: '', uo95: '', reason: '', value: 0 }],
-				businessPurposeText: renderBusinessPurpose(request)
+				recipients: [{ name: '', uo95: '', reason: '', value: 0 }]
 			})
 		).resolves.toEqual({
 			ready: false,
@@ -603,8 +591,7 @@ test('Recipient reason, dollar limits, total matching, and Brand Approval do not
 			...request,
 			documentationCategories: ['merchandise_apparel'],
 			totalAmount: 10,
-			recipients: [{ name: 'Aidan', uo95: '951951840', reason: '', value: 75 }],
-			businessPurposeText: renderBusinessPurpose(request)
+			recipients: [{ name: 'Aidan', uo95: '951951840', reason: '', value: 75 }]
 		})
 	).resolves.toEqual({
 		ready: true,
@@ -616,8 +603,7 @@ test('assembled Merchandise/Apparel purchase includes optional Brand Approval', 
 	const purchase = await assemblePurchase(fileCtx(), {
 		...request,
 		documentationCategories: ['merchandise_apparel'],
-		brandApprovalFileId: 'file_brand_approval',
-		businessPurposeText: renderBusinessPurpose(request)
+		brandApprovalFileId: 'file_brand_approval'
 	});
 
 	expect(purchase).toMatchObject({ brandApprovalFileId: 'file_brand_approval' });
@@ -631,8 +617,7 @@ test('category requirements are additive', async () => {
 			documentationCategories: ['food', 'printing_services', 'office_supplies_goods'],
 			cateringWaiverFileId: null,
 			printingInvoiceFileId: null,
-			officeLocation: '',
-			businessPurposeText: renderBusinessPurpose(request)
+			officeLocation: ''
 		})
 	).resolves.toEqual({
 		ready: false,
@@ -698,7 +683,7 @@ test('reports blocked Draft reasons grouped by section', async () => {
 			itemDescription: '',
 			totalAmount: 0,
 			budgetLineItem: '',
-			businessPurposeText: 'Reimburse {purchaser}.',
+			businessPurposeSource: parseBusinessPurposeText('Move supplies to {Office Location}.'),
 			receiptFileIds: [],
 			secondApprovalFileId: null,
 			publicityFileId: null
@@ -762,7 +747,7 @@ test('Ready gate rejects blocked Drafts with sectioned reasons', async () => {
 	await expect(
 		assertReady(ctx as never, {
 			...request,
-			businessPurposeText: 'Reimburse {purchaser}.',
+			businessPurposeSource: parseBusinessPurposeText('Move supplies to {Office Location}.'),
 			receiptFileIds: [],
 			publicityFileId: null
 		})
@@ -784,8 +769,7 @@ test('Ready gate rejects document ids that are not owned records', async () => {
 
 	await expect(
 		assertReady(ctx as never, {
-			...request,
-			businessPurposeText: renderBusinessPurpose(request)
+			...request
 		})
 	).rejects.toThrow(
 		['Purchase request is not ready.', 'Files: Receipt document missing.'].join('\n')
