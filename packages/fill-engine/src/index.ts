@@ -38,6 +38,12 @@ export type FillAction =
 	| { type: 'file'; labelIncludes: string; files: Document[] }
 	| { type: 'stop'; message: string };
 
+export const engageFormUrlPrefix = 'https://uoregon.campuslabs.com/engage/submitter/form/';
+
+export function isEngageFormUrl(url: string | undefined) {
+	return url?.startsWith(engageFormUrlPrefix) === true;
+}
+
 export type FillPlan = {
 	step: EngageStep;
 	actions: FillAction[];

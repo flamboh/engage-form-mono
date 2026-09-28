@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { samplePurchaseRequest } from '../../domain/src/index.ts';
-import { createFillPlan, detectStep, engageSchema } from './index.ts';
+import { createFillPlan, detectStep, engageSchema, isEngageFormUrl } from './index.ts';
 
 test('detects Engage steps by heading', () => {
 	expect(detectStep('SOFS Request Organization Representation')).toBe('organizationRepresentation');
@@ -384,4 +384,16 @@ test('creates separate upload actions for additional receipts', () => {
 		labelIncludes: 'RECEIPT : Optional third upload',
 		files: [thirdReceipt]
 	});
+});
+
+test('recognizes Engage submitter form pages', () => {
+	expect(
+		isEngageFormUrl('https://uoregon.campuslabs.com/engage/submitter/form/start/730239')
+	).toBe(true);
+	expect(
+		isEngageFormUrl('https://uoregon.campuslabs.com/engage/submitter/form/step/1?Guid=abc')
+	).toBe(true);
+	expect(isEngageFormUrl('https://uoregon.campuslabs.com/engage/organizations')).toBe(false);
+	expect(isEngageFormUrl('https://evil.example/engage/submitter/form/start/1')).toBe(false);
+	expect(isEngageFormUrl(undefined)).toBe(false);
 });
