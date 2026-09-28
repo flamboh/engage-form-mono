@@ -16,6 +16,7 @@ export type AnalyzeExpenseResponse = {
 export type AwsCredentials = {
 	accessKeyId: string;
 	secretAccessKey: string;
+	sessionToken?: string;
 	region: string;
 };
 
@@ -30,6 +31,7 @@ export async function analyzeExpense(
 	const client = new AwsClient({
 		accessKeyId: credentials.accessKeyId,
 		secretAccessKey: credentials.secretAccessKey,
+		sessionToken: credentials.sessionToken,
 		region: credentials.region,
 		service: 'textract'
 	});

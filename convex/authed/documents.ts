@@ -21,7 +21,7 @@ import {
 	slotOf,
 	type Slot
 } from '../extraction/apply';
-import { applyReceiptFields } from '../extraction/jobs';
+import { applyReceiptFields, extractionTimeoutMs } from '../extraction/jobs';
 import { authedMutation, authedQuery } from './helpers';
 import { presentPurchaseRequest } from './purchaseBuilder';
 
@@ -171,6 +171,9 @@ async function startExtraction(
 	await ctx.scheduler.runAfter(0, internal.extraction.jobs.extractFile, {
 		extractionId,
 		classify
+	});
+	await ctx.scheduler.runAfter(extractionTimeoutMs, internal.extraction.jobs.expireExtraction, {
+		extractionId
 	});
 }
 

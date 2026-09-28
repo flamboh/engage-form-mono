@@ -73,6 +73,24 @@ export const refreshDefaults = internalAction({
 	}
 });
 
+export const extractionTimeoutMs = 3 * 60 * 1000;
+
+export const expireExtraction = internalMutation({
+	args: { extractionId: v.id('extractions') },
+	handler: async (ctx, args) => {
+		const extraction = await ctx.db.get(args.extractionId);
+		if (extraction === null) return null;
+		if (extraction.status !== 'pending' && extraction.status !== 'running') return null;
+		if (Date.now() - extraction.updatedAt < extractionTimeoutMs - 10_000) return null;
+		await ctx.db.patch(args.extractionId, {
+			status: 'failed',
+			error: 'Reading the document timed out.',
+			updatedAt: Date.now()
+		});
+		return null;
+	}
+});
+
 export const startExtraction = internalMutation({
 	args: { extractionId: v.id('extractions') },
 	handler: async (ctx, args) => {
@@ -279,5 +297,6 @@ function extractionEnv(): ExtractionEnv {
 	if (!jevKey || !accessKeyId || !secretAccessKey) {
 		throw new Error('Receipt reading is not configured.');
 	}
-	return { jevKey, aws: { accessKeyId, secretAccessKey, region } };
+	const sessionToken = process.env.AWS_SESSION_TOKEN || undefined;
+	return { jevKey, aws: { accessKeyId, secretAccessKey, sessionToken, region } };
 }

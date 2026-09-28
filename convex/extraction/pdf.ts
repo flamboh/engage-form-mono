@@ -5,8 +5,10 @@ import type { DocumentText } from './candidates';
 export type PdfText = { pageCount: number; text: DocumentText | null };
 
 export async function pdfText(bytes: Uint8Array): Promise<PdfText> {
-	const pdf = await getDocumentProxy(bytes.slice());
-	const { totalPages, text } = await extractText(pdf, { mergePages: false });
+	const { totalPages, text } = await withoutTransferableClones(async () => {
+		const pdf = await getDocumentProxy(bytes.slice());
+		return await extractText(pdf, { mergePages: false });
+	});
 	const lines = text
 		.flatMap((page) => page.split('\n'))
 		.map((line) => line.replace(/\s+/g, ' ').trim())
@@ -25,4 +27,14 @@ export async function firstPagePdf(bytes: Uint8Array) {
 	const [page] = await output.copyPages(source, [0]);
 	output.addPage(page);
 	return await output.save();
+}
+
+async function withoutTransferableClones<T>(run: () => Promise<T>) {
+	const original = globalThis.structuredClone;
+	globalThis.structuredClone = ((value: unknown) => original(value)) as typeof structuredClone;
+	try {
+		return await run();
+	} finally {
+		globalThis.structuredClone = original;
+	}
 }
