@@ -376,7 +376,7 @@ test('final common facts do not require Activity Date for Ready', async () => {
 	});
 });
 
-test('accepts one ID Card Document for Personal Reimbursement', async () => {
+test('requires both sides of the ID card for Personal Reimbursement', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
@@ -388,8 +388,8 @@ test('accepts one ID Card Document for Personal Reimbursement', async () => {
 			businessPurposeText: renderBusinessPurpose(request)
 		})
 	).resolves.toEqual({
-		ready: true,
-		sections: []
+		ready: false,
+		sections: [{ section: 'Purchaser', reasons: ['Back of ID card missing.'] }]
 	});
 });
 

@@ -70,6 +70,7 @@ export async function evaluatePurchaseReadiness(
 	requireSectionText('Purchaser', request.purchaser.uo95, 'Purchaser UO 95 missing.');
 	requireSectionText('Purchaser', request.purchaser.permanentAddress, 'Purchaser address missing.');
 	requireSectionText('Purchaser', request.purchaser.idCardFrontFileId, 'ID card document missing.');
+	if (request.purchaser.idCardBackFileId === null) add('Purchaser', 'Back of ID card missing.');
 
 	requireSectionText('Purchase details', request.vendor, 'Vendor missing.');
 	requireSectionText('Purchase details', request.itemDescription, 'Item description missing.');
@@ -144,7 +145,7 @@ export async function evaluatePurchaseReadiness(
 				options.documentExists,
 				request.purchaser.idCardBackFileId,
 				'Purchaser',
-				'Second ID card document missing.'
+				'Back of ID card missing.'
 			);
 		}
 		if (request.receiptFileIds.length > 0) {

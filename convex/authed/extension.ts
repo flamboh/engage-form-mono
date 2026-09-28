@@ -14,7 +14,7 @@ import { assembledPurchase, nullReturn } from '../purchaseZod';
 import { authedMutation, authedQuery } from './helpers';
 
 export const engagePurchaseRequestUrl =
-	'https://uoregon.campuslabs.com/engage/submitter/form/start/730239';
+	'https://uoregon.campuslabs.com/engage/forms?query=request%20to%20purchase';
 
 export const pendingFillMaxAgeMs = 30 * 60_000;
 

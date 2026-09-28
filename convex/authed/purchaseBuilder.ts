@@ -106,9 +106,8 @@ export const upsertUserProfile = authedMutation({
 		requireText(args.studentEmail, 'Student email missing.');
 		requireText(args.phone, 'Phone missing.');
 		await requireOwnedDoc(ctx, 'files', args.idCardFrontFileId, owner);
-		if (args.idCardBackFileId !== null) {
-			await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
-		}
+		if (args.idCardBackFileId === null) throw new Error('Back of ID card missing.');
+		await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
 		const fields = {
 			owner,
 			name: args.name,
@@ -283,9 +282,8 @@ export const upsertPurchaser = authedMutation({
 		const owner = ownerFromIdentity(ctx.identity);
 		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
 		await requireOwnedDoc(ctx, 'files', args.idCardFrontFileId, owner);
-		if (args.idCardBackFileId !== null) {
-			await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
-		}
+		if (args.idCardBackFileId === null) throw new Error('Back of ID card missing.');
+		await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
 		requireText(args.name, 'Purchaser name missing.');
 		requireText(args.uo95, 'UO 95 missing.');
 		requireText(args.permanentAddress, 'Permanent address missing.');

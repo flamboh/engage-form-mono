@@ -33,13 +33,14 @@
 	let uo95 = $state(start?.uo95 ?? '');
 	let permanentAddress = $state(start?.permanentAddress ?? '');
 	let idCardFrontFileId = $state<Id<'files'> | null>(start?.idCardFrontFileId ?? null);
+	let idCardBackFileId = $state<Id<'files'> | null>(start?.idCardBackFileId ?? null);
 	let saving = $state(false);
 	let error = $state('');
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
-		if (idCardFrontFileId === null) {
-			error = 'Add a photo of your UO ID card to continue.';
+		if (idCardFrontFileId === null || idCardBackFileId === null) {
+			error = 'Add photos of the front and back of your UO ID card to continue.';
 			return;
 		}
 		error = '';
@@ -52,7 +53,7 @@
 				studentEmail: studentEmail.trim(),
 				phone: phone.trim(),
 				idCardFrontFileId,
-				idCardBackFileId: start?.idCardBackFileId ?? null
+				idCardBackFileId
 			});
 			await onSaved();
 		} catch (err) {
@@ -99,12 +100,16 @@
 			bind:value={permanentAddress}
 		/>
 	</label>
-	<DocumentPicker
-		bind:fileId={idCardFrontFileId}
-		kind="id_front"
-		label="Photo of your UO ID card"
-		hint="Engage asks for it on every reimbursement. We keep it so you only add it once."
-	/>
+	<div class="flex flex-col gap-2">
+		<p class="text-xs text-stone-500">
+			Engage asks for both sides of your UO ID card on every reimbursement. We keep them so you only
+			add them once.
+		</p>
+		<div class="grid gap-5 sm:grid-cols-2">
+			<DocumentPicker bind:fileId={idCardFrontFileId} kind="id_front" label="UO ID card, front" />
+			<DocumentPicker bind:fileId={idCardBackFileId} kind="id_back" label="UO ID card, back" />
+		</div>
+	</div>
 	{#if error}<p class="text-sm text-red-700" role="alert">{error}</p>{/if}
 	<div>
 		<button class={primaryButtonClass} type="submit" disabled={saving}>

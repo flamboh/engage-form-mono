@@ -163,7 +163,7 @@ const sectionCopy: Record<string, Copy> = {
 	Purchaser: {
 		key: 'purchaser',
 		label: 'Finish the purchaser’s saved details',
-		detail: 'Their UO ID, address, or ID card is missing.',
+		detail: 'Their UO ID number, address, or a photo of either side of their ID card is missing.',
 		target: { kind: 'field', field: 'purchaser' },
 		waitsForReceipt: false
 	},

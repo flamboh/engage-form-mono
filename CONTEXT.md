@@ -109,7 +109,7 @@ A document showing another eligible approver approved reimbursement when the req
 _Avoid_: Approval file, self approval
 
 **ID Card Document**:
-A document showing a purchaser's UO ID card. At least one is required; a second is optional.
+A document showing one side of a purchaser's UO ID card. Both the front and the back are required.
 _Avoid_: ID card image, ID file, card upload
 
 ## Relationships
@@ -167,4 +167,4 @@ _Avoid_: ID card image, ID file, card upload
 - "user profile" describes application state; resolved: use **Requester** for the domain source of requester autofill details.
 - "file" describes storage; resolved: use **Document** for evidence attached to a **Purchase Request**.
 - "requester is purchaser" describes the rule mechanically; resolved: use **Self Reimbursement** for that domain case.
-- A purchaser needs at least one **ID Card Document**; a second **ID Card Document** is optional.
+- A purchaser needs two **ID Card Documents**: the front and the back of their UO ID card.

@@ -26,6 +26,7 @@
 	let uo95 = $state(start?.uo95 ?? '');
 	let permanentAddress = $state(start?.permanentAddress ?? '');
 	let idCardFrontFileId = $state<Id<'files'> | null>(start?.idCardFrontFileId ?? null);
+	let idCardBackFileId = $state<Id<'files'> | null>(start?.idCardBackFileId ?? null);
 	let saving = $state(false);
 	let error = $state('');
 
@@ -35,8 +36,8 @@
 			error = 'Choose an organization.';
 			return;
 		}
-		if (idCardFrontFileId === null) {
-			error = 'Add a photo of their UO ID card.';
+		if (idCardFrontFileId === null || idCardBackFileId === null) {
+			error = 'Add photos of the front and back of their UO ID card.';
 			return;
 		}
 		error = '';
@@ -49,7 +50,7 @@
 				uo95: uo95.trim(),
 				permanentAddress: permanentAddress.trim(),
 				idCardFrontFileId,
-				idCardBackFileId: start?.idCardBackFileId ?? null
+				idCardBackFileId
 			});
 			onDone();
 		} catch (err) {
@@ -83,11 +84,10 @@
 		Permanent address
 		<input class={inputClass} required bind:value={permanentAddress} />
 	</label>
-	<DocumentPicker
-		bind:fileId={idCardFrontFileId}
-		kind="id_front"
-		label="Photo of their UO ID card"
-	/>
+	<div class="grid gap-5 sm:grid-cols-2">
+		<DocumentPicker bind:fileId={idCardFrontFileId} kind="id_front" label="UO ID card, front" />
+		<DocumentPicker bind:fileId={idCardBackFileId} kind="id_back" label="UO ID card, back" />
+	</div>
 	{#if error}<p class="text-sm text-red-700" role="alert">{error}</p>{/if}
 	<div class="flex items-center gap-3">
 		<button class={primaryButtonClass} type="submit" disabled={saving}>
