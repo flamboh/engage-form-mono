@@ -73,7 +73,7 @@ Route: `/app/welcome/[step]`. Steps in order:
 
 1. `profile` — Create `users` row. Fields above. ID card documents uploaded inline. No skip.
 2. `org` — Create first student organization with `budgetLines` as a repeatable list of strings. Business purpose template prefilled with a sensible default. No skip.
-3. `done` — Success screen with the primary CTA: **Build your first request** → `/app/purchase/new`.
+3. `done` — Success screen with the primary CTA: **Build your first request** → a new draft on the Student Organization board.
 
 ### Gating
 
@@ -110,7 +110,7 @@ Triggered by the layout guard above, not by a sign-in event. This means the wiza
 - Remove the requester-related UI (no `isRequester` toggle, no email/phone fields on the form).
 - Add a "Profile" entry point that opens an edit view of the current `users` row.
 
-### Builder (`/app/purchase/new`)
+### Request page (`/app/org/[organizationId]/purchase/[purchaseRequestId]`)
 
 - Remove the requester-person picker entirely.
 - Purchaser section shows a toggle: **I'm the purchaser** (default, `kind: "self"`) / **Someone else** (reveals purchaser picker, `kind: "purchaser"`).

@@ -151,19 +151,6 @@ export const organizationDoc = z.object({
 	updatedAt: z.number()
 });
 
-export const fileDoc = z.object({
-	_id: zid('files'),
-	_creationTime: z.number(),
-	owner: z.string(),
-	kind: fileKind,
-	storageId: zid('_storage').optional(),
-	r2Key: z.string().optional(),
-	filename: z.string(),
-	contentType: z.string(),
-	size: z.number(),
-	createdAt: z.number()
-});
-
 export const purchaserDoc = z.object({
 	_id: zid('purchasers'),
 	_creationTime: z.number(),
@@ -247,9 +234,9 @@ export const wizardSnapshot = z.object({
 	budgetLineItem: z.string(),
 	businessPurposeText: z.string(),
 	businessPurposeTouched: z.boolean(),
-	purpose: z.string().optional(),
-	activityTime: z.string().optional(),
-	activityLocation: z.string().optional(),
+	purpose: z.string(),
+	activityTime: z.string(),
+	activityLocation: z.string(),
 	receiptFileIds: z.array(zid('files')),
 	secondApprovalFileId: zid('files').nullable(),
 	publicityFileId: zid('files').nullable(),
@@ -268,8 +255,7 @@ export const documentPayload = z.object({
 	filename: z.string(),
 	contentType: z.string(),
 	size: z.number(),
-	storageKey: z.string(),
-	url: z.string().nullable()
+	url: z.string()
 });
 
 export const assembledPurchase = z.object({
@@ -306,5 +292,3 @@ export const assembledPurchase = z.object({
 	recipients: z.array(recipient),
 	documents: z.array(documentPayload)
 });
-
-export type WizardSnapshot = z.infer<typeof wizardSnapshot>;

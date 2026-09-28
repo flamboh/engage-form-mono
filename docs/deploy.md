@@ -74,14 +74,3 @@ Tickets are only valid for up to about 2 hours, so rotating the secret just brea
 2. Set it on the Worker: `bunx wrangler secret put FILES_SIGNING_SECRET < secret.txt`, run in `apps/web`.
 3. Set it on both Convex deployments with the same value, using `bunx convex env set --from-file` with and without `--prod`.
 4. Delete the local secret file.
-
-## Migrating legacy Convex storage files
-
-Files uploaded before R2 have `storageId` and no `r2Key`. They keep working through Convex storage URLs. To move them into R2, run this once per deployment:
-
-```sh
-bunx convex run files:migrateLegacyFiles '{}'
-bunx convex run --prod files:migrateLegacyFiles '{}'
-```
-
-The action processes the `files` table in batches of 25 and schedules itself until it's done. For each legacy file, it uploads the blob through a signed ticket, sets `r2Key`, clears `storageId`, and deletes the old blob. Running it again is safe, because migrated files are skipped.

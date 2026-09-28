@@ -14,7 +14,6 @@ import {
 } from '../convex/extraction/apply';
 import {
 	changedSnapshotPatch,
-	keepFilledFields,
 	parseBusinessPurposeText,
 	previousRequestDefaults,
 	userFieldSources
@@ -306,21 +305,6 @@ test('snapshot edits mark changed fields as user-set', () => {
 		userFieldSources(filled, { vendor: 'Bigbox', totalAmount: 28.48, budgetLineItem: 'Food' })
 	).toEqual({ vendor: 'user', totalAmount: 'receipt', budgetLineItem: 'user' });
 	expect(userFieldSources(filled, { vendor: 'Bigbox Wholesale' })).toBe(filled.fieldSources);
-});
-
-test('stale empty snapshots do not erase receipt-filled fields', () => {
-	const filled = {
-		...draft,
-		vendor: 'Bigbox Wholesale',
-		totalAmount: 28.48,
-		activityDate: '2025-10-14',
-		fieldSources: { vendor: 'receipt', totalAmount: 'receipt', activityDate: 'default' }
-	} as Doc<'purchaseRequests'>;
-	expect(
-		keepFilledFields(filled, { vendor: '', totalAmount: 0, activityDate: '', itemDescription: '' })
-	).toEqual({ itemDescription: '' });
-	const typed = { ...filled, fieldSources: { vendor: 'user' } } as Doc<'purchaseRequests'>;
-	expect(keepFilledFields(typed, { vendor: '' })).toEqual({ vendor: '' });
 });
 
 test('snapshot saves with changedFields only apply and mark the edited fields', () => {

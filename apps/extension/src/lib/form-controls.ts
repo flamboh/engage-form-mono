@@ -55,10 +55,10 @@ export async function setComboBox(labelIncludes: string, valueIncludes: string) 
 
 export async function setFiles(
 	labelIncludes: string,
-	files: { filename: string; contentType: string; storageKey: string }[],
+	files: { filename: string; contentType: string }[],
 	uploadFiles: (
 		selector: string,
-		files: { filename: string; contentType: string; storageKey: string }[],
+		files: { filename: string; contentType: string }[],
 		dropSelector: string
 	) => Promise<FileUploadResult>
 ) {

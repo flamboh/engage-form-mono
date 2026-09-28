@@ -10,7 +10,6 @@ import {
 import { internal } from '../_generated/api';
 import { readFileBytes } from '../files';
 import { demoteIfNotReady, renderBusinessPurpose } from '../purchaseModel';
-import { presentPurchaseRequest } from '../authed/purchaseBuilder';
 import { isCurrentAttempt, placeDocument, receiptFieldsPatch, slotForKind, slotOf } from './apply';
 import { documentKinds, type DocumentExtraction, type ParsedField } from './jev';
 import { decideDefaults, extractDocument, readDocumentText, type ExtractionEnv } from './pipeline';
@@ -205,7 +204,7 @@ export const decisionContext = internalQuery({
 		return {
 			vendor: request.vendor,
 			itemDescription: request.itemDescription,
-			businessPurpose: renderBusinessPurpose(presentPurchaseRequest(request)),
+			businessPurpose: renderBusinessPurpose(request),
 			budgetLines: decideBudget ? request.studentOrganization.budgetLines : []
 		};
 	}

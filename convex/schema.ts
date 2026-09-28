@@ -64,19 +64,10 @@ const businessPurposeVariable = v.union(
 	v.literal('recipients'),
 	v.literal('recipientUo95Ids'),
 	v.literal('activityDate'),
-	v.literal('officeLocation'),
-	v.literal('purpose'),
-	// Deprecated Business Purpose variables. Kept until old rows are backfilled.
-	v.literal('eventName'),
-	v.literal('eventDate'),
-	v.literal('eventTime'),
-	v.literal('eventLocation'),
-	v.literal('eventEstimatedAttendance'),
 	v.literal('activityTime'),
 	v.literal('activityLocation'),
-	v.literal('estimatedAttendance'),
-	v.literal('attendance'),
-	v.literal('location')
+	v.literal('officeLocation'),
+	v.literal('purpose')
 );
 
 const businessPurposeSource = v.object({
@@ -157,8 +148,7 @@ export default defineSchema({
 	files: defineTable({
 		owner: v.string(),
 		kind: fileKind,
-		storageId: v.optional(v.id('_storage')),
-		r2Key: v.optional(v.string()),
+		r2Key: v.string(),
 		filename: v.string(),
 		contentType: v.string(),
 		size: v.number(),
@@ -205,13 +195,7 @@ export default defineSchema({
 		studentOrganization: studentOrganizationDetails,
 		requester: requesterDetails,
 		purchaser: purchaserDetails,
-		activityDate: v.optional(v.string()),
-		// Deprecated after Activity Date replaced Event Details. Kept optional until old rows are backfilled.
-		eventName: v.optional(v.string()),
-		eventDate: v.optional(v.string()),
-		eventTime: v.optional(v.string()),
-		eventLocation: v.optional(v.string()),
-		eventEstimatedAttendance: v.optional(v.number()),
+		activityDate: v.string(),
 		vendor: v.string(),
 		itemDescription: v.string(),
 		totalAmount: v.number(),

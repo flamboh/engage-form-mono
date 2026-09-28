@@ -27,7 +27,6 @@ import {
 } from '../extraction/apply';
 import { applyReceiptFields, extractionTimeoutMs } from '../extraction/jobs';
 import { authedMutation, authedQuery } from './helpers';
-import { presentPurchaseRequest } from './purchaseBuilder';
 
 export const getRequestView = authedQuery({
 	args: { id: zid('purchaseRequests') },
@@ -45,7 +44,7 @@ export const getRequestView = authedQuery({
 			const file = await ctx.db.get(fileId);
 			if (file === null || file.owner !== owner) continue;
 			const extraction = extractionsByFile.get(fileId) ?? null;
-			const url = await previewUrl(ctx, file);
+			const url = await previewUrl(file);
 			documents.push({
 				fileId,
 				kind: file.kind,
@@ -58,32 +57,14 @@ export const getRequestView = authedQuery({
 					(slot === 'receipt' && url === null && extraction?.status !== 'done')
 			});
 		}
-		const purchase = presentPurchaseRequest(request);
 		return {
-			purchase,
+			purchase: request,
 			documents,
 			reading: documents.some((document) => document.reading),
 			reviews: requestReviews(request, extractions),
 			readiness: await purchaseReadiness(ctx, request),
-			businessPurposeText: renderBusinessPurpose(purchase)
+			businessPurposeText: renderBusinessPurpose(request)
 		};
-	}
-});
-
-export const attachDocuments = authedMutation({
-	args: {
-		purchaseRequestId: zid('purchaseRequests'),
-		fileIds: z.array(zid('files')),
-		slot: z.union([documentSlot, z.literal('auto')])
-	},
-	returns: nullReturn,
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
-		requireEditableDocuments(request);
-		for (const fileId of args.fileIds) await requireOwnedDoc(ctx, 'files', fileId, owner);
-		await attachFiles(ctx, request, args.fileIds, args.slot);
-		return null;
 	}
 });
 
@@ -260,9 +241,9 @@ async function extractionForFile(ctx: MutationCtx, fileId: Id<'files'>) {
 		.first();
 }
 
-async function previewUrl(ctx: Parameters<typeof fileDownloadUrl>[0], file: Doc<'files'>) {
+async function previewUrl(file: Doc<'files'>) {
 	try {
-		return await fileDownloadUrl(ctx, file);
+		return await fileDownloadUrl(file);
 	} catch {
 		return null;
 	}
