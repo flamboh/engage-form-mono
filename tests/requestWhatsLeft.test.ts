@@ -78,3 +78,21 @@ test('reasons map to plain language without jargon', () => {
 	expect(labels).toContain('Add Publicity Proof');
 	expect(labels.join(' ')).not.toMatch(/fund letter|confidence|OCR/i);
 });
+
+test('a removed-receipt check asks whether the typed value is still right', () => {
+	const items = whatsLeft({
+		readiness,
+		reviews: [
+			{
+				field: 'vendor',
+				value: 'Test Edited Store',
+				alternatives: ['Amazon'],
+				receiptRemoved: true
+			}
+		],
+		reading: false
+	});
+	const review = items.find((item) => item.key === 'review-vendor');
+	expect(review).toMatchObject({ label: 'Check the store' });
+	expect(review?.detail).toBe('You removed a receipt. Is Test Edited Store still right?');
+});

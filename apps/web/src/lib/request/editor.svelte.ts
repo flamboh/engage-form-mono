@@ -1,4 +1,5 @@
 import type { Doc, Id } from '$convex/_generated/dataModel';
+import { mentionsPurpose, withPurpose } from '$convex/businessPurpose';
 import type { DocumentSlot, RequestView } from '$convex/requestView';
 import {
 	formatBusinessPurposeSource,
@@ -44,6 +45,7 @@ export type FormState = {
 export type RequestBackend = {
 	saveSnapshot(snapshot: FormState, changedFields: (keyof FormState)[]): Promise<void>;
 	applyTemplate(templateId: Id<'businessPurposeTemplates'>): Promise<void>;
+	saveOrganizationTemplate(businessPurposeTemplate: string): Promise<void>;
 	resolveReview(field: ReviewField, value: string): Promise<void>;
 	removeDocument(fileId: Id<'files'>): Promise<void>;
 	retryReading(fileId: Id<'files'>): Promise<void>;
@@ -202,6 +204,29 @@ export class RequestEditor {
 			purchaserSource: { kind: 'purchaser', purchaserId: purchaser._id },
 			purchaser: savedPurchaserDetails(purchaser)
 		});
+	}
+
+	setPurpose(purpose: string, options: { debounce?: boolean } = {}) {
+		const text = this.form?.businessPurposeText ?? '';
+		const append = purpose.trim() !== '' && !mentionsPurpose(text);
+		this.update(
+			append
+				? { purpose, businessPurposeText: withPurpose(text), businessPurposeTouched: true }
+				: { purpose },
+			options
+		);
+		return append;
+	}
+
+	async saveSentenceForFuture() {
+		let saved = false;
+		await this.#run(async () => {
+			await this.flush();
+			const text = this.form?.businessPurposeText ?? '';
+			await this.#backend().saveOrganizationTemplate(text);
+			saved = true;
+		});
+		return saved;
 	}
 
 	async applyTemplate(templateId: Id<'businessPurposeTemplates'>) {

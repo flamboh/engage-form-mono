@@ -24,7 +24,6 @@ type Extraction = Pick<
 	Doc<'extractions'>,
 	'fileId' | 'status' | 'vendor' | 'totalAmount' | 'receiptDate' | 'items'
 >;
-type RemovedExtraction = Pick<Doc<'extractions'>, 'status' | 'vendor' | 'items'>;
 type ExtractedField = NonNullable<Doc<'extractions'>['vendor']>;
 type ReceiptFacts = { vendor: string; totalAmount: string; receiptDate: string; items: string[] };
 
@@ -189,7 +188,12 @@ export function receiptFieldsPatch(request: Request, extractions: Extraction[]):
 	return patch;
 }
 
-export type Review = { field: ReviewField; value: string; alternatives: string[] };
+export type Review = {
+	field: ReviewField;
+	value: string;
+	alternatives: string[];
+	receiptRemoved?: boolean;
+};
 
 export function requestReviews(request: Request, extractions: Extraction[]): Review[] {
 	const receipts = receiptExtractions(request, extractions);
@@ -223,7 +227,7 @@ export function requestReviews(request: Request, extractions: Extraction[]): Rev
 	for (const check of activeReceiptChecks(request)) {
 		const suggestion = suggestions[check.field];
 		const alternatives = suggestion === '' || suggestion === check.value ? [] : [suggestion];
-		reviews.push({ field: check.field, value: check.value, alternatives });
+		reviews.push({ field: check.field, value: check.value, alternatives, receiptRemoved: true });
 	}
 	return reviews;
 }
@@ -238,43 +242,16 @@ export function activeReceiptChecks(request: Request): ReceiptCheck[] {
 	);
 }
 
-export function receiptRemovalChecks(
-	request: Request,
-	removed: RemovedExtraction | null
-): ReceiptCheck[] {
+export function receiptRemovalChecks(request: Request): ReceiptCheck[] {
 	const sources = request.fieldSources ?? {};
 	const checks = activeReceiptChecks(request);
 	for (const field of ['vendor', 'itemDescription'] as const) {
 		const value = request[field];
 		if (sources[field] !== 'user' || value.trim() === '') continue;
 		if (checks.some((check) => check.field === field)) continue;
-		if (mayReference(value, removedMentions(field, removed))) checks.push({ field, value });
+		checks.push({ field, value });
 	}
 	return checks;
-}
-
-function removedMentions(field: CheckField, removed: RemovedExtraction | null) {
-	if (removed === null || removed.status !== 'done') return null;
-	if (field === 'itemDescription') return removed.items;
-	if (removed.vendor === null) return [];
-	return [removed.vendor.value, ...removed.vendor.alternatives];
-}
-
-function mayReference(value: string, mentions: string[] | null) {
-	if (mentions === null) return true;
-	const words = wordsOf(value);
-	return mentions.some((mention) =>
-		wordsOf(mention).some((word) =>
-			words.some((other) => word.startsWith(other) || other.startsWith(word))
-		)
-	);
-}
-
-function wordsOf(text: string) {
-	return text
-		.toLowerCase()
-		.split(/[^a-z0-9]+/)
-		.filter((word) => word.length >= 3 && !/^\d+$/.test(word));
 }
 
 function currentValue(request: Request, field: ExtractedReviewField) {

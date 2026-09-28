@@ -129,7 +129,7 @@ export const removeDocument = authedMutation({
 		const extraction = await extractionForFile(ctx, args.fileId);
 		await ctx.db.patch(request._id, {
 			...detachDocument(request, args.fileId),
-			...(slot === 'receipt' ? { receiptChecks: receiptRemovalChecks(request, extraction) } : {}),
+			...(slot === 'receipt' ? { receiptChecks: receiptRemovalChecks(request) } : {}),
 			updatedAt: Date.now()
 		});
 		if (extraction !== null && extraction.purchaseRequestId === request._id) {

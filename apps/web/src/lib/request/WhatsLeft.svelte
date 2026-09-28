@@ -21,6 +21,8 @@
 	let expanded = $state(false);
 	const shown = $derived(expanded ? items : items.slice(0, collapsedCount));
 	const hiddenCount = $derived(items.length - shown.length);
+	const mobileCount = $derived(reading ? 1 : 2);
+	const mobileHiddenCount = $derived(expanded ? 0 : Math.max(0, items.length - mobileCount));
 </script>
 
 <section id="whats-left" class="flex flex-col gap-3" aria-labelledby="left-heading">
@@ -31,18 +33,24 @@
 		<h2 id="left-heading" class="text-lg font-semibold text-(--ink)">What’s left</h2>
 		<ol class="flex flex-col border-t border-(--line)">
 			{#if reading}
-				<li class="flex items-center gap-3 border-b border-(--line) py-3" role="status">
+				<li class="flex items-center gap-3 border-b border-(--line) py-2 lg:py-3" role="status">
 					<span class="pulse size-2 shrink-0 bg-(--marker-deep)" aria-hidden="true"></span>
 					<span class="flex flex-col">
 						<span class="text-sm font-medium text-(--ink)">Reading your receipt</span>
-						<span class="text-sm text-(--quiet)"
+						<span class="text-sm text-(--quiet) max-lg:hidden"
 							>The store, items, and total will fill in on their own.</span
 						>
 					</span>
 				</li>
 			{/if}
-			{#each shown as item (item.key)}
-				<li class="flex items-center gap-3 border-b border-(--line)">
+			{#each shown as item, index (item.key)}
+				<li
+					class={[
+						'flex items-center gap-3 border-b border-(--line)',
+						!expanded && 'compact',
+						index >= mobileCount && !expanded && 'max-lg:hidden'
+					]}
+				>
 					<span
 						class={['size-2 shrink-0', item.blocking ? 'bg-(--ink)' : 'bg-(--marker-deep)']}
 						aria-hidden="true"
@@ -50,7 +58,7 @@
 					{#if item.target.kind === 'link'}
 						<a class="row" href={item.target.href}>
 							<span class="text-sm font-medium text-(--ink)">{item.label}</span>
-							<span class="text-sm text-(--quiet)">{item.detail}</span>
+							<span class="detail text-sm text-(--quiet)">{item.detail}</span>
 						</a>
 					{:else if item.target.kind === 'slot'}
 						{@const slot = item.target.slot}
@@ -62,7 +70,7 @@
 						>
 							<span class="flex min-w-0 flex-1 flex-col">
 								<span class="text-sm font-medium text-(--ink)">{item.label}</span>
-								<span class="text-sm text-(--quiet)">{item.detail}</span>
+								<span class="detail text-sm text-(--quiet)">{item.detail}</span>
 							</span>
 							<span
 								class="add shrink-0 border border-(--ink) px-3 py-1.5 text-sm font-medium text-(--ink)"
@@ -72,15 +80,24 @@
 					{:else}
 						<button class="row" type="button" onclick={() => onjump(item)}>
 							<span class="text-sm font-medium text-(--ink)">{item.label}</span>
-							{#if item.detail}<span class="text-sm text-(--quiet)">{item.detail}</span>{/if}
+							{#if item.detail}<span class="detail text-sm text-(--quiet)">{item.detail}</span>{/if}
 						</button>
 					{/if}
 				</li>
 			{/each}
 		</ol>
+		{#if mobileHiddenCount > 0}
+			<button
+				class="self-start text-sm text-(--quiet) underline hover:text-(--ink) focus-visible:outline-2 focus-visible:outline-(--pine) lg:hidden"
+				type="button"
+				onclick={() => (expanded = true)}
+			>
+				{mobileHiddenCount} more
+			</button>
+		{/if}
 		{#if hiddenCount > 0}
 			<button
-				class="self-start text-sm text-(--quiet) underline hover:text-(--ink) focus-visible:outline-2 focus-visible:outline-(--pine)"
+				class="self-start text-sm text-(--quiet) underline hover:text-(--ink) focus-visible:outline-2 focus-visible:outline-(--pine) max-lg:hidden"
 				type="button"
 				onclick={() => (expanded = true)}
 			>
@@ -98,6 +115,17 @@
 		flex-direction: column;
 		padding: 0.75rem 0;
 		text-align: left;
+	}
+
+	@media (width < 64rem) {
+		.compact .detail {
+			display: none;
+		}
+
+		.compact .row,
+		.compact :global(.row-pick) {
+			padding-block: 0.5rem;
+		}
 	}
 
 	.row:hover span:first-child {

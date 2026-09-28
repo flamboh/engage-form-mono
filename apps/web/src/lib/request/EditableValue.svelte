@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { dateInputValue } from './labels';
 
 	let {
@@ -55,12 +56,13 @@
 				if (event.key === 'Enter') commit();
 				if (event.key === 'Escape') editing = false;
 			}}
-			{@attach (node) => {
-				draft = type === 'date' ? dateInputValue(value) : value;
-				node.value = draft;
-				node.focus();
-				if (type !== 'date') node.select();
-			}}
+			{@attach (node) =>
+				untrack(() => {
+					draft = type === 'date' ? dateInputValue(value) : value;
+					node.value = draft;
+					node.focus();
+					if (type !== 'date') node.select();
+				})}
 		/>
 	</span>
 {:else}

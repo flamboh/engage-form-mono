@@ -7,6 +7,7 @@
 		status,
 		error = '',
 		expired = false,
+		renderable = true,
 		onremove,
 		onretry,
 		ondismiss,
@@ -20,6 +21,7 @@
 		status: 'saved' | 'reading' | 'uploading' | 'failed' | 'unreadable';
 		error?: string;
 		expired?: boolean;
+		renderable?: boolean;
 		onremove?: () => void;
 		onretry?: () => void;
 		ondismiss?: () => void;
@@ -27,7 +29,9 @@
 		onpreviewerror?: () => void;
 	} = $props();
 
-	const isImage = $derived(contentType.startsWith('image/') && preview !== null && !expired);
+	const isImage = $derived(
+		contentType.startsWith('image/') && preview !== null && !expired && renderable
+	);
 	const badge = $derived(
 		contentType === 'application/pdf' ? 'PDF' : contentType.startsWith('image/') ? 'Photo' : 'File'
 	);
@@ -41,8 +45,10 @@
 	class:is-failed={status === 'failed'}
 	class:is-unreadable={status === 'unreadable'}
 >
-	<div class="slip relative flex flex-col bg-white">
-		<div class="relative aspect-[3/4] overflow-hidden bg-(--paper)">
+	<div class="slip relative flex bg-white max-lg:min-h-14 max-lg:items-center lg:flex-col">
+		<div
+			class="relative shrink-0 overflow-hidden bg-(--paper) max-lg:size-14 lg:aspect-[3/4] lg:w-full"
+		>
 			{#if isImage}
 				<img
 					class="h-full w-full object-cover object-top"
@@ -51,11 +57,14 @@
 					onerror={onpreviewerror}
 				/>
 			{:else}
-				<div class="flex h-full flex-col justify-between p-3">
-					<span class="self-start border border-(--ink) px-1.5 text-xs font-semibold text-(--ink)"
+				<div
+					class="flex h-full flex-col justify-between p-3 max-lg:items-center max-lg:justify-center"
+				>
+					<span
+						class="self-start border border-(--ink) px-1.5 text-xs font-semibold text-(--ink) max-lg:self-center"
 						>{badge}</span
 					>
-					<div class="flex flex-col gap-1.5" aria-hidden="true">
+					<div class="flex flex-col gap-1.5 max-lg:hidden" aria-hidden="true">
 						<span class="h-1.5 w-4/5 bg-(--line)"></span>
 						<span class="h-1.5 w-3/5 bg-(--line)"></span>
 						<span class="h-1.5 w-2/3 bg-(--line)"></span>
@@ -65,7 +74,7 @@
 			{#if statusText}
 				<div class="scan absolute inset-0" aria-hidden="true"></div>
 				<span
-					class="absolute bottom-2 left-2 bg-(--ink) px-1.5 py-0.5 text-xs font-medium text-white"
+					class="absolute bottom-2 left-2 bg-(--ink) px-1.5 py-0.5 text-xs font-medium text-white max-lg:hidden"
 					role="status">{statusText}</span
 				>
 			{/if}
@@ -78,22 +87,25 @@
 					aria-label={`Open ${label} ${filename}`}
 				></a>
 			{/if}
-			{#if onremove !== undefined && status !== 'uploading'}
-				<button
-					class="absolute top-1.5 right-1.5 grid size-7 place-items-center bg-white/90 text-(--ink) hover:bg-(--ink) hover:text-white focus-visible:outline-2 focus-visible:outline-(--pine)"
-					type="button"
-					aria-label={`Remove ${label} ${filename}`}
-					onclick={onremove}
-				>
-					<svg viewBox="0 0 12 12" class="size-3" aria-hidden="true"
-						><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" /></svg
-					>
-				</button>
-			{/if}
 		</div>
-		<div class="flex flex-col gap-0.5 px-2.5 pt-2 pb-3">
+		{#if onremove !== undefined && status !== 'uploading'}
+			<button
+				class="absolute top-1.5 right-1.5 z-10 grid size-7 place-items-center bg-white/90 text-(--ink) hover:bg-(--ink) hover:text-white focus-visible:outline-2 focus-visible:outline-(--pine)"
+				type="button"
+				aria-label={`Remove ${label} ${filename}`}
+				onclick={onremove}
+			>
+				<svg viewBox="0 0 12 12" class="size-3" aria-hidden="true"
+					><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" /></svg
+				>
+			</button>
+		{/if}
+		<div class="flex min-w-0 flex-col gap-0.5 px-2.5 max-lg:py-1 max-lg:pr-9 lg:pt-2 lg:pb-3">
 			<span class="text-xs font-semibold text-(--ink)">{label}</span>
-			<span class="hidden truncate text-xs text-(--quiet) sm:block" title={filename}
+			{#if statusText}
+				<span class="text-xs text-(--quiet) lg:hidden" aria-hidden="true">{statusText}…</span>
+			{/if}
+			<span class="hidden truncate text-xs text-(--quiet) lg:block" title={filename}
 				>{filename}</span
 			>
 			{#if expired}
@@ -108,7 +120,7 @@
 				<span class="text-xs text-(--alert)">Couldn’t read this — fill it in</span>
 				{#if onretryreading}
 					<button
-						class="mt-1 self-start text-xs font-medium text-(--pine) underline"
+						class="self-start text-xs font-medium text-(--pine) underline lg:mt-1"
 						type="button"
 						onclick={onretryreading}>Try again</button
 					>
@@ -116,7 +128,7 @@
 			{/if}
 			{#if status === 'failed'}
 				<span class="text-xs text-(--alert)">{error || 'Upload failed.'}</span>
-				<span class="mt-1 flex gap-2">
+				<span class="flex gap-2 lg:mt-1">
 					{#if onretry}
 						<button
 							class="text-xs font-medium text-(--pine) underline"
