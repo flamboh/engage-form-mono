@@ -531,13 +531,9 @@ function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {
 			snapshot.typeOfPurchase === 'personal_reimbursement' ? 'Other processes are too slow.' : '',
 		businessPurposeSource: parseBusinessPurposeText(snapshot.businessPurposeText),
 		businessPurposeTouched: snapshot.businessPurposeTouched,
-		...(snapshot.purpose === undefined ? {} : { purpose: snapshot.purpose.trim().slice(0, 200) }),
-		...(snapshot.activityTime === undefined
-			? {}
-			: { activityTime: snapshot.activityTime.trim().slice(0, 40) }),
-		...(snapshot.activityLocation === undefined
-			? {}
-			: { activityLocation: snapshot.activityLocation.trim().slice(0, 200) }),
+		purpose: snapshot.purpose.trim().slice(0, 200),
+		activityTime: snapshot.activityTime.trim().slice(0, 40),
+		activityLocation: snapshot.activityLocation.trim().slice(0, 200),
 		receiptFileIds: snapshot.receiptFileIds,
 		secondApprovalFileId: snapshot.secondApprovalFileId,
 		publicityFileId: snapshot.publicityFileId,
