@@ -58,7 +58,7 @@ export type RequestBackend = {
 };
 
 export type FillPhase = 'idle' | 'opening' | 'sent';
-export type FieldSource = 'user' | 'receipt' | 'default';
+export type FieldSource = 'user' | 'receipt' | 'previous' | 'suggested';
 
 const textDebounceMs = 450;
 

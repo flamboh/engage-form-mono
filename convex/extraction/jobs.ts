@@ -230,14 +230,14 @@ export const applyDecisions = internalMutation({
 			(request.budgetLineItem === '' || budgetLine.confident)
 		) {
 			patch.budgetLineItem = budgetLine.value;
-			sources.budgetLineItem = 'default';
+			sources.budgetLineItem = 'suggested';
 		}
 		if (sources.documentationCategories !== 'user' && args.categories.length > 0) {
 			const kept = request.documentationCategories.filter((category) => category === 'asuo_funds');
 			const categories = [...kept, ...args.categories];
 			if (JSON.stringify(categories) !== JSON.stringify(request.documentationCategories)) {
 				patch.documentationCategories = categories;
-				sources.documentationCategories = 'default';
+				sources.documentationCategories = 'suggested';
 			}
 		}
 		if (Object.keys(patch).length === 0) return null;

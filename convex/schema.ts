@@ -107,7 +107,12 @@ const purchaserDetails = v.object({
 	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
-const fieldSource = v.union(v.literal('user'), v.literal('receipt'), v.literal('default'));
+const fieldSource = v.union(
+	v.literal('user'),
+	v.literal('receipt'),
+	v.literal('previous'),
+	v.literal('suggested')
+);
 
 const extractedField = v.object({
 	value: v.string(),

@@ -2,7 +2,7 @@ import type { Doc, Id } from '../_generated/dataModel';
 import { describeItems } from './candidates';
 import type { DocumentKind } from './jev';
 
-export type FieldSource = 'user' | 'receipt' | 'default';
+export type FieldSource = 'user' | 'receipt' | 'previous' | 'suggested';
 export type FieldSources = Record<string, FieldSource>;
 export type ExtractedReviewField = 'vendor' | 'totalAmount' | 'receiptDate';
 export type CheckField = 'vendor' | 'itemDescription';
@@ -175,11 +175,11 @@ export function receiptFieldsPatch(request: Request, extractions: Extraction[]):
 	const activityDate = request.activityDate ?? '';
 	const followsReceipt =
 		activityDate === '' ||
-		(sources.activityDate === 'default' && activityDate === previousReceiptDate);
+		(sources.activityDate === 'receipt' && activityDate === previousReceiptDate);
 	if (sources.activityDate !== 'user' && followsReceipt && activityDate !== nextReceiptDate) {
 		patch.activityDate = nextReceiptDate;
 		if (nextReceiptDate === '') delete sources.activityDate;
-		else sources.activityDate = 'default';
+		else sources.activityDate = 'receipt';
 	}
 
 	if (JSON.stringify(sources) !== JSON.stringify(request.fieldSources ?? {})) {
@@ -291,7 +291,7 @@ export function resolveReviewPatch(
 		(activityDate === '' || activityDate === (request.receiptDate ?? ''))
 	) {
 		patch.activityDate = text;
-		sources.activityDate = 'default';
+		sources.activityDate = 'receipt';
 	}
 	return patch;
 }

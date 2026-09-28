@@ -170,7 +170,7 @@ export function previousRequestDefaults(
 	const sources: FieldSources = {};
 	const defaults: Partial<Doc<'purchaseRequests'>> = {};
 	if (previous.purchaserSource.kind === 'self') {
-		sources.purchaserSource = 'default';
+		sources.purchaserSource = 'previous';
 	} else if (
 		purchaser !== null &&
 		purchaser._id === previous.purchaserSource.purchaserId &&
@@ -179,24 +179,24 @@ export function previousRequestDefaults(
 	) {
 		defaults.purchaserSource = previous.purchaserSource;
 		defaults.purchaser = purchaserDetails(purchaser);
-		sources.purchaserSource = 'default';
+		sources.purchaserSource = 'previous';
 	}
 	if (previous.businessPurposeSource.parts.length > 0) {
 		defaults.businessPurposeSource = previous.businessPurposeSource;
 		defaults.businessPurposeTouched = previous.businessPurposeTouched;
-		sources.businessPurposeSource = 'default';
+		sources.businessPurposeSource = 'previous';
 	}
 	if (organization.budgetLines.includes(previous.budgetLineItem)) {
 		defaults.budgetLineItem = previous.budgetLineItem;
-		sources.budgetLineItem = 'default';
+		sources.budgetLineItem = 'previous';
 	}
 	if (previous.documentationCategories.length > 0) {
 		defaults.documentationCategories = previous.documentationCategories;
-		sources.documentationCategories = 'default';
+		sources.documentationCategories = 'previous';
 	}
 	if (previous.reimbursementReason.trim() !== '') {
 		defaults.reimbursementReason = previous.reimbursementReason;
-		sources.reimbursementReason = 'default';
+		sources.reimbursementReason = 'previous';
 	}
 	return { ...defaults, fieldSources: sources };
 }

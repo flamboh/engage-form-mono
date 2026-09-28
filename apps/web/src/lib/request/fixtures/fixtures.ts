@@ -197,9 +197,9 @@ function basePurchase(): Purchase {
 		updatedAt: now,
 		lastFilledAt: null,
 		fieldSources: {
-			purchaserSource: 'default',
-			budgetLineItem: 'default',
-			businessPurposeSource: 'default'
+			purchaserSource: 'previous',
+			budgetLineItem: 'previous',
+			businessPurposeSource: 'previous'
 		}
 	};
 }
@@ -215,9 +215,9 @@ const receiptDoc = (reading = false, readFailed = false) =>
 		readFailed
 	);
 const readSources = {
-	purchaserSource: 'default',
-	budgetLineItem: 'default',
-	businessPurposeSource: 'default',
+	purchaserSource: 'previous',
+	budgetLineItem: 'previous',
+	businessPurposeSource: 'previous',
 	vendor: 'receipt',
 	itemDescription: 'receipt',
 	totalAmount: 'receipt',

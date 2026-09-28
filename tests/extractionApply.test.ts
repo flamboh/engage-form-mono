@@ -123,7 +123,7 @@ test('multiple receipts fill summed totals, joined vendors, items, and the earli
 			itemDescription: 'receipt',
 			totalAmount: 'receipt',
 			receiptDate: 'receipt',
-			activityDate: 'default'
+			activityDate: 'receipt'
 		}
 	});
 });
@@ -210,12 +210,12 @@ test('resolving the receipt date moves an Activity Date that followed the receip
 		...draft,
 		receiptDate: '2025-10-14',
 		activityDate: '2025-10-14',
-		fieldSources: { receiptDate: 'receipt', activityDate: 'default' }
+		fieldSources: { receiptDate: 'receipt', activityDate: 'receipt' }
 	} as Doc<'purchaseRequests'>;
 	expect(resolveReviewPatch(filled, 'receiptDate', '2025-10-15')).toEqual({
 		receiptDate: '2025-10-15',
 		activityDate: '2025-10-15',
-		fieldSources: { receiptDate: 'user', activityDate: 'default' }
+		fieldSources: { receiptDate: 'user', activityDate: 'receipt' }
 	});
 	expect(() => resolveReviewPatch(filled, 'totalAmount', 'abc')).toThrow();
 });
@@ -276,11 +276,11 @@ test('new drafts copy defaults from the previous request in the organization', (
 		documentationCategories: ['food'],
 		reimbursementReason: 'Other processes are too slow.',
 		fieldSources: {
-			purchaserSource: 'default',
-			businessPurposeSource: 'default',
-			budgetLineItem: 'default',
-			documentationCategories: 'default',
-			reimbursementReason: 'default'
+			purchaserSource: 'previous',
+			businessPurposeSource: 'previous',
+			budgetLineItem: 'previous',
+			documentationCategories: 'previous',
+			reimbursementReason: 'previous'
 		}
 	});
 	const archived = { ...purchaser, archived: true } as Doc<'purchasers'>;
@@ -299,7 +299,7 @@ test('snapshot edits mark changed fields as user-set', () => {
 		...draft,
 		vendor: 'Bigbox Wholesale',
 		totalAmount: 28.48,
-		fieldSources: { vendor: 'receipt', totalAmount: 'receipt', budgetLineItem: 'default' }
+		fieldSources: { vendor: 'receipt', totalAmount: 'receipt', budgetLineItem: 'suggested' }
 	} as Doc<'purchaseRequests'>;
 	expect(
 		userFieldSources(filled, { vendor: 'Bigbox', totalAmount: 28.48, budgetLineItem: 'Food' })

@@ -3,9 +3,12 @@
 
 	let { source }: { source: FieldSource | undefined } = $props();
 
-	const text = $derived(
-		source === 'receipt' ? 'from receipt' : source === 'default' ? 'same as last time' : ''
-	);
+	const labels: Partial<Record<FieldSource, string>> = {
+		receipt: 'from receipt',
+		previous: 'same as last time',
+		suggested: 'suggested'
+	};
+	const text = $derived(source === undefined ? '' : (labels[source] ?? ''));
 </script>
 
 {#if text}

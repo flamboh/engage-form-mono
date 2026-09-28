@@ -209,7 +209,9 @@ export const purchaseRequestDoc = z.object({
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	lastFilledAt: z.number().nullable(),
-	fieldSources: z.record(z.string(), z.enum(['user', 'receipt', 'default'])).optional(),
+	fieldSources: z
+		.record(z.string(), z.enum(['user', 'receipt', 'previous', 'suggested']))
+		.optional(),
 	receiptDate: z.string().optional(),
 	purpose: z.string().optional(),
 	activityTime: z.string().optional(),
