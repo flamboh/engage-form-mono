@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as authed_board from "../authed/board.js";
 import type * as authed_demo from "../authed/demo.js";
 import type * as authed_documents from "../authed/documents.js";
 import type * as authed_extension from "../authed/extension.js";
@@ -31,6 +32,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "authed/board": typeof authed_board;
   "authed/demo": typeof authed_demo;
   "authed/documents": typeof authed_documents;
   "authed/extension": typeof authed_extension;
