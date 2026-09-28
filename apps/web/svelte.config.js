@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-vercel';
+import adapter from '@sveltejs/adapter-cloudflare';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 

@@ -2,6 +2,7 @@ import { z } from 'zod/v4';
 import { zid } from 'convex-helpers/server/zod4';
 import type { Doc, Id } from '../_generated/dataModel';
 import { authedMutation, authedQuery } from './helpers';
+import { deleteStoredFile, issueUploadTicket, requireOwnedKey } from '../files';
 import type { BusinessPurposePart, BusinessPurposeSource } from '../businessPurpose';
 import {
 	applyDraftPatch,
@@ -199,18 +200,19 @@ export const getDraft = authedQuery({
 
 export const getPurchase = getDraft;
 
-export const generateUploadUrl = authedMutation({
-	args: {},
-	returns: z.string(),
-	handler: async (ctx) => {
-		return await ctx.storage.generateUploadUrl();
+export const createUploadTicket = authedMutation({
+	args: { contentType: z.string(), size: z.number() },
+	returns: z.object({ uploadUrl: z.string(), r2Key: z.string() }),
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		return await issueUploadTicket(owner, args.contentType, args.size);
 	}
 });
 
 export const saveFile = authedMutation({
 	args: {
 		kind: fileKind,
-		storageId: zid('_storage'),
+		r2Key: z.string(),
 		filename: z.string(),
 		contentType: z.string(),
 		size: z.number()
@@ -219,6 +221,7 @@ export const saveFile = authedMutation({
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		requireText(args.filename, 'Filename missing.');
+		await requireOwnedKey(owner, args.r2Key);
 		return await ctx.db.insert('files', { ...args, owner, createdAt: Date.now() });
 	}
 });
@@ -629,9 +632,7 @@ export const discardDraft = authedMutation({
 			request.computerPriceQuoteFileId
 		].filter((id): id is Id<'files'> => id !== null);
 		for (const fileId of fileIds) {
-			const file = await requireOwnedDoc(ctx, 'files', fileId, owner);
-			if (file.storageId !== undefined) await ctx.storage.delete(file.storageId);
-			await ctx.db.delete(fileId);
+			await deleteStoredFile(ctx, await requireOwnedDoc(ctx, 'files', fileId, owner));
 		}
 		await ctx.db.delete(args.id);
 		return null;
