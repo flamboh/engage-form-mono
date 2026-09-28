@@ -21,7 +21,8 @@
 		onfiles,
 		onremove,
 		onretryreading,
-		refreshpreview
+		refreshpreview,
+		onapproval
 	}: {
 		documents: RequestDocument[];
 		pending: PendingUpload[];
@@ -31,6 +32,7 @@
 		onremove: (fileId: Id<'files'>) => void;
 		onretryreading: (fileId: Id<'files'>) => void;
 		refreshpreview: (fileId: Id<'files'>) => Promise<string | null>;
+		onapproval: () => void;
 	} = $props();
 
 	let freshUrls = $state<Record<string, string>>({});
@@ -65,6 +67,19 @@
 	const targetSlots = $derived(missingSlots.filter((slot) => slot !== 'receipt'));
 	const empty = $derived(documents.length === 0 && inFlight.length === 0);
 </script>
+
+{#snippet approvalAction()}
+	<span class="flex flex-wrap items-baseline gap-x-2">
+		<button
+			class="text-sm font-medium text-(--pine) underline hover:text-(--pine-deep) focus-visible:outline-2 focus-visible:outline-(--pine)"
+			type="button"
+			onclick={onapproval}
+		>
+			Get it approved
+		</button>
+		<span class="text-xs text-(--quiet)">We’ll write the email.</span>
+	</span>
+{/snippet}
 
 <section
 	id="field-documents"
@@ -162,6 +177,7 @@
 					hint={slotHints[slot] ?? ''}
 					compact
 					{onfiles}
+					children={slot === 'second_approval' ? approvalAction : undefined}
 				/>
 			{/each}
 		</div>

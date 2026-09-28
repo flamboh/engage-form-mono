@@ -5,6 +5,7 @@
 	import type { SavedData } from '$lib/purchase/draftDetails';
 	import type { PendingUpload, UploadSlot } from '$lib/uploads.svelte';
 	import ActionBar from './ActionBar.svelte';
+	import ApprovalDialog, { type SavedApprover } from './ApprovalDialog.svelte';
 	import BusinessPurposeCard from './BusinessPurposeCard.svelte';
 	import DocumentsRail from './DocumentsRail.svelte';
 	import EditDetails from './EditDetails.svelte';
@@ -13,13 +14,14 @@
 	import RequestQuestions from './RequestQuestions.svelte';
 	import WhatsLeft from './WhatsLeft.svelte';
 	import { onDestroy } from 'svelte';
-	import { whatsLeft, type LeftItem } from './whatsLeft';
+	import { whatsLeft, type LeftField, type LeftItem, type LeftTarget } from './whatsLeft';
 
 	let {
 		view,
 		saved,
 		user,
 		recentPurposes = [],
+		approvers = [],
 		organizationId,
 		pending,
 		backend,
@@ -29,6 +31,7 @@
 		saved: SavedData | undefined;
 		user: Doc<'users'> | null;
 		recentPurposes?: string[];
+		approvers?: SavedApprover[];
 		organizationId: Id<'organizations'>;
 		pending: PendingUpload[];
 		backend: RequestBackend;
@@ -42,6 +45,7 @@
 	);
 
 	let detailsOpen = $state(false);
+	let approvalDialog = $state<ApprovalDialog | null>(null);
 
 	onDestroy(() => void editor.flush());
 
@@ -173,7 +177,14 @@
 	}
 
 	function jump(item: LeftItem) {
-		const target = item.target;
+		jumpTo(item.target);
+	}
+
+	function jumpToField(field: LeftField) {
+		jumpTo({ kind: 'field', field });
+	}
+
+	function jumpTo(target: LeftTarget) {
 		if (target.kind === 'link') return;
 		if (target.kind === 'field' && target.field === 'details') detailsOpen = true;
 		const id =
@@ -237,6 +248,7 @@
 				onremove={(fileId) => void editor.removeDocument(fileId)}
 				onretryreading={(fileId) => void editor.retryReading(fileId)}
 				refreshpreview={(fileId) => editor.freshPreview(fileId)}
+				onapproval={() => approvalDialog?.show()}
 			/>
 		</aside>
 
@@ -252,7 +264,14 @@
 				</div>
 			{:else}
 				{#if purchase.status === 'draft'}
-					<WhatsLeft items={visibleItems} {reading} {ready} onjump={jump} onfiles={upload} />
+					<WhatsLeft
+						items={visibleItems}
+						{reading}
+						{ready}
+						onjump={jump}
+						onfiles={upload}
+						onapproval={() => approvalDialog?.show()}
+					/>
 				{/if}
 				<div class="contents" inert={approved}>
 					<RequestQuestions
@@ -289,6 +308,17 @@
 			{/if}
 		</main>
 	</div>
+
+	<ApprovalDialog
+		bind:this={approvalDialog}
+		{editor}
+		{approvers}
+		requesterName={purchase?.requester.name ?? user?.name ?? ''}
+		requesterEmail={purchase?.requester.email ?? user?.studentEmail ?? ''}
+		onremember={(approver) => void backend.rememberApprover(approver).catch(() => {})}
+		onforget={(id) => void backend.forgetApprover(id).catch(() => {})}
+		onjump={jumpToField}
+	/>
 
 	<ActionBar
 		{editor}

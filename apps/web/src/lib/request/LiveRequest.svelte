@@ -30,6 +30,10 @@
 		clerkContext.currentSession ? { organizationId, excludeId: purchaseRequestId } : 'skip'
 	);
 
+	const approversQuery = useQuery(api.authed.approvers.recentApprovers, () =>
+		clerkContext.currentSession ? { organizationId } : 'skip'
+	);
+
 	const pending = $derived(uploadsFor(purchaseRequestId));
 	const serverFileIds = $derived(viewQuery.data?.documents.map((document) => document.fileId));
 
@@ -82,6 +86,12 @@
 				clearFilled: false
 			});
 		},
+		rememberApprover: async (approver) => {
+			await client.mutation(api.authed.approvers.rememberApprover, { organizationId, ...approver });
+		},
+		forgetApprover: async (id) => {
+			await client.mutation(api.authed.approvers.forgetApprover, { id });
+		},
 		upload: (files, slot) => {
 			const session = clerkContext.currentSession;
 			if (!session) return;
@@ -95,6 +105,7 @@
 	saved={savedQuery.data}
 	user={userQuery.data ?? null}
 	recentPurposes={purposesQuery.data ?? []}
+	approvers={approversQuery.data ?? []}
 	{organizationId}
 	{pending}
 	{backend}

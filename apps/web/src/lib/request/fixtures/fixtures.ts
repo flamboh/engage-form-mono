@@ -312,6 +312,10 @@ const scenarios: Record<string, () => Scenario> = {
 		},
 		documents: [receiptDoc(), publicityDoc(), approvalDoc()]
 	}),
+	approval: () => ({
+		purchase: { ...complete, secondApprovalFileId: null },
+		documents: [receiptDoc(), publicityDoc(), cateringDoc()]
+	}),
 	ready: () => ({ purchase: complete, documents: completeDocs() }),
 	filled: () => ({
 		purchase: { ...complete, status: 'ready', lastFilledAt: now },
@@ -349,3 +353,18 @@ export function businessPurposeTextFor(purchase: Purchase) {
 }
 
 export const mockRead = readReceipt;
+
+export function mockApprovers() {
+	return [
+		{
+			id: 'mock_approver_sam' as Id<'approvers'>,
+			name: 'Sam Rivera',
+			email: 'srivera@uoregon.edu'
+		},
+		{
+			id: 'mock_approver_priya' as Id<'approvers'>,
+			name: 'Priya Natarajan',
+			email: 'priyan@uoregon.edu'
+		}
+	];
+}

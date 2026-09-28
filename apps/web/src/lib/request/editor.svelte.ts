@@ -1,4 +1,5 @@
 import type { Doc, Id } from '$convex/_generated/dataModel';
+import type { Approver } from '$convex/approvalEmail';
 import { mentionsPurpose, withPurpose } from '$convex/businessPurpose';
 import type { DocumentSlot, RequestView } from '$convex/requestView';
 import {
@@ -56,6 +57,8 @@ export type RequestBackend = {
 	markApproved(): Promise<void>;
 	reopen(): Promise<void>;
 	upload(files: File[], slot: UploadSlot): void;
+	rememberApprover(approver: Approver): Promise<void>;
+	forgetApprover(id: Id<'approvers'>): Promise<void>;
 };
 
 export type FillPhase = 'idle' | 'opening' | 'sent';
