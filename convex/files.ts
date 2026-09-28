@@ -9,13 +9,14 @@ import {
 	type QueryCtx
 } from './_generated/server';
 import { internal } from './_generated/api';
-import { ownerKeyPrefix, ownsKey, signedFileUrl } from './fileSigning';
+import { ownerKeyPrefix, ownsKey, signedFileUrl, uploadContentType } from './fileSigning';
 
 const minute = 60 * 1000;
 const hour = 60 * minute;
 export const maxUploadSize = 15 * 1024 * 1024;
 const uploadTicketTtl = 10 * minute;
 const migrationBatchSize = 25;
+const downloadTimeoutMs = 20_000;
 
 function filesConfig() {
 	const baseUrl = process.env.FILES_BASE_URL;
@@ -26,13 +27,14 @@ function filesConfig() {
 
 export async function issueUploadTicket(owner: string, contentType: string, size: number) {
 	if (size > maxUploadSize) throw new Error('File is larger than 15 MB.');
+	const normalizedContentType = uploadContentType(contentType);
 	const { baseUrl, secret } = filesConfig();
 	const r2Key = `${await ownerKeyPrefix(owner)}/${crypto.randomUUID()}`;
 	const uploadUrl = await signedFileUrl(baseUrl, secret, {
 		action: 'put',
 		key: r2Key,
 		expiresAt: Date.now() + uploadTicketTtl,
-		contentType,
+		contentType: normalizedContentType,
 		maxSize: maxUploadSize
 	});
 	return { uploadUrl, r2Key };
@@ -69,7 +71,7 @@ export async function readFileBytes(ctx: ActionCtx, fileId: Id<'files'>) {
 	if (file === null) throw new Error('File not found.');
 	const url = await fileDownloadUrl(ctx, file);
 	if (url === null) throw new Error('File has no stored content.');
-	const response = await fetch(url);
+	const response = await fetch(url, { signal: AbortSignal.timeout(downloadTimeoutMs) });
 	if (!response.ok) throw new Error(`File download failed with ${response.status}.`);
 	return { file, bytes: await response.arrayBuffer() };
 }
@@ -84,7 +86,10 @@ export const deleteObject = internalAction({
 			key: args.key,
 			expiresAt: Date.now() + uploadTicketTtl
 		});
-		const response = await fetch(url, { method: 'DELETE' });
+		const response = await fetch(url, {
+			method: 'DELETE',
+			signal: AbortSignal.timeout(downloadTimeoutMs)
+		});
 		if (!response.ok && response.status !== 404)
 			throw new Error(`File delete failed with ${response.status}.`);
 		return null;

@@ -29,24 +29,40 @@ const variablesById: Map<string, (typeof businessPurposeVariables)[number]> = ne
 	businessPurposeVariables.map((variable) => [variable.id, variable])
 );
 
+const tokenPattern = /\{([^{}]+)\}/g;
+
 export function parseBusinessPurposeText(text: string): BusinessPurposeSource {
 	const parts: BusinessPurposePart[] = [];
-	const tokenPattern = /\{([^{}]+)\}/g;
+	const pushText = (value: string) => {
+		if (value === '') return;
+		const last = parts.at(-1);
+		if (last?.kind === 'text') last.text += value;
+		else parts.push({ kind: 'text', text: value });
+	};
 	let lastIndex = 0;
 	for (const match of text.matchAll(tokenPattern)) {
-		if (match.index > lastIndex) {
-			parts.push({ kind: 'text', text: text.slice(lastIndex, match.index) });
-		}
-		const name = match[1].trim();
-		const variable = variablesByLabel.get(name) ?? variablesById.get(name);
-		if (variable === undefined) {
-			throw new Error(`Unknown Business Purpose variable: ${name}.`);
-		}
-		parts.push({ kind: 'variable', variable: variable.id });
+		pushText(text.slice(lastIndex, match.index));
+		const variable = variableForToken(match[1]);
+		if (variable === undefined) pushText(match[0]);
+		else parts.push({ kind: 'variable', variable: variable.id });
 		lastIndex = match.index + match[0].length;
 	}
-	if (lastIndex < text.length) parts.push({ kind: 'text', text: text.slice(lastIndex) });
+	pushText(text.slice(lastIndex));
 	return { parts };
+}
+
+export function validateBusinessPurposeText(text: string) {
+	for (const match of text.matchAll(tokenPattern)) {
+		if (variableForToken(match[1]) === undefined) {
+			throw new Error(`Unknown Business Purpose variable: ${match[1].trim()}.`);
+		}
+	}
+	return parseBusinessPurposeText(text);
+}
+
+function variableForToken(token: string) {
+	const name = token.trim();
+	return variablesByLabel.get(name) ?? variablesById.get(name);
 }
 
 export function formatBusinessPurposeSource(source: BusinessPurposeSource) {

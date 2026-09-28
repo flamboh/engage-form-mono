@@ -22,7 +22,8 @@ export const requestDocument = z.object({
 	filename: z.string(),
 	contentType: z.string(),
 	previewUrl: z.string().nullable(),
-	reading: z.boolean()
+	reading: z.boolean(),
+	readFailed: z.boolean()
 });
 
 export const requestReview = z.object({

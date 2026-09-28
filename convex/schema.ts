@@ -265,6 +265,7 @@ export default defineSchema({
 		receiptDate: v.union(extractedField, v.null()),
 		items: v.array(v.string()),
 		error: v.union(v.string(), v.null()),
+		attempt: v.optional(v.number()),
 		createdAt: v.number(),
 		updatedAt: v.number()
 	})

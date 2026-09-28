@@ -5,6 +5,7 @@ import {
 	signedFileUrl,
 	signFileTicket,
 	ticketFromUrl,
+	uploadContentType,
 	verifyFileTicket,
 	type FileTicket
 } from '../convex/fileSigning';
@@ -84,4 +85,45 @@ test('owner key prefixes are stable, distinct, and gate key ownership', async ()
 	expect(ownsKey(alice, `${alice}/${crypto.randomUUID()}/extra`)).toBe(false);
 	expect(ownsKey(alice, `${alice}x/${crypto.randomUUID()}`)).toBe(false);
 	expect(ownsKey(alice, alice)).toBe(false);
+});
+
+test('ticket fields cannot be shifted across boundaries', async () => {
+	const signature = await signFileTicket(secret, {
+		action: 'get',
+		key: 'abc',
+		expiresAt: now,
+		contentType: 'image/png\n1'
+	});
+	expect(
+		await verifyFileTicket(
+			secret,
+			{ action: 'get', key: 'abc', expiresAt: now, contentType: 'image/png', maxSize: 1 },
+			signature,
+			now
+		)
+	).toBe(false);
+	const withoutOptional = await signFileTicket(secret, { action: 'get', key: 'k', expiresAt: now });
+	expect(
+		await verifyFileTicket(
+			secret,
+			{ action: 'get', key: 'k', expiresAt: now, contentType: '' },
+			withoutOptional,
+			now
+		)
+	).toBe(false);
+});
+
+test('upload content types are normalized and whitelisted', () => {
+	expect(uploadContentType('image/JPEG')).toBe('image/jpeg');
+	expect(uploadContentType(' application/pdf ')).toBe('application/pdf');
+	expect(uploadContentType('image/heic')).toBe('image/heic');
+	for (const bad of [
+		'text/html',
+		'image/svg+xml',
+		'application/octet-stream',
+		'image/png\nx',
+		'image/png; charset=utf-8',
+		''
+	])
+		expect(() => uploadContentType(bad)).toThrow();
 });
