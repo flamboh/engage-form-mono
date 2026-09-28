@@ -1,0 +1,176 @@
+<script lang="ts">
+	import type { Id } from '$convex/_generated/dataModel';
+	import { parseBusinessPurposeText } from '$convex/businessPurpose';
+	import type { DocumentSlot, RequestView } from '$convex/requestView';
+	import { startUploads, uploadsFor, type UploadTransport } from '$lib/uploads.svelte';
+	import type { RequestBackend } from '../editor.svelte';
+	import { slotField } from '../editor.svelte';
+	import RequestPage from '../RequestPage.svelte';
+	import { untrack } from 'svelte';
+	import {
+		mockEngageUrl,
+		mockOrganizationId,
+		mockRead,
+		mockReceiptImage,
+		mockRequestId,
+		mockSaved,
+		mockUser,
+		scenarioNames,
+		scenarioView,
+		withReadiness
+	} from './fixtures';
+
+	let { scenario }: { scenario: string } = $props();
+
+	const initialScenario = untrack(() => scenario);
+	const initial = scenarioView(initialScenario);
+	let view = $state<RequestView>(initial);
+	const pending = $derived(uploadsFor(mockRequestId));
+	const session = { getToken: async () => null };
+	const files: Record<string, File> = {};
+	let counter = 0;
+
+	void refresh();
+	if (initialScenario === 'drop') {
+		void fetch(mockReceiptImage)
+			.then((response) => response.blob())
+			.then((blob) => {
+				backend.upload([new File([blob], 'IMG_2291.svg', { type: 'image/svg+xml' })], 'auto');
+			});
+	}
+
+	async function refresh() {
+		const next = await withReadiness($state.snapshot(view) as RequestView);
+		view.readiness = next.readiness;
+		view.businessPurposeText = next.businessPurposeText;
+	}
+
+	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+	const transport: UploadTransport = {
+		upload: async (file) => {
+			await wait(700);
+			const id = `mock_upload_${++counter}` as Id<'files'>;
+			files[id] = file;
+			return id;
+		},
+		attach: async (_requestId, fileIds, slot) => {
+			await wait(250);
+			for (const fileId of fileIds) {
+				const file = files[fileId];
+				const kind: DocumentSlot = slot === 'auto' ? 'receipt' : slot;
+				view.documents.push({
+					fileId,
+					kind,
+					filename: file?.name ?? 'document',
+					contentType: file?.type ?? 'application/octet-stream',
+					previewUrl: null,
+					reading: kind === 'receipt'
+				});
+				if (kind === 'receipt') {
+					view.purchase.receiptFileIds = [...view.purchase.receiptFileIds, fileId];
+					view.reading = true;
+				} else if (kind !== 'recipient_list') {
+					Object.assign(view.purchase, { [slotField[kind]]: fileId });
+				}
+			}
+			await refresh();
+			if (view.reading) void finishReading();
+		}
+	};
+
+	async function finishReading() {
+		await wait(2600);
+		view.reading = false;
+		for (const document of view.documents) document.reading = false;
+		if (!view.purchase.vendor) view.purchase.vendor = mockRead.vendor;
+		if (!view.purchase.itemDescription) view.purchase.itemDescription = mockRead.itemDescription;
+		if (!view.purchase.totalAmount) view.purchase.totalAmount = mockRead.totalAmount;
+		view.purchase.receiptDate = mockRead.receiptDate;
+		view.reviews = [{ field: 'totalAmount', value: '36.18', alternatives: ['33.95', '38.40'] }];
+		await refresh();
+	}
+
+	const backend: RequestBackend = {
+		saveSnapshot: async (snapshot) => {
+			await wait(120);
+			const { businessPurposeText, totalAmount, ...rest } = snapshot;
+			Object.assign(view.purchase, rest, {
+				totalAmount: totalAmount ?? 0,
+				businessPurposeSource: parseBusinessPurposeText(businessPurposeText)
+			});
+			await refresh();
+		},
+		applyTemplate: async (templateId) => {
+			await wait(150);
+			const template = mockSaved.businessPurposeTemplates.find((item) => item._id === templateId);
+			if (template === undefined) throw new Error('Template not found.');
+			view.purchase.businessPurposeSource = parseBusinessPurposeText(
+				template.businessPurposeTemplate
+			);
+			view.purchase.businessPurposeTouched = true;
+			await refresh();
+		},
+		resolveReview: async (field, value) => {
+			await wait(150);
+			if (field === 'totalAmount') view.purchase.totalAmount = Number(value) || 0;
+			else if (field === 'vendor') view.purchase.vendor = value;
+			else view.purchase.receiptDate = value;
+			view.reviews = view.reviews.filter((review) => review.field !== field);
+			await refresh();
+		},
+		removeDocument: async (fileId) => {
+			await wait(150);
+			view.documents = view.documents.filter((document) => document.fileId !== fileId);
+			view.purchase.receiptFileIds = view.purchase.receiptFileIds.filter((id) => id !== fileId);
+			for (const field of Object.values(slotField)) {
+				if ((view.purchase as Record<string, unknown>)[field] === fileId) {
+					Object.assign(view.purchase, { [field]: null });
+				}
+			}
+			await refresh();
+		},
+		requestFill: async () => {
+			await wait(400);
+			if (!view.readiness.ready) throw new Error('Purchase request is not ready.');
+			view.purchase.status = 'ready';
+			setTimeout(() => (view.purchase.lastFilledAt = Date.now()), 5000);
+			return { engageUrl: mockEngageUrl };
+		},
+		markApproved: async () => {
+			await wait(150);
+			view.purchase.status = 'approved';
+		},
+		reopen: async () => {
+			await wait(150);
+			view.purchase.status = 'ready';
+		},
+		upload: (files, slot) => {
+			startUploads(session, mockRequestId, files, slot, transport);
+		}
+	};
+</script>
+
+<nav
+	class="fixed top-2 left-1/2 z-50 flex hidden -translate-x-1/2 flex-wrap gap-1 bg-black/80 p-1 text-xs text-white lg:flex"
+	aria-label="Mock scenarios"
+>
+	{#each scenarioNames as name (name)}
+		<a
+			class="px-1.5 py-0.5 hover:bg-white/20"
+			class:bg-white={name === scenario}
+			class:text-black={name === scenario}
+			href={`?mock=${name}`}
+			data-sveltekit-reload>{name}</a
+		>
+	{/each}
+</nav>
+
+<RequestPage
+	{view}
+	saved={mockSaved}
+	user={mockUser}
+	organizationId={mockOrganizationId}
+	{pending}
+	{backend}
+/>
