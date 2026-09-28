@@ -1,6 +1,7 @@
 import type { PurchaseRequest } from '@engage-form/domain';
 import type { EngageStep } from '@engage-form/fill-engine';
 import type { Id } from '../../../../convex/_generated/dataModel';
+import type { PendingFillState } from './pending-fill';
 
 export type ReadyPurchaseRequest = {
 	id: Id<'purchaseRequests'>;
@@ -20,7 +21,9 @@ export type RuntimeMessage =
 	| { type: 'START_FILL'; purchaseId: string; token: string }
 	| { type: 'GET_FILL_PAYLOAD'; purchaseId: string }
 	| { type: 'REVIEW_REACHED'; purchaseId: string }
-	| { type: 'FILL_RUN_ENDED' };
+	| { type: 'FILL_RUN_ENDED' }
+	| { type: 'GET_PENDING_FILL' }
+	| { type: 'CLEAR_PENDING_FILL'; purchaseId: string };
 
 export type FillMessage =
 	| {
@@ -37,6 +40,7 @@ export type RuntimeResponse =
 	| { ok: true; token: string | null }
 	| { ok: true; message: string }
 	| { ok: true; purchase: PurchaseRequest }
+	| { ok: true; pendingFillState: PendingFillState }
 	| FillResponse
 	| { ok: false; message: string };
 

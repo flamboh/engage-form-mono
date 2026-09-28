@@ -1,4 +1,4 @@
-import type { PurchaseRequest } from '@engage-form/domain';
+import { formatMoney, type PurchaseRequest } from '@engage-form/domain';
 import { createFillPlan, detectStep, type FillAction } from '@engage-form/fill-engine';
 import type { FillMessage, FillResponse } from './messages';
 
@@ -6,6 +6,7 @@ export type FillRunState = {
 	purchaseId: string;
 	filled: number;
 	pageCount: number;
+	label: string;
 };
 
 type FillResult = {
@@ -42,8 +43,11 @@ export function createContentRunner(deps: ContentRunnerDeps) {
 		};
 	}
 
-	async function startFillRun(purchaseRequest: PurchaseRequest): Promise<FillResponse> {
-		deps.saveFillRun({ purchaseId: purchaseRequest.id, filled: 0, pageCount: 0 });
+	async function startFillRun(
+		purchaseRequest: PurchaseRequest,
+		label = fillLabel(purchaseRequest)
+	): Promise<FillResponse> {
+		deps.saveFillRun({ purchaseId: purchaseRequest.id, filled: 0, pageCount: 0, label });
 		return continueFillRun();
 	}
 
@@ -121,6 +125,16 @@ export function createContentRunner(deps: ContentRunnerDeps) {
 			return { ...result, filled, ok: false };
 		}
 
+		if (deps.loadFillRun()?.purchaseId !== state.purchaseId) {
+			return {
+				ok: false,
+				message: 'Fill cancelled.',
+				step,
+				filled,
+				missed: []
+			};
+		}
+
 		if (!deps.clickNextStep()) {
 			deps.clearFillRun();
 			return {
@@ -155,4 +169,12 @@ export function createContentRunner(deps: ContentRunnerDeps) {
 		resumeFillRun,
 		startFillRun
 	};
+}
+
+export function fillLabel(
+	purchaseRequest: Pick<PurchaseRequest, 'vendor' | 'itemDescription' | 'totalAmount'>
+) {
+	const name = purchaseRequest.vendor.trim() || purchaseRequest.itemDescription.trim();
+	const amount = formatMoney(purchaseRequest.totalAmount);
+	return name === '' ? amount : `${name} · ${amount}`;
 }

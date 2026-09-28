@@ -1,11 +1,17 @@
 import { createClerkClient } from '@clerk/chrome-extension/client';
 import type { PurchaseRequest } from '@engage-form/domain';
+import { isEngageFormUrl } from '@engage-form/fill-engine';
 import { ConvexHttpClient } from 'convex/browser';
 import { Effect } from 'effect';
 import { browser } from 'wxt/browser';
 import { api } from '../../../../convex/_generated/api';
 import type { Id } from '../../../../convex/_generated/dataModel';
-import { readClerkPublishableKey, readClerkSyncHost, readConvexUrl } from '../lib/env';
+import {
+	readClerkPublishableKey,
+	readClerkSyncHost,
+	readConvexUrl,
+	readWebAppUrl
+} from '../lib/env';
 import {
 	type FillMessage,
 	type FillResponse,
@@ -13,6 +19,9 @@ import {
 	type RuntimeResponse,
 	runtimeError
 } from '../lib/messages';
+import type { PendingFillState } from '../lib/pending-fill';
+import { withTimeout } from '../lib/timeout';
+import { readWebAppConvexToken } from '../lib/web-app-token';
 
 let clerk: ReturnType<typeof createSyncedClerk> | null = null;
 const clerkTokenTimeoutMs = 4_000;
@@ -45,9 +54,12 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 	if (message.type === 'AUTH_STATE') {
 		return Effect.gen(function* () {
 			const client = yield* refreshClerkEffect();
+			const signedIn =
+				client.session !== null ||
+				(yield* Effect.promise(() => readWebAppConvexToken(readWebAppUrl()))) !== null;
 			return {
 				ok: true,
-				signedIn: client.session !== null,
+				signedIn,
 				email: client.user?.primaryEmailAddress?.emailAddress ?? null
 			} as const;
 		});
@@ -102,6 +114,26 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 		});
 	}
 
+	if (message.type === 'GET_PENDING_FILL') {
+		return Effect.tryPromise({
+			try: async () => ({ ok: true, pendingFillState: await getPendingFillState() }) as const,
+			catch: toError
+		});
+	}
+
+	if (message.type === 'CLEAR_PENDING_FILL') {
+		return Effect.tryPromise({
+			try: async () => {
+				const convex = await authedConvex();
+				await convex.mutation(api.authed.extension.clearPendingFill, {
+					purchaseRequestId: message.purchaseId as Id<'purchaseRequests'>
+				});
+				return { ok: true, message: 'Pending fill cleared.' } as const;
+			},
+			catch: toError
+		});
+	}
+
 	if (message.type === 'START_FILL') {
 		return Effect.tryPromise({
 			try: () => fillActiveTab(message.purchaseId, message.token),
@@ -114,6 +146,9 @@ function handleRuntimeMessage(message: RuntimeMessage): Effect.Effect<RuntimeRes
 
 function getConvexTokenEffect() {
 	return Effect.gen(function* () {
+		const webToken = yield* Effect.promise(() => readWebAppConvexToken(readWebAppUrl()));
+		if (webToken !== null) return webToken;
+
 		const client = yield* refreshClerkEffect();
 		if (client.session === null) return null;
 
@@ -182,10 +217,6 @@ async function currentEngageTab() {
 	return { id: tab.id };
 }
 
-function isEngageFormUrl(url: string | undefined) {
-	return url?.startsWith('https://uoregon.campuslabs.com/engage/submitter/form/') === true;
-}
-
 async function sendFillMessage(tabId: number, message: FillMessage): Promise<FillResponse> {
 	try {
 		return (await browser.tabs.sendMessage(tabId, message)) as FillResponse;
@@ -201,6 +232,21 @@ async function authedConvex(token?: string) {
 	const convex = new ConvexHttpClient(readConvexUrl());
 	convex.setAuth(convexToken);
 	return convex;
+}
+
+async function getPendingFillState(): Promise<PendingFillState> {
+	const token = await Effect.runPromise(getConvexTokenEffect()).catch(() => null);
+	if (token === null) return { signedIn: false };
+
+	const convex = new ConvexHttpClient(readConvexUrl());
+	convex.setAuth(token);
+	try {
+		const pendingFill = await convex.query(api.authed.extension.getPendingFill, {});
+		return { signedIn: true, pendingFill };
+	} catch (error) {
+		if (toError(error).message.includes('Unauthorized')) return { signedIn: false };
+		throw error;
+	}
 }
 
 async function getPreparedPurchase(purchaseId: string, token?: string): Promise<PurchaseRequest> {
@@ -261,13 +307,6 @@ function toError(error: unknown) {
 	return error instanceof Error ? error : new Error(String(error));
 }
 
-function withTimeout<T>(promise: Promise<T>, message: string, timeoutMs: number) {
-	return new Promise<T>((resolve, reject) => {
-		const timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
-		promise.then(resolve, reject).finally(() => clearTimeout(timeout));
-	});
-}
-
 function logBackground(message: string, context: Record<string, unknown> = {}) {
 	console.info('[Engage Form][background]', message, context);
 }
@@ -278,6 +317,13 @@ function summarizeResponse(response: RuntimeResponse) {
 	if ('signedIn' in response)
 		return { ok: true, signedIn: response.signedIn, emailPresent: response.email !== null };
 	if ('purchase' in response) return { ok: true, purchasePresent: true };
+	if ('pendingFillState' in response)
+		return {
+			ok: true,
+			signedIn: response.pendingFillState.signedIn,
+			pendingFill:
+				response.pendingFillState.signedIn && response.pendingFillState.pendingFill !== null
+		};
 	if ('step' in response)
 		return { ok: true, message: response.message, step: response.step, filled: response.filled };
 	return { ok: true, message: response.message };

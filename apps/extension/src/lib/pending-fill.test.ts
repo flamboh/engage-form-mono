@@ -13,6 +13,7 @@ const pendingFill = {
 function decide(overrides: Partial<Parameters<typeof autoStartDecision>[0]> = {}) {
 	return autoStartDecision({
 		url: formUrl,
+		step: 'formStart',
 		now,
 		activeRun: false,
 		state: { signedIn: true, pendingFill },
@@ -29,6 +30,12 @@ test('ignores pages outside the Engage submitter form', () => {
 	expect(decide({ url: 'https://uoregon.campuslabs.com/engage/organizations' })).toEqual({
 		type: 'idle'
 	});
+});
+
+test('waits for a recognized purchase request step and never starts on review', () => {
+	expect(decide({ step: 'unknown' })).toEqual({ type: 'idle' });
+	expect(decide({ step: 'review' })).toEqual({ type: 'idle' });
+	expect(decide({ step: 'about' })).toEqual({ type: 'start', pendingFill });
 });
 
 test('lets an active fill run resume instead of starting again', () => {

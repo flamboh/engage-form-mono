@@ -36,7 +36,9 @@ export default defineConfig({
 						'http://localhost/*',
 						'http://127.0.0.1/*',
 						hostPermission(env.PUBLIC_WEB_APP_URL ?? 'http://localhost'),
-						hostPermission(env.PUBLIC_CLERK_SYNC_HOST ?? env.PUBLIC_WEB_APP_URL ?? 'http://localhost'),
+						hostPermission(
+							env.PUBLIC_CLERK_SYNC_HOST ?? env.PUBLIC_WEB_APP_URL ?? 'http://localhost'
+						),
 						clerkFrontendApi ? hostPermission(clerkFrontendApi) : null
 					].filter((value): value is string => value !== null)
 				)

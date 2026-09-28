@@ -1,4 +1,4 @@
-import { isEngageFormUrl } from '@engage-form/fill-engine';
+import { type EngageStep, isEngageFormUrl } from '@engage-form/fill-engine';
 
 export const pendingFillMaxAgeMs = 30 * 60_000;
 
@@ -21,12 +21,14 @@ export type AutoStartDecision =
 
 export function autoStartDecision(input: {
 	url: string;
+	step: EngageStep;
 	now: number;
 	activeRun: boolean;
 	state: PendingFillState;
 	signInDismissed: boolean;
 }): AutoStartDecision {
 	if (!isEngageFormUrl(input.url) || input.activeRun) return { type: 'idle' };
+	if (input.step === 'unknown' || input.step === 'review') return { type: 'idle' };
 	if (!input.state.signedIn) return input.signInDismissed ? { type: 'idle' } : { type: 'signIn' };
 
 	const { pendingFill } = input.state;

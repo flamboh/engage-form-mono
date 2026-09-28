@@ -387,9 +387,9 @@ test('creates separate upload actions for additional receipts', () => {
 });
 
 test('recognizes Engage submitter form pages', () => {
-	expect(
-		isEngageFormUrl('https://uoregon.campuslabs.com/engage/submitter/form/start/730239')
-	).toBe(true);
+	expect(isEngageFormUrl('https://uoregon.campuslabs.com/engage/submitter/form/start/730239')).toBe(
+		true
+	);
 	expect(
 		isEngageFormUrl('https://uoregon.campuslabs.com/engage/submitter/form/step/1?Guid=abc')
 	).toBe(true);
