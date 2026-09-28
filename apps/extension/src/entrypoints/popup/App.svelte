@@ -6,7 +6,7 @@
 	import type { Id } from '../../../../../convex/_generated/dataModel';
 	import { readConvexUrl, readWebAppUrl } from '../../lib/env';
 	import type { ReadyPurchaseRequest, RuntimeMessage, RuntimeResponse } from '../../lib/messages';
-	import { isPendingFillFresh, type PendingFill } from '../../lib/pending-fill';
+	import type { PendingFill } from '../../lib/pending-fill';
 	import { withTimeout } from '../../lib/timeout';
 
 	let signedIn = $state(false);
@@ -20,9 +20,6 @@
 	const webAppUrl = readWebAppUrl();
 	const convex = new ConvexClient(readConvexUrl());
 	const subscriptions: (() => void)[] = [];
-	const freshPendingFill = $derived(
-		pendingFill !== null && isPendingFillFresh(pendingFill, Date.now()) ? pendingFill : null
-	);
 
 	onMount(() => {
 		void refreshAuth();
@@ -85,8 +82,11 @@
 		for (const unsubscribe of subscriptions.splice(0)) unsubscribe();
 	}
 
-	async function fetchConvexToken() {
-		const response = await sendRuntimeMessage({ type: 'GET_CONVEX_TOKEN' });
+	async function fetchConvexToken(options: { forceRefreshToken?: boolean } = {}) {
+		const response = await sendRuntimeMessage({
+			type: 'GET_CONVEX_TOKEN',
+			forceRefresh: options.forceRefreshToken === true
+		});
 		if (!response.ok) throw new Error(response.message);
 		if (!('token' in response)) throw new Error('Background did not return a Convex token.');
 		if (response.token === null) throw new Error('Signed in session missing Convex token.');
@@ -120,6 +120,11 @@
 			return;
 		}
 		await refreshAuth();
+	}
+
+	async function signIn() {
+		const response = await sendRuntimeMessage({ type: 'SIGN_IN' });
+		if (!response.ok) status = response.message;
 	}
 
 	function openTab(url: string) {
@@ -169,13 +174,13 @@
 			<button
 				class="rounded-md bg-stone-950 px-3 py-2 text-sm font-medium text-white hover:bg-stone-800"
 				type="button"
-				onclick={() => openTab(`${webAppUrl}/app`)}
+				onclick={signIn}
 			>
 				Sign in
 			</button>
 		{:else}
-			{#if freshPendingFill !== null}
-				{@const pending = freshPendingFill}
+			{#if pendingFill !== null}
+				{@const pending = pendingFill}
 				<div class="rounded-md border border-stone-900 bg-white p-3">
 					<p class="text-xs text-stone-500">Waiting for Engage</p>
 					<p class="mt-0.5 text-sm font-semibold">{pending.label}</p>
