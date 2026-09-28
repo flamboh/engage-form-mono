@@ -558,7 +558,9 @@ export const saveDraftSnapshot = authedMutation({
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		const patch = keepFilledFields(request, snapshotPatch(request, args.snapshot));
+		const patch = withoutDocumentFields(
+			keepFilledFields(request, snapshotPatch(request, args.snapshot))
+		);
 		const fieldSources = userFieldSources(request, patch);
 		await ctx.db.patch(args.id, {
 			...patch,
@@ -568,6 +570,23 @@ export const saveDraftSnapshot = authedMutation({
 		return null;
 	}
 });
+
+const documentFields = [
+	'receiptFileIds',
+	'secondApprovalFileId',
+	'publicityFileId',
+	'cateringWaiverFileId',
+	'printingInvoiceFileId',
+	'brandApprovalFileId',
+	'buildingManagerApprovalFileId',
+	'computerPriceQuoteFileId'
+] as const;
+
+function withoutDocumentFields<T extends object>(patch: T) {
+	const rest = { ...patch } as Record<string, unknown>;
+	for (const field of documentFields) delete rest[field];
+	return rest as Omit<T, (typeof documentFields)[number]>;
+}
 
 export const scheduleDraftAutosave = authedMutation({
 	args: { id: zid('purchaseRequests'), patch: z.record(z.string(), z.any()) },

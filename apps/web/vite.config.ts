@@ -22,7 +22,10 @@ const LOCAL_CONVEX_ENV_KEYS = [
 	'CLERK_JWT_ISSUER_DOMAIN',
 	'TYPESAFE_AI_KEY',
 	'FILES_SIGNING_SECRET',
-	'FILES_BASE_URL'
+	'FILES_BASE_URL',
+	'AWS_ACCESS_KEY_ID',
+	'AWS_SECRET_ACCESS_KEY',
+	'AWS_REGION'
 ] as const;
 
 const getLocalConvexEnvVars = (loadedEnv: Record<string, string>) => {
