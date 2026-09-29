@@ -166,5 +166,23 @@ test('keeps proper nouns and lowercases common words mid-sentence', () => {
 test('gift purposes read as giving', () => {
 	expect(
 		generateBusinessPurpose(facts({ items: 'mugs', purpose: 'gifts for graduating seniors' })).text
-	).toContain('The mugs were given as gifts to graduating seniors at');
+	).toContain('The mugs were given as gifts for graduating seniors at');
+});
+
+test('prizes keep the preposition the user wrote', () => {
+	const { text } = generateBusinessPurpose(
+		facts({ items: 'vinyl', purpose: 'prizes for trivia night' })
+	);
+	expect(text).toContain('given as prizes for trivia night');
+});
+
+test('customized text must mention one of the event dates', () => {
+	const custom = (date: string) =>
+		customTextOmissions(`Chess Club bought snacks from Target for $24.50 on ${date}.`, facts());
+	expect(custom('4/7')).not.toContain('dates');
+	expect(custom('04/07')).not.toContain('dates');
+	expect(custom('April 7th')).not.toContain('dates');
+	expect(custom('Apr 7')).not.toContain('dates');
+	expect(custom('4/14')).toContain('dates');
+	expect(custom('14/7')).toContain('dates');
 });

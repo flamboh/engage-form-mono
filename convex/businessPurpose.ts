@@ -191,10 +191,34 @@ export function customTextOmissions(text: string, facts: BusinessPurposeFacts): 
 			omissions.push('attendance');
 		}
 	}
-	if (normalizeEventDates(facts.dates).length > 0 && !/\b\d{1,2}\/\d{1,2}\b/.test(haystack)) {
+	const dates = normalizeEventDates(facts.dates);
+	if (dates.length > 0 && !dates.some((date) => mentionsDate(haystack, date))) {
 		omissions.push('dates');
 	}
 	return omissions;
+}
+
+const monthNames = [
+	'january',
+	'february',
+	'march',
+	'april',
+	'may',
+	'june',
+	'july',
+	'august',
+	'september',
+	'october',
+	'november',
+	'december'
+];
+
+function mentionsDate(haystack: string, date: string) {
+	const [, month, day] = date.split('-').map(Number);
+	const numeric = new RegExp(`(^|[^\\d])0?${month}/0?${day}(?!\\d)`);
+	const name = monthNames[month - 1];
+	const named = new RegExp(`\\b(${name}|${name.slice(0, 3)})\\.?\\s+${day}(st|nd|rd|th)?\\b`);
+	return numeric.test(haystack) || named.test(haystack);
 }
 
 function tense(plural: boolean, dates: string[], today: string | null) {
@@ -218,8 +242,10 @@ function reasonPhrase(reason: string) {
 function purposeUse(purpose: string) {
 	if (purpose === '') return 'used';
 	const text = midSentence(purpose).replace(/[.!]+$/, '');
-	const giving = /^(gifts?|prizes?|giveaways?|awards?)\s+(?:for|to)\s+(.+)$/i.exec(text);
-	if (giving !== null) return `given as ${giving[1].toLowerCase()} to ${giving[2]}`;
+	const giving = /^(gifts?|prizes?|giveaways?|awards?)\s+(for|to)\s+(.+)$/i.exec(text);
+	if (giving !== null) {
+		return `given as ${giving[1].toLowerCase()} ${giving[2].toLowerCase()} ${giving[3]}`;
+	}
 	if (/^(to|as|in|during)\b/i.test(text)) return `used ${text}`;
 	return `used for ${text.replace(/^for\s+/i, '')}`;
 }
