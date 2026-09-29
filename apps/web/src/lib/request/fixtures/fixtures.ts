@@ -145,7 +145,7 @@ export function receiptImage(vendor: string, lines: [string, string][], total: s
 }
 
 export function flyerImage() {
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400"><rect width="300" height="400" fill="#154733"/><g font-family="Arial, sans-serif" fill="#fee123" text-anchor="middle"><text x="150" y="120" font-size="36" font-weight="bold">BOULDERING</text><text x="150" y="162" font-size="36" font-weight="bold">NIGHT</text><text x="150" y="230" font-size="18" fill="#fff">Fri Oct 2 · 7pm</text><text x="150" y="258" font-size="18" fill="#fff">Student Rec Center</text><text x="150" y="330" font-size="14" fill="#fff">All students welcome</text></g></svg>`;
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400"><rect width="300" height="400" fill="#1d5b40"/><g font-family="Arial, sans-serif" fill="#fee123" text-anchor="middle"><text x="150" y="120" font-size="36" font-weight="bold">BOULDERING</text><text x="150" y="162" font-size="36" font-weight="bold">NIGHT</text><text x="150" y="230" font-size="18" fill="#fff">Fri Oct 2 · 7pm</text><text x="150" y="258" font-size="18" fill="#fff">Student Rec Center</text><text x="150" y="330" font-size="14" fill="#fff">All students welcome</text></g></svg>`;
 	return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
