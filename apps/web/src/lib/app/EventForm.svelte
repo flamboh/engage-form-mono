@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { weekdayName } from '$convex/events';
+	import { errorMessage } from '$lib/app/styles';
 	import type { EventDetails } from '$lib/purchase/draftDetails';
-	import { errorMessage, inputClass, labelClass, primaryButtonClass } from '$lib/app/styles';
+	import Button from '$lib/ui/Button.svelte';
+	import InlineError from '$lib/ui/InlineError.svelte';
 
 	let {
 		initial = null,
 		submitLabel,
 		cancelLabel = 'Cancel',
-		tone = 'app',
 		autofocus = false,
 		onsubmit,
 		oncancel
@@ -16,7 +17,6 @@
 		initial?: Partial<EventDetails> | null;
 		submitLabel: string;
 		cancelLabel?: string;
-		tone?: 'app' | 'request';
 		autofocus?: boolean;
 		onsubmit: (details: EventDetails) => Promise<void> | void;
 		oncancel?: () => void;
@@ -34,11 +34,6 @@
 	let openToAllStudents = $state(start?.openToAllStudents ?? true);
 	let saving = $state(false);
 	let error = $state('');
-
-	const field = $derived(tone === 'request' ? 'input' : inputClass);
-	const label = $derived(
-		tone === 'request' ? 'flex flex-col gap-1.5 text-sm font-medium text-(--ink)' : labelClass
-	);
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
@@ -67,15 +62,11 @@
 	}
 </script>
 
-<form
-	class="event-form flex flex-col gap-4"
-	class:tone-request={tone === 'request'}
-	onsubmit={save}
->
-	<label class={label}>
+<form class="flex flex-col gap-4" onsubmit={save}>
+	<label class="flex flex-col gap-1.5 text-sm font-medium">
 		Event name
 		<input
-			class={field}
+			class="input"
 			required
 			maxlength="80"
 			placeholder="Weekly listening session"
@@ -112,7 +103,7 @@
 				<span>One time</span>
 			</label>
 		</div>
-		<span class="text-xs text-(--quiet,#78716c)">
+		<span class="text-xs text-quiet">
 			{weekday === null
 				? 'We’ll suggest the receipt date for each request.'
 				: `We’ll suggest the ${weekdayName(weekday)} after each receipt.`}
@@ -120,18 +111,18 @@
 	</fieldset>
 
 	<div class="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)_8rem]">
-		<label class={label}>
+		<label class="flex flex-col gap-1.5 text-sm font-medium">
 			Start time
-			<input class={field} type="time" bind:value={time} />
+			<input class="input" type="time" bind:value={time} />
 		</label>
-		<label class={label}>
+		<label class="flex flex-col gap-1.5 text-sm font-medium">
 			Building and room
-			<input class={field} maxlength="120" placeholder="McKenzie 240A" bind:value={location} />
+			<input class="input" maxlength="120" placeholder="McKenzie 240A" bind:value={location} />
 		</label>
-		<label class={label}>
+		<label class="flex flex-col gap-1.5 text-sm font-medium">
 			Students
 			<input
-				class={field}
+				class="input"
 				type="number"
 				min="0"
 				inputmode="numeric"
@@ -142,23 +133,17 @@
 	</div>
 
 	<label class="flex items-center gap-2 text-sm">
-		<input class="size-4 accent-[#154733]" type="checkbox" bind:checked={openToAllStudents} />
+		<input class="size-4 accent-pine" type="checkbox" bind:checked={openToAllStudents} />
 		Open to all students
 	</label>
 
-	{#if error}<p class="text-sm text-red-700" role="alert">{error}</p>{/if}
-	<div class="flex items-center gap-3">
-		<button
-			class={tone === 'request' ? 'submit-request' : primaryButtonClass}
-			type="submit"
-			disabled={saving}
-		>
+	{#if error}<InlineError message={error} />{/if}
+	<div class="flex items-center gap-4">
+		<Button variant="primary" type="submit" busy={saving}>
 			{saving ? 'Saving…' : submitLabel}
-		</button>
+		</Button>
 		{#if oncancel}
-			<button class="text-sm text-stone-600 hover:text-stone-900" type="button" onclick={oncancel}>
-				{cancelLabel}
-			</button>
+			<Button variant="quiet" onclick={oncancel}>{cancelLabel}</Button>
 		{/if}
 	</div>
 </form>
@@ -166,54 +151,29 @@
 <style>
 	.day {
 		display: inline-flex;
-		min-height: 2.25rem;
+		min-height: 36px;
 		min-width: 3rem;
 		cursor: pointer;
 		align-items: center;
 		justify-content: center;
-		border: 1px solid #d6d3d1;
-		border-radius: 9999px;
-		background: white;
+		border: 1px solid var(--line);
+		background: var(--surface);
 		padding: 0 0.75rem;
 		font-size: 0.875rem;
 	}
 
-	.tone-request .day {
-		border-color: var(--line);
-		border-radius: 0;
-	}
-
 	.day:hover {
-		border-color: #154733;
+		border-color: var(--pine);
 	}
 
 	.day:has(:checked) {
-		border-color: #154733;
-		background: #154733;
+		border-color: var(--pine);
+		background: var(--pine);
 		color: white;
 	}
 
 	.day:has(:focus-visible) {
-		outline: 2px solid #154733;
+		outline: 2px solid var(--pine);
 		outline-offset: 2px;
-	}
-
-	.submit-request {
-		display: inline-flex;
-		min-height: 2.5rem;
-		align-items: center;
-		background: var(--pine);
-		padding: 0 1rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: white;
-	}
-
-	.submit-request:hover {
-		background: var(--pine-deep);
-	}
-
-	.submit-request:disabled {
-		opacity: 0.6;
 	}
 </style>

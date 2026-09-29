@@ -60,6 +60,28 @@
 	}
 }
 
+@layer components {
+	.input {
+		width: 100%;
+		min-height: 42px;
+		border: 1px solid var(--line);
+		background: var(--surface);
+		padding: 0.5rem 0.75rem;
+		font-size: 0.9375rem;
+		color: var(--ink);
+	}
+
+	.input::placeholder {
+		color: var(--faint);
+	}
+
+	.input:focus-visible {
+		border-color: var(--pine);
+		outline: 2px solid color-mix(in oklab, var(--pine) 30%, transparent);
+		outline-offset: 0;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,

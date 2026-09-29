@@ -3,7 +3,9 @@
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import DocumentPicker from '$lib/app/DocumentPicker.svelte';
-	import { errorMessage, inputClass, labelClass, primaryButtonClass } from '$lib/app/styles';
+	import { errorMessage } from '$lib/app/styles';
+	import Button from '$lib/ui/Button.svelte';
+	import InlineError from '$lib/ui/InlineError.svelte';
 	import { useConvexClient } from 'convex-svelte';
 
 	let {
@@ -63,38 +65,41 @@
 
 <form class="flex flex-col gap-4" onsubmit={save}>
 	{#if organizations.length > 1}
-		<label class={labelClass}>
+		<label class="flex flex-col gap-1.5 text-sm font-medium">
 			Organization
-			<select class={inputClass} bind:value={organizationId}>
+			<select class="input" bind:value={organizationId}>
 				{#each organizations as org (org._id)}
 					<option value={org._id}>{org.name}</option>
 				{/each}
 			</select>
 		</label>
 	{/if}
-	<label class={labelClass}>
+	<label class="flex flex-col gap-1.5 text-sm font-medium">
 		Full name
-		<input class={inputClass} required bind:value={name} />
+		<input class="input" required bind:value={name} />
 	</label>
-	<label class={labelClass}>
-		UO ID number
-		<input class={inputClass} required inputmode="numeric" placeholder="95…" bind:value={uo95} />
-	</label>
-	<label class={labelClass}>
-		Permanent address
-		<input class={inputClass} required bind:value={permanentAddress} />
-	</label>
-	<div class="grid gap-5 sm:grid-cols-2">
-		<DocumentPicker bind:fileId={idCardFrontFileId} kind="id_front" label="UO ID card, front" />
-		<DocumentPicker bind:fileId={idCardBackFileId} kind="id_back" label="UO ID card, back" />
+	<div class="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
+		<label class="flex flex-col gap-1.5 text-sm font-medium">
+			UO ID number
+			<input class="input" required inputmode="numeric" placeholder="95…" bind:value={uo95} />
+		</label>
+		<label class="flex flex-col gap-1.5 text-sm font-medium">
+			Permanent address
+			<input class="input" required bind:value={permanentAddress} />
+		</label>
 	</div>
-	{#if error}<p class="text-sm text-red-700" role="alert">{error}</p>{/if}
-	<div class="flex items-center gap-3">
-		<button class={primaryButtonClass} type="submit" disabled={saving}>
-			{saving ? 'Saving…' : start ? 'Save' : 'Add purchaser'}
-		</button>
-		<button class="text-sm text-stone-600 hover:text-stone-900" type="button" onclick={onDone}>
-			Cancel
-		</button>
+	<div class="flex flex-col gap-2">
+		<span class="text-sm font-medium">Their UO ID card</span>
+		<div class="flex flex-wrap gap-3">
+			<DocumentPicker bind:fileId={idCardFrontFileId} kind="id_front" label="Front" />
+			<DocumentPicker bind:fileId={idCardBackFileId} kind="id_back" label="Back" />
+		</div>
+	</div>
+	{#if error}<InlineError message={error} />{/if}
+	<div class="flex items-center gap-4">
+		<Button variant="primary" type="submit" busy={saving}>
+			{saving ? 'Saving…' : start ? 'Save' : 'Add person'}
+		</Button>
+		<Button variant="quiet" onclick={onDone}>Cancel</Button>
 	</div>
 </form>

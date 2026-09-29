@@ -1,14 +1,18 @@
 <script lang="ts">
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import { formatEventTime, weekdayName } from '$convex/events';
+	import { formatEventTime } from '$convex/events';
 	import EventForm from '$lib/app/EventForm.svelte';
-	import { errorMessage, secondaryButtonClass } from '$lib/app/styles';
+	import { errorMessage } from '$lib/app/styles';
 	import type { EventDetails } from '$lib/purchase/draftDetails';
+	import Button from '$lib/ui/Button.svelte';
+	import EmptyState from '$lib/ui/EmptyState.svelte';
+	import FieldRow from '$lib/ui/FieldRow.svelte';
+	import InlineError from '$lib/ui/InlineError.svelte';
+	import SectionHeader from '$lib/ui/SectionHeader.svelte';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 
-	let { organization, showName }: { organization: Doc<'organizations'>; showName: boolean } =
-		$props();
+	let { organization }: { organization: Doc<'organizations'> } = $props();
 
 	const client = useConvexClient();
 	const eventsQuery = useQuery(api.authed.events.listEvents, () => ({
@@ -43,80 +47,80 @@
 		}
 	}
 
+	function cadence(event: Doc<'events'>) {
+		return event.weekday === null ? 'One time' : 'Weekly';
+	}
+
 	function summary(event: Doc<'events'>) {
-		const when = event.weekday === null ? 'One time' : `${weekdayName(event.weekday)}s`;
-		const time = event.time ? ` at ${formatEventTime(event.time)}` : '';
-		const where = event.location ? `, ${event.location}` : '';
-		const count = event.attendance === null ? '' : `, about ${event.attendance} students`;
-		return `${when}${time}${where}${count}`;
+		const days = [
+			'Sundays',
+			'Mondays',
+			'Tuesdays',
+			'Wednesdays',
+			'Thursdays',
+			'Fridays',
+			'Saturdays'
+		];
+		return [
+			event.name,
+			event.weekday === null
+				? ''
+				: `${days[event.weekday]}${event.time ? ` ${formatEventTime(event.time)}` : ''}`,
+			event.location,
+			event.attendance === null ? '' : `about ${event.attendance}`
+		]
+			.filter((part) => part !== '')
+			.join(', ');
 	}
 </script>
 
-<div class="flex flex-col gap-2">
-	<div class="flex items-center justify-between gap-4">
-		{#if showName}
-			<h3 class="text-sm font-medium text-stone-700">{organization.name}</h3>
-		{:else}
-			<span></span>
-		{/if}
-		<button class={secondaryButtonClass} type="button" onclick={() => toggle('new')}>
-			Add event
-		</button>
-	</div>
-	{#if error}<p class="text-sm text-red-700" role="alert">{error}</p>{/if}
-	<ul class="divide-y divide-stone-200 border-y border-stone-200">
-		{#if editing === 'new'}
-			<li class="py-5">
-				<EventForm
-					submitLabel="Add event"
-					autofocus
-					onsubmit={(details) => save(details)}
-					oncancel={() => (editing = null)}
-				/>
-			</li>
-		{/if}
+<div class="flex flex-col">
+	<SectionHeader title="Events" level={3}>
+		{#snippet action()}
+			<Button variant="quiet" size="sm" onclick={() => toggle('new')}>Add event</Button>
+		{/snippet}
+	</SectionHeader>
+	{#if error}<div class="pt-3"><InlineError message={error} /></div>{/if}
+	{#if editing === 'new'}
+		<div class="border-b border-line py-5">
+			<EventForm
+				submitLabel="Add event"
+				autofocus
+				onsubmit={(details) => save(details)}
+				oncancel={() => (editing = null)}
+			/>
+		</div>
+	{/if}
+	<dl>
 		{#each events as event (event._id)}
-			<li class="py-4">
-				<div class="flex items-center justify-between gap-4">
-					<div class="min-w-0">
-						<p class="truncate font-medium">{event.name}</p>
-						<p class="truncate text-sm text-stone-500">{summary(event)}</p>
-					</div>
-					<div class="flex shrink-0 items-center gap-1">
-						<button
-							class="rounded-full px-3 py-1.5 text-sm font-medium text-[#154733] hover:bg-[#154733]/10"
-							type="button"
-							aria-expanded={editing === event._id}
-							onclick={() => toggle(event._id)}
-						>
-							{editing === event._id ? 'Close' : 'Edit'}
-						</button>
-						<button
-							class="rounded-full px-3 py-1.5 text-sm text-stone-500 hover:bg-stone-100 hover:text-stone-900"
-							type="button"
-							onclick={() => archive(event._id)}
-						>
-							Archive
-						</button>
+			{#if editing === event._id}
+				<div class="border-b border-line py-5">
+					<EventForm
+						initial={event}
+						submitLabel="Save"
+						onsubmit={(details) => save(details, event._id)}
+						oncancel={() => (editing = null)}
+					/>
+					<div class="pt-4">
+						<Button variant="quiet" size="sm" onclick={() => archive(event._id)}>
+							Archive this event
+						</Button>
 					</div>
 				</div>
-				{#if editing === event._id}
-					<div class="pt-5">
-						<EventForm
-							initial={event}
-							submitLabel="Save"
-							onsubmit={(details) => save(details, event._id)}
-							oncancel={() => (editing = null)}
-						/>
-					</div>
-				{/if}
-			</li>
+			{:else}
+				<FieldRow
+					label={cadence(event)}
+					value={summary(event)}
+					onaction={() => toggle(event._id)}
+				/>
+			{/if}
 		{:else}
 			{#if editing !== 'new' && eventsQuery.data !== undefined}
-				<li class="py-4 text-sm text-stone-500">
-					Add a meeting or event you hold often. Requests fill in its time, room, and turnout.
-				</li>
+				<EmptyState
+					title="No events yet."
+					body="Add one you hold often and requests fill in its time, room, and turnout."
+				/>
 			{/if}
 		{/each}
-	</ul>
+	</dl>
 </div>
