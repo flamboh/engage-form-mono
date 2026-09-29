@@ -12,7 +12,7 @@
 	import Chip from './Chip.svelte';
 	import EditableValue from './EditableValue.svelte';
 	import type { RequestEditor } from './editor.svelte';
-	import { dateInputValue, shortDate } from './labels';
+	import { dateInputValue } from './labels';
 	import SourceCue from './SourceCue.svelte';
 
 	let { editor, events }: { editor: RequestEditor; events: Doc<'events'>[] } = $props();
@@ -48,6 +48,12 @@
 				)
 	);
 	const source = $derived(editor.sourceOf('activity'));
+
+	function shortDate(value: string) {
+		const weekday = weekdayOf(value);
+		if (weekday === null) return value;
+		return `${weekdayName(weekday).slice(0, 3)} ${value.slice(5, 7)}/${value.slice(8, 10)}`;
+	}
 
 	async function create(details: EventDetails) {
 		const id = await editor.saveEvent(details);

@@ -1,4 +1,3 @@
-import { weekdayName, weekdayOf } from '$convex/events';
 import type { DocumentSlot } from '$convex/requestView';
 import type { DocumentationCategory } from '$lib/purchase/draftDetails';
 
@@ -72,10 +71,4 @@ export function reviewDisplay(
 
 export function dateInputValue(value: string | null | undefined) {
 	return value !== null && value !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
-}
-
-export function shortDate(value: string) {
-	const weekday = weekdayOf(value);
-	if (weekday === null) return value;
-	return `${weekdayName(weekday).slice(0, 3)} ${value.slice(5, 7)}/${value.slice(8, 10)}`;
 }

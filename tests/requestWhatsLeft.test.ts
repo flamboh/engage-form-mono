@@ -96,3 +96,20 @@ test('a removed-receipt check asks whether the typed value is still right', () =
 	expect(review).toMatchObject({ label: 'Check the store' });
 	expect(review?.detail).toBe('You removed a receipt. Is Test Edited Store still right?');
 });
+
+test('missing event facts collapse into one item that points at the event', () => {
+	const items = whatsLeft({
+		readiness: {
+			sections: [
+				{
+					section: 'Event',
+					reasons: ['Add the event date.', 'Add how many students attended.']
+				}
+			]
+		},
+		reviews: [],
+		reading: false
+	});
+	expect(items).toHaveLength(1);
+	expect(items[0]).toMatchObject({ key: 'event', target: { kind: 'field', field: 'event' } });
+});

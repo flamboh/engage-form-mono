@@ -14,6 +14,7 @@ export type MissingSlot =
 	| 'printing_invoice';
 export type ReviewField = 'vendor' | 'totalAmount' | 'receiptDate' | 'itemDescription';
 export type LeftField =
+	| 'event'
 	| 'why'
 	| 'purchaser'
 	| 'budget'
@@ -153,6 +154,13 @@ const reasonCopy: Record<string, Copy> = {
 };
 
 const sectionCopy: Record<string, Copy> = {
+	Event: {
+		key: 'event',
+		label: 'Finish the event details',
+		detail: 'Engage needs which event, its date and time, the room, and about how many came.',
+		target: { kind: 'field', field: 'event' },
+		waitsForReceipt: false
+	},
 	Recipients: {
 		key: 'recipient-details',
 		label: 'Finish recipient details',

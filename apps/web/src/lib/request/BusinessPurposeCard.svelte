@@ -1,7 +1,10 @@
 <script lang="ts">
-	import type { MissingFact } from '$convex/businessPurpose';
+	import {
+		businessPurposeFactsFrom,
+		customTextOmissions,
+		type MissingFact
+	} from '$convex/businessPurpose';
 	import type { RequestEditor } from './editor.svelte';
-	import { omittedFactLabels, omittedFacts } from './purposeCheck';
 
 	let {
 		editor,
@@ -20,16 +23,23 @@
 	const form = $derived(editor.form);
 	const override = $derived(form?.businessPurposeOverride ?? null);
 	const shown = $derived(override ?? text);
-	const omitted = $derived(
-		override === null || form === null
-			? []
-			: omittedFacts(override, {
-					vendor: form.vendor,
-					totalAmount: form.totalAmount,
-					attendance: form.activity.attendance,
-					dates: form.activity.dates
-				})
-	);
+	const omitted = $derived.by(() => {
+		const purchase = editor.purchase;
+		if (override === null || form === null || purchase === undefined) return [];
+		const facts = businessPurposeFactsFrom({
+			...purchase,
+			...form,
+			totalAmount: form.totalAmount ?? 0
+		});
+		return customTextOmissions(override, facts).filter((fact) => fact in omittedLabels);
+	});
+
+	const omittedLabels: Partial<Record<MissingFact, string>> = {
+		vendor: 'the store',
+		total: 'the total',
+		attendance: 'how many students attended',
+		dates: 'the event date'
+	};
 
 	function customize() {
 		if (override === null) editor.update({ businessPurposeOverride: text });
@@ -91,8 +101,9 @@
 	{#if omitted.length > 0}
 		<p class="text-sm text-(--ink)" role="status">
 			<span class="dot" aria-hidden="true"></span>
-			Your wording doesn’t seem to mention {list(omitted.map((fact) => omittedFactLabels[fact]))}.
-			Engage denies purposes missing these.
+			Your wording doesn’t seem to mention {list(
+				omitted.map((fact) => omittedLabels[fact] ?? fact)
+			)}. Engage denies purposes missing these.
 		</p>
 	{/if}
 
