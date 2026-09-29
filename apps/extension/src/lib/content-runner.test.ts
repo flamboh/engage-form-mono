@@ -159,7 +159,7 @@ test('clears a run when the cached purchase is missing', async () => {
 
 	expect(result).toEqual({
 		ok: false,
-		message: 'Selected purchase request could not be loaded from Convex.',
+		message: 'Selected purchase request could not be loaded. Start the fill again.',
 		step: 'claims',
 		filled: 4,
 		missed: []

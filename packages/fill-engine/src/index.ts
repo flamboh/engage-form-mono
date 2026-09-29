@@ -29,9 +29,9 @@ export type EngageStep =
 	| 'unknown';
 
 export type FillAction =
-	| { type: 'text'; labelIncludes: string; value: string }
-	| { type: 'textarea'; labelIncludes: string; value: string }
-	| { type: 'checkbox'; labelIncludes: string; checked: boolean }
+	| { type: 'text'; labelIncludes: string; alternatives?: string[]; value: string }
+	| { type: 'textarea'; labelIncludes: string; alternatives?: string[]; value: string }
+	| { type: 'checkbox'; labelIncludes: string; keywords?: string[]; checked: boolean }
 	| { type: 'radio'; labelIncludes: string }
 	| { type: 'combobox'; labelIncludes: string; valueIncludes: string }
 	| { type: 'select'; labelIncludes: string; valueIncludes: string }
@@ -51,13 +51,20 @@ export type FillPlan = {
 
 type EngageField =
 	| {
-			type: 'text' | 'textarea' | 'combobox' | 'select';
+			type: 'text' | 'textarea';
+			labelIncludes: string;
+			alternatives?: string[];
+			resolve: (purchaseRequest: PurchaseRequest) => string;
+	  }
+	| {
+			type: 'combobox' | 'select';
 			labelIncludes: string;
 			resolve: (purchaseRequest: PurchaseRequest) => string;
 	  }
 	| {
 			type: 'checkbox';
 			labelIncludes: string | ((purchaseRequest: PurchaseRequest) => string);
+			keywords?: string[];
 			checked: boolean | ((purchaseRequest: PurchaseRequest) => boolean);
 	  }
 	| {
@@ -80,6 +87,7 @@ type EngageField =
 type EngageStepSchema = {
 	step: EngageStep;
 	headingIncludes: string[];
+	headingKeywords?: string[];
 	fields: EngageField[];
 };
 
@@ -164,11 +172,16 @@ export const engageSchema: EngageStepSchema[] = [
 		step: 'documentation',
 		headingIncludes: ['documentation inquiry'],
 		fields: [
-			categoryCheckboxField('ASUO funds', 'asuo_funds'),
-			categoryCheckboxField('food', 'food'),
-			categoryCheckboxField('printing services', 'printing_services'),
-			checkboxField('merchandise/apparel or gifts', hasMerchandiseOrGiftCategory),
-			categoryCheckboxField('office supplies/goods', 'office_supplies_goods')
+			categoryCheckboxField('ASUO funds', ['asuo'], 'asuo_funds'),
+			categoryCheckboxField('food', ['food'], 'food'),
+			categoryCheckboxField('printing', ['printing', 'print services'], 'printing_services'),
+			keywordCheckboxField(
+				'gifts or logo designs',
+				['gift', 'logo', 'merchandise', 'apparel'],
+				hasMerchandiseOrGiftCategory
+			),
+			categoryCheckboxField('office supplies', ['office'], 'office_supplies_goods'),
+			keywordCheckboxField('none of the above', ['none'], hasNoDocumentationCategory)
 		]
 	},
 	{
@@ -194,9 +207,18 @@ export const engageSchema: EngageStepSchema[] = [
 	{
 		step: 'gifts',
 		headingIncludes: ['uo branding/apparel/gifts'],
+		headingKeywords: ['gift', 'logo', 'branding', 'apparel', 'merchandise'],
 		fields: [
-			textareaField('per person gift/apparel/prize amount', recipientValueText),
-			textareaField('name and 95# of the recipient', recipientIdText)
+			textareaField('per person gift/apparel/prize amount', recipientValueText, [
+				'per person',
+				'prize amount',
+				'gift amount'
+			]),
+			textareaField('name and 95# of the recipient', recipientIdText, [
+				'95# of the recipient',
+				'95 of the recipient',
+				'name and 95'
+			])
 		]
 	},
 	{
@@ -218,13 +240,37 @@ export const engageSchema: EngageStepSchema[] = [
 
 export function detectStep(headingText: string): EngageStep {
 	const text = normalize(headingText);
-	const step = engageSchema.find((item) =>
-		item.headingIncludes.some((heading) => text.includes(heading))
-	);
+	const step =
+		engageSchema.find((item) => item.headingIncludes.some((heading) => text.includes(heading))) ??
+		engageSchema.find((item) =>
+			(item.headingKeywords ?? []).some((keyword) => hasKeyword(headingText, keyword))
+		);
 
-	if (step !== undefined) return step.step;
+	return step?.step ?? 'unknown';
+}
 
-	return 'unknown';
+export function normalizeLabel(value: string) {
+	return value
+		.toLowerCase()
+		.replace(/&/g, ' and ')
+		.replace(/[/,\-–—:;()[\]."'?!]/g, ' ')
+		.replace(/\b(and|or)\b/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+export function hasKeyword(label: string, keyword: string) {
+	return ` ${normalizeLabel(label)}`.includes(` ${normalizeLabel(keyword)}`);
+}
+
+export function choiceMatches(
+	label: string,
+	action: Pick<Extract<FillAction, { type: 'checkbox' }>, 'labelIncludes' | 'keywords'>
+) {
+	if (action.keywords === undefined) {
+		return normalizeLabel(label).includes(normalizeLabel(action.labelIncludes));
+	}
+	return action.keywords.some((keyword) => hasKeyword(label, keyword));
 }
 
 export function createFillPlan(step: EngageStep, purchaseRequest: PurchaseRequest): FillPlan {
@@ -282,6 +328,7 @@ function resolveField(
 		return {
 			type: field.type,
 			labelIncludes: field.labelIncludes,
+			...(field.alternatives === undefined ? {} : { alternatives: field.alternatives }),
 			value: field.resolve(purchaseRequest)
 		};
 	}
@@ -301,6 +348,7 @@ function resolveField(
 				typeof field.labelIncludes === 'string'
 					? field.labelIncludes
 					: field.labelIncludes(purchaseRequest),
+			...(field.keywords === undefined ? {} : { keywords: field.keywords }),
 			checked: typeof field.checked === 'boolean' ? field.checked : field.checked(purchaseRequest)
 		};
 	}
@@ -342,9 +390,10 @@ function textField(
 
 function textareaField(
 	labelIncludes: string,
-	resolve: (purchaseRequest: PurchaseRequest) => string
+	resolve: (purchaseRequest: PurchaseRequest) => string,
+	alternatives?: string[]
 ): EngageField {
-	return { type: 'textarea', labelIncludes, resolve };
+	return { type: 'textarea', labelIncludes, alternatives, resolve };
 }
 
 function comboboxField(
@@ -368,11 +417,20 @@ function checkboxField(
 	return { type: 'checkbox', labelIncludes, checked };
 }
 
+function keywordCheckboxField(
+	labelIncludes: string,
+	keywords: string[],
+	checked: (purchaseRequest: PurchaseRequest) => boolean
+): EngageField {
+	return { type: 'checkbox', labelIncludes, keywords, checked };
+}
+
 function categoryCheckboxField(
 	labelIncludes: string,
+	keywords: string[],
 	category: PurchaseRequest['documentationCategories'][number]
 ): EngageField {
-	return checkboxField(labelIncludes, (purchase) =>
+	return keywordCheckboxField(labelIncludes, keywords, (purchase) =>
 		effectiveDocumentationCategories(purchase).includes(category)
 	);
 }
@@ -380,6 +438,10 @@ function categoryCheckboxField(
 function hasMerchandiseOrGiftCategory(purchase: PurchaseRequest) {
 	const categories = effectiveDocumentationCategories(purchase);
 	return categories.includes('merchandise_apparel') || categories.includes('gifts_prizes');
+}
+
+function hasNoDocumentationCategory(purchase: PurchaseRequest) {
+	return effectiveDocumentationCategories(purchase).length === 0;
 }
 
 function radioField(labelIncludes: string): EngageField {

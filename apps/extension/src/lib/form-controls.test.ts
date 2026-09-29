@@ -1,5 +1,41 @@
 import { expect, test } from 'vitest';
-import { setFiles } from './form-controls';
+import { missMessage, pickChoice, setFiles } from './form-controls';
+
+const liveDocumentationLabels = [
+	'Your event is using ASUO funds.',
+	'Your event is having food.',
+	'This PO involves printing services.',
+	'This PO involves purchasing gifts or logo designs.',
+	'This PO involves office supplies/goods.',
+	'None of the above'
+];
+
+test('picks the live 2026-27 gifts or logo designs checkbox', () => {
+	expect(
+		pickChoice(liveDocumentationLabels, {
+			labelIncludes: 'gifts or logo designs',
+			keywords: ['gift', 'logo', 'merchandise', 'apparel']
+		})
+	).toBe(3);
+	expect(pickChoice(liveDocumentationLabels, { labelIncludes: 'none', keywords: ['none'] })).toBe(
+		5
+	);
+	expect(pickChoice(liveDocumentationLabels, { labelIncludes: 'no alcohol' })).toBeNull();
+});
+
+test('lists the visible labels when a choice is missing', () => {
+	const message = missMessage('checkbox:gifts or logo designs', [
+		...liveDocumentationLabels.slice(0, 3),
+		'  This PO involves printing services.  ',
+		'x'.repeat(200)
+	]);
+	expect(message).toBe(
+		`checkbox:gifts or logo designs (this page has: “Your event is using ASUO funds.”, “Your event is having food.”, “This PO involves printing services.”, “${'x'.repeat(69)}…”)`
+	);
+	expect(missMessage('textarea:per person', [])).toBe(
+		'textarea:per person (no labels found on this page)'
+	);
+});
 
 test('uploads through hidden file inputs and tagged drop targets', async () => {
 	const dom = installFakeDom();

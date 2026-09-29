@@ -1,6 +1,15 @@
 import { expect, test } from 'vitest';
 import { samplePurchaseRequest } from '../../domain/src/index.ts';
-import { createFillPlan, detectStep, engageSchema, isEngageFormUrl } from './index.ts';
+import {
+	choiceMatches,
+	createFillPlan,
+	detectStep,
+	engageSchema,
+	type FillAction,
+	hasKeyword,
+	isEngageFormUrl,
+	normalizeLabel
+} from './index.ts';
 
 test('detects Engage steps by heading', () => {
 	expect(detectStep('SOFS Request Organization Representation')).toBe('organizationRepresentation');
@@ -234,23 +243,23 @@ test('skips optional second ID card upload when only one ID card document exists
 	});
 });
 
-test('fills Documentation inquiry from effective categories without None of the above', () => {
+function documentationChoice(categories: typeof samplePurchaseRequest.documentationCategories) {
 	const plan = createFillPlan('documentation', {
 		...samplePurchaseRequest,
-		documentationCategories: [],
+		documentationCategories: categories,
 		organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
 	});
+	return (labelIncludes: string) =>
+		plan.actions.find(
+			(action): action is Extract<FillAction, { type: 'checkbox' }> =>
+				action.type === 'checkbox' && action.labelIncludes === labelIncludes
+		)?.checked;
+}
 
-	expect(plan.actions).not.toContainEqual({
-		type: 'checkbox',
-		labelIncludes: 'None of the above',
-		checked: false
-	});
-	expect(plan.actions).toContainEqual({
-		type: 'checkbox',
-		labelIncludes: 'ASUO funds',
-		checked: false
-	});
+test('checks None of the above only when no Documentation Category applies', () => {
+	expect(documentationChoice([])('none of the above')).toBe(true);
+	expect(documentationChoice([])('ASUO funds')).toBe(false);
+	expect(documentationChoice(['food'])('none of the above')).toBe(false);
 });
 
 test('fills ASUO Funds when it is implicit from Fund Letter I', () => {
@@ -262,70 +271,149 @@ test('fills ASUO Funds when it is implicit from Fund Letter I', () => {
 	expect(plan.actions).toContainEqual({
 		type: 'checkbox',
 		labelIncludes: 'ASUO funds',
+		keywords: ['asuo'],
 		checked: true
 	});
+	expect(plan.actions).toContainEqual(
+		expect.objectContaining({ labelIncludes: 'none of the above', checked: false })
+	);
 });
 
 test('fills ASUO Funds when a non-I Fund Letter selects it', () => {
-	const plan = createFillPlan('documentation', {
-		...samplePurchaseRequest,
-		documentationCategories: ['asuo_funds'],
-		organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
-	});
-
-	expect(plan.actions).toContainEqual({
-		type: 'checkbox',
-		labelIncludes: 'ASUO funds',
-		checked: true
-	});
+	expect(documentationChoice(['asuo_funds'])('ASUO funds')).toBe(true);
 });
 
 test('fills selected additive Documentation Categories', () => {
-	const plan = createFillPlan('documentation', {
-		...samplePurchaseRequest,
-		documentationCategories: ['food', 'printing_services', 'office_supplies_goods'],
-		organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
-	});
+	const choice = documentationChoice(['food', 'printing_services', 'office_supplies_goods']);
 
-	expect(plan.actions).toContainEqual({ type: 'checkbox', labelIncludes: 'food', checked: true });
-	expect(plan.actions).toContainEqual({
-		type: 'checkbox',
-		labelIncludes: 'printing services',
-		checked: true
-	});
-	expect(plan.actions).toContainEqual({
-		type: 'checkbox',
-		labelIncludes: 'office supplies/goods',
-		checked: true
-	});
+	expect(choice('food')).toBe(true);
+	expect(choice('printing')).toBe(true);
+	expect(choice('office supplies')).toBe(true);
+	expect(choice('gifts or logo designs')).toBe(false);
 });
 
 test('maps either Merchandise/Apparel or Gifts/Prizes to the Engage combined checkbox', () => {
-	for (const category of ['merchandise_apparel', 'gifts_prizes'] as const) {
-		const plan = createFillPlan('documentation', {
-			...samplePurchaseRequest,
-			documentationCategories: [category],
-			organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
-		});
+	expect(documentationChoice(['merchandise_apparel'])('gifts or logo designs')).toBe(true);
+	expect(documentationChoice(['gifts_prizes'])('gifts or logo designs')).toBe(true);
+	expect(documentationChoice([])('gifts or logo designs')).toBe(false);
+});
 
-		expect(plan.actions).toContainEqual({
-			type: 'checkbox',
-			labelIncludes: 'merchandise/apparel or gifts',
-			checked: true
-		});
+const documentationLabelSets = {
+	'2026-27 live': [
+		'Your event is using ASUO funds.',
+		'Your event is having food.',
+		'This PO involves printing services.',
+		'This PO involves purchasing gifts or logo designs.',
+		'This PO involves office supplies/goods.',
+		'None of the above'
+	],
+	'2025-26': [
+		'Your event is using ASUO funds.',
+		'Your event is having food.',
+		'This PO involves printing services.',
+		'This PO involves designs for merchandise/apparel or gifts.',
+		'This PO involves office supplies/goods.',
+		'None of the above'
+	],
+	'Oxford comma and ampersands': [
+		'Your event uses ASUO Funds',
+		'Food & drinks will be served at your event',
+		'This request involves Printing (UO Print Services)',
+		'This PO involves designs for merchandise, apparel, and/or gifts.',
+		'Office Supplies & Goods',
+		'None of the above.'
+	],
+	'short labels': [
+		'ASUO funds',
+		'Food',
+		'Printing services',
+		'Gifts, prizes, or logo designs',
+		'Office supplies/goods',
+		'None of these apply'
+	],
+	'custom printed swag': [
+		'Activity paid for with ASUO funds',
+		'Food/beverages',
+		'Print Services invoice or waiver',
+		'Logo designs, merchandise/apparel, or gifts',
+		'Office supplies-goods',
+		'None'
+	]
+};
+
+const documentationActions = createFillPlan('documentation', samplePurchaseRequest).actions.filter(
+	(action): action is Extract<FillAction, { type: 'checkbox' }> => action.type === 'checkbox'
+);
+
+test('matches the live 2026-27 gifts or logo designs checkbox', () => {
+	const merch = documentationActions.find(
+		(action) => action.labelIncludes === 'gifts or logo designs'
+	);
+	expect(merch).toBeDefined();
+	expect(choiceMatches('This PO involves purchasing gifts or logo designs.', merch!)).toBe(true);
+	expect(
+		documentationActions.filter((action) =>
+			choiceMatches('This PO involves purchasing gifts or logo designs.', action)
+		)
+	).toEqual([merch]);
+});
+
+test.each(Object.entries(documentationLabelSets))(
+	'matches each Documentation Inquiry checkbox to exactly one field (%s)',
+	(_name, labels) => {
+		for (const label of labels) {
+			expect(
+				documentationActions.filter((action) => choiceMatches(label, action)).length,
+				label
+			).toBe(1);
+		}
+		for (const action of documentationActions) {
+			expect(
+				labels.filter((label) => choiceMatches(label, action)).length,
+				action.labelIncludes
+			).toBe(1);
+		}
 	}
+);
 
-	const plan = createFillPlan('documentation', {
+test('normalizes punctuation and conjunctions in labels', () => {
+	expect(normalizeLabel('Merchandise/Apparel or Gifts')).toBe('merchandise apparel gifts');
+	expect(normalizeLabel('merchandise, apparel, and/or gifts.')).toBe('merchandise apparel gifts');
+	expect(normalizeLabel('Office Supplies & Goods')).toBe('office supplies goods');
+	expect(normalizeLabel('UO ID CARD : Optional second-upload')).toBe(
+		'uo id card optional second upload'
+	);
+	expect(hasKeyword('Gifts, prizes', 'gift')).toBe(true);
+	expect(hasKeyword('Not for non-affiliates', 'none')).toBe(false);
+});
+
+test('detects the gifts step when its heading wording changes', () => {
+	expect(detectStep('SOFS Request UO Branding/Apparel/Gifts')).toBe('gifts');
+	expect(detectStep('SOFS Request Gifts and Logo Designs')).toBe('gifts');
+	expect(detectStep('SOFS Request UO Branding, Apparel & Gifts')).toBe('gifts');
+	expect(detectStep('SOFS Request Documentation Inquiry')).toBe('documentation');
+	expect(detectStep('Something new')).toBe('unknown');
+});
+
+test('gives gifts step text fields fallback labels', () => {
+	const plan = createFillPlan('gifts', {
 		...samplePurchaseRequest,
-		documentationCategories: [],
-		organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
+		documentationCategories: ['gifts_prizes']
 	});
-
-	expect(plan.actions).toContainEqual({
-		type: 'checkbox',
-		labelIncludes: 'merchandise/apparel or gifts',
-		checked: false
-	});
+	expect(plan.actions).toContainEqual(
+		expect.objectContaining({
+			type: 'textarea',
+			labelIncludes: 'per person gift/apparel/prize amount',
+			alternatives: expect.arrayContaining(['per person'])
+		})
+	);
+	expect(plan.actions).toContainEqual(
+		expect.objectContaining({
+			type: 'textarea',
+			labelIncludes: 'name and 95# of the recipient',
+			alternatives: expect.arrayContaining(['95# of the recipient'])
+		})
+	);
 });
 
 test('skips self approval upload when requester is not purchaser', () => {

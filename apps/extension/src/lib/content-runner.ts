@@ -1,6 +1,6 @@
 import { formatMoney, type PurchaseRequest } from '@engage-form/domain';
 import { createFillPlan, detectStep, type FillAction } from '@engage-form/fill-engine';
-import type { FillMessage, FillResponse } from './messages';
+import type { FillResponse } from './messages';
 
 export type FillRunState = {
 	purchaseId: string;
@@ -87,7 +87,7 @@ export function createContentRunner(deps: ContentRunnerDeps) {
 			deps.clearFillRun();
 			return {
 				ok: false,
-				message: 'Unknown Engage step. Stopped before advancing.',
+				message: unknownStepMessage(deps.pageHeading()),
 				step,
 				filled: state.filled,
 				missed: []
@@ -110,7 +110,7 @@ export function createContentRunner(deps: ContentRunnerDeps) {
 			deps.clearFillRun();
 			return {
 				ok: false,
-				message: 'Selected purchase request could not be loaded from Convex.',
+				message: 'Selected purchase request could not be loaded. Start the fill again.',
 				step,
 				filled: state.filled,
 				missed: []
@@ -156,16 +156,9 @@ export function createContentRunner(deps: ContentRunnerDeps) {
 		};
 	}
 
-	function handleMessage(message: FillMessage) {
-		return message.type === 'START_FILL_RUN'
-			? startFillRun(message.purchase)
-			: fillCurrentPage(message.purchase);
-	}
-
 	return {
 		continueFillRun,
 		fillCurrentPage,
-		handleMessage,
 		resumeFillRun,
 		startFillRun
 	};
@@ -177,4 +170,12 @@ export function fillLabel(
 	const name = purchaseRequest.vendor.trim() || purchaseRequest.itemDescription.trim();
 	const amount = formatMoney(purchaseRequest.totalAmount);
 	return name === '' ? amount : `${name} · ${amount}`;
+}
+
+export function unknownStepMessage(headings: string) {
+	const text = headings.replace(/\s+/g, ' ').trim();
+	const shown = text.length > 160 ? `${text.slice(0, 159)}…` : text;
+	return shown === ''
+		? 'Unknown Engage step (no headings found). Stopped before advancing.'
+		: `Unknown Engage step (headings: “${shown}”). Stopped before advancing.`;
 }

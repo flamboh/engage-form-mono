@@ -1,5 +1,7 @@
 # WXT Extension Uses Clerk and Convex Realtime
 
+Superseded by ADR 0004 for auth, realtime, and payload caching. The WXT and Svelte popup choices still hold.
+
 The browser extension is implemented as a WXT extension with a Svelte popup. It signs in with the same Clerk identity as the web app and uses authenticated Convex queries and mutations instead of custom device tokens. OAuth sign-in happens in the web app, then the extension reads the synced Clerk session with Clerk Sync Host.
 
 Ready purchase requests are observed through Convex realtime in the popup while it is open. The popup owns the realtime `listReadyPurchases` query and asks background code for fresh Convex tokens when its client needs auth.

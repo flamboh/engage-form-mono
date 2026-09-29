@@ -59,7 +59,6 @@ export type Document = {
 	contentType: string;
 	size: number;
 	url?: string | null;
-	dataUrl?: string;
 };
 
 export type Recipient = {

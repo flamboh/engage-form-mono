@@ -1,20 +1,72 @@
-export function setField(labelIncludes: string, value: string, selector: 'input' | 'textarea') {
-	const control = findControl(labelIncludes, selector);
-	if (control === null) return false;
+import { choiceMatches } from '@engage-form/fill-engine';
+
+export type ControlResult = { ok: true } | { ok: false; message: string };
+
+export type ChoiceTarget = {
+	labelIncludes: string;
+	keywords?: string[];
+};
+
+const maxListedLabels = 8;
+const maxLabelLength = 70;
+const maxChoiceContainerText = 600;
+
+export function setField(
+	labelIncludes: string,
+	alternatives: string[],
+	value: string,
+	selector: 'input' | 'textarea'
+): ControlResult {
+	const control = [labelIncludes, ...alternatives]
+		.map((label) => findControl(label, selector))
+		.find((found) => found !== null);
+	if (control === undefined) {
+		return {
+			ok: false,
+			message: missMessage(`${selector}:${labelIncludes}`, visibleFieldLabels())
+		};
+	}
 
 	control.value = value;
 	dispatchInput(control);
-	return true;
+	return { ok: true };
 }
 
-export function setChoice(labelIncludes: string, type: 'checkbox' | 'radio', checked: boolean) {
-	const input = findChoice(labelIncludes, type);
-	if (input === null) return false;
+export function setChoice(
+	target: ChoiceTarget,
+	type: 'checkbox' | 'radio',
+	checked: boolean
+): ControlResult {
+	const choices = Array.from(document.querySelectorAll<HTMLInputElement>(`input[type="${type}"]`));
+	const labels = choices.map((choice) => choiceLabel(choice, type));
+	const index = pickChoice(labels, target);
+	if (index === null) {
+		if (type === 'checkbox' && !checked) return { ok: true };
+		return { ok: false, message: missMessage(`${type}:${target.labelIncludes}`, labels) };
+	}
 
+	const input = choices[index];
 	if (input.checked !== checked) input.click();
 	dispatchInput(input);
 
-	return true;
+	return { ok: true };
+}
+
+export function pickChoice(labels: string[], target: ChoiceTarget) {
+	const index = labels.findIndex((label) => choiceMatches(label, target));
+	return index === -1 ? null : index;
+}
+
+export function missMessage(what: string, labels: string[]) {
+	const listed = [
+		...new Set(labels.map((label) => label.replace(/\s+/g, ' ').trim()).filter(Boolean))
+	]
+		.slice(0, maxListedLabels)
+		.map((label) =>
+			label.length > maxLabelLength ? `“${label.slice(0, maxLabelLength - 1)}…”` : `“${label}”`
+		);
+	if (listed.length === 0) return `${what} (no labels found on this page)`;
+	return `${what} (this page has: ${listed.join(', ')})`;
 }
 
 export function setSelect(labelIncludes: string, valueIncludes: string) {
@@ -53,14 +105,10 @@ export async function setComboBox(labelIncludes: string, valueIncludes: string) 
 	return true;
 }
 
-export async function setFiles(
+export async function setFiles<File extends { filename: string; contentType: string }>(
 	labelIncludes: string,
-	files: { filename: string; contentType: string }[],
-	uploadFiles: (
-		selector: string,
-		files: { filename: string; contentType: string }[],
-		dropSelector: string
-	) => Promise<FileUploadResult>
+	files: File[],
+	uploadFiles: (selector: string, files: File[], dropSelector: string) => Promise<FileUploadResult>
 ) {
 	const uploadButton = findUploadButton(labelIncludes);
 	if (uploadButton === null) return uploadMiss(`Upload button missing for "${labelIncludes}".`);
@@ -96,7 +144,7 @@ export async function setFiles(
 	return uploadDone(await waitForUploadDialogDone(dialog), labelIncludes);
 }
 
-export type FileUploadResult = { ok: true } | { ok: false; message: string };
+export type FileUploadResult = ControlResult;
 
 export function clickNextStep() {
 	const button = findNavigationButton();
@@ -152,9 +200,41 @@ function findComboBoxOption(valueIncludes: string) {
 	);
 }
 
-function findChoice(labelIncludes: string, type: 'checkbox' | 'radio') {
-	const choices = Array.from(document.querySelectorAll<HTMLInputElement>(`input[type="${type}"]`));
-	return choices.find((choice) => includes(choiceText(choice), labelIncludes)) ?? null;
+function choiceLabel(choice: HTMLInputElement, type: 'checkbox' | 'radio') {
+	const labelledBy = (choice.getAttribute('aria-labelledby') ?? '')
+		.split(/\s+/)
+		.map((id) => (id === '' ? '' : (document.getElementById(id)?.textContent ?? '')));
+	const labels = Array.from(choice.labels ?? []).map((label) => label.textContent ?? '');
+	return [
+		choice.getAttribute('aria-label') ?? '',
+		...labels,
+		...labelledBy,
+		choiceContainer(choice, type)?.textContent ?? ''
+	]
+		.map((text) => text.replace(/\s+/g, ' ').trim())
+		.filter((text, index, all) => text !== '' && all.indexOf(text) === index)
+		.join(' ');
+}
+
+function choiceContainer(choice: HTMLInputElement, type: 'checkbox' | 'radio') {
+	let container: HTMLElement | null = null;
+	let parent = choice.parentElement;
+	while (
+		parent !== null &&
+		parent !== document.body &&
+		parent.querySelectorAll(`input[type="${type}"]`).length === 1 &&
+		(parent.textContent ?? '').length <= maxChoiceContainerText
+	) {
+		container = parent;
+		parent = parent.parentElement;
+	}
+	return container;
+}
+
+function visibleFieldLabels() {
+	return Array.from(document.querySelectorAll<HTMLElement>('label, legend, [role="heading"]'))
+		.filter(isVisible)
+		.map((label) => label.textContent ?? '');
 }
 
 function findUploadButton(labelIncludes: string) {
@@ -233,11 +313,6 @@ function findClickableElements(labelIncludes: string) {
 	return Array.from(
 		document.querySelectorAll<HTMLElement>('button, [role="button"], input[type="button"], a')
 	).filter((element) => isVisible(element) && includes(elementText(element), labelIncludes));
-}
-
-function choiceText(choice: HTMLInputElement) {
-	const container = choice.closest('label, div, li, p');
-	return `${accessibleText(choice)} ${container?.textContent ?? ''}`;
 }
 
 function accessibleText(element: Element) {

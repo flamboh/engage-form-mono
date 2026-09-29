@@ -1,35 +1,30 @@
 <script lang="ts">
-	import { ConvexClient } from 'convex/browser';
 	import { onMount } from 'svelte';
 	import { browser } from 'wxt/browser';
-	import { api } from '../../../../../convex/_generated/api';
-	import type { Id } from '../../../../../convex/_generated/dataModel';
-	import { readConvexUrl, readWebAppUrl } from '../../lib/env';
-	import type { ReadyPurchaseRequest, RuntimeMessage, RuntimeResponse } from '../../lib/messages';
+	import { readWebAppUrl } from '../../lib/env';
+	import {
+		isAuthRequired,
+		type ReadyPurchaseRequest,
+		type RuntimeMessage,
+		type RuntimeResponse
+	} from '../../lib/messages';
 	import type { PendingFill } from '../../lib/pending-fill';
 	import { withTimeout } from '../../lib/timeout';
 
 	let signedIn = $state(false);
-	let email = $state<string | null>(null);
 	let status = $state('Loading…');
 	let purchases = $state<ReadyPurchaseRequest[] | null>(null);
 	let pendingFill = $state<PendingFill | null>(null);
 	let fillingPurchaseId = $state<string | null>(null);
 
-	const runtimeTimeoutMs = 5_000;
+	const runtimeTimeoutMs = 20_000;
 	const webAppUrl = readWebAppUrl();
-	const convex = new ConvexClient(readConvexUrl());
-	const subscriptions: (() => void)[] = [];
 
 	onMount(() => {
-		void refreshAuth();
-		return () => {
-			stopRealtime();
-			void convex.close();
-		};
+		void refresh();
 	});
 
-	async function refreshAuth() {
+	async function refresh() {
 		const response = await sendRuntimeMessage({ type: 'AUTH_STATE' });
 		if (!response.ok) {
 			status = response.message;
@@ -38,79 +33,43 @@
 		if (!('signedIn' in response)) return;
 
 		signedIn = response.signedIn;
-		email = response.email;
+		status = '';
 		if (!signedIn) {
-			stopRealtime();
 			purchases = null;
 			pendingFill = null;
-			status = '';
 			return;
 		}
 
-		status = '';
-		startRealtime();
-	}
-
-	function startRealtime() {
-		if (subscriptions.length > 0) return;
-		convex.setAuth(fetchConvexToken);
-		subscriptions.push(
-			convex.onUpdate(
-				api.authed.extension.listReadyPurchases,
-				{},
-				(rows) => {
-					purchases = rows;
-				},
-				(error) => {
-					status = error.message;
-				}
-			).unsubscribe,
-			convex.onUpdate(
-				api.authed.extension.getPendingFill,
-				{},
-				(value) => {
-					pendingFill = value;
-				},
-				(error) => {
-					status = error.message;
-				}
-			).unsubscribe
-		);
-	}
-
-	function stopRealtime() {
-		for (const unsubscribe of subscriptions.splice(0)) unsubscribe();
-	}
-
-	async function fetchConvexToken(options: { forceRefreshToken?: boolean } = {}) {
-		const response = await sendRuntimeMessage({
-			type: 'GET_CONVEX_TOKEN',
-			forceRefresh: options.forceRefreshToken === true
-		});
-		if (!response.ok) throw new Error(response.message);
-		if (!('token' in response)) throw new Error('Background did not return a Convex token.');
-		if (response.token === null) throw new Error('Signed in session missing Convex token.');
-		return response.token;
+		const [ready, pending] = await Promise.all([
+			sendRuntimeMessage({ type: 'LIST_READY' }),
+			sendRuntimeMessage({ type: 'GET_PENDING_FILL' })
+		]);
+		if (isAuthRequired(ready)) {
+			signedIn = false;
+			return;
+		}
+		if (ready.ok && 'purchases' in ready) purchases = ready.purchases;
+		else if (!ready.ok) status = ready.message;
+		if (pending.ok && 'pendingFillState' in pending && pending.pendingFillState.signedIn) {
+			pendingFill = pending.pendingFillState.pendingFill;
+		}
 	}
 
 	async function fillPurchase(purchaseId: string) {
 		fillingPurchaseId = purchaseId;
 		status = 'Filling the open Engage tab…';
-		try {
-			const token = await fetchConvexToken();
-			const response = await sendRuntimeMessage({ type: 'START_FILL', purchaseId, token });
-			status = response.ok ? '' : response.message;
-		} catch (error) {
-			status = error instanceof Error ? error.message : String(error);
-		} finally {
-			fillingPurchaseId = null;
-		}
+		const response = await sendRuntimeMessage({ type: 'START_FILL', purchaseId });
+		status = response.ok ? '' : response.message;
+		fillingPurchaseId = null;
 	}
 
 	async function cancelPendingFill(purchaseRequestId: string) {
-		await convex.mutation(api.authed.extension.clearPendingFill, {
-			purchaseRequestId: purchaseRequestId as Id<'purchaseRequests'>
+		const response = await sendRuntimeMessage({
+			type: 'CLEAR_PENDING_FILL',
+			purchaseId: purchaseRequestId
 		});
+		if (!response.ok) status = response.message;
+		await refresh();
 	}
 
 	async function signOut() {
@@ -119,11 +78,11 @@
 			status = response.message;
 			return;
 		}
-		await refreshAuth();
+		await refresh();
 	}
 
-	async function signIn() {
-		const response = await sendRuntimeMessage({ type: 'SIGN_IN' });
+	async function connect() {
+		const response = await sendRuntimeMessage({ type: 'CONNECT' });
 		if (!response.ok) status = response.message;
 	}
 
@@ -159,7 +118,7 @@
 		<h1 class="text-sm font-semibold">Engage Form</h1>
 		{#if signedIn}
 			<button class="text-xs text-stone-500 hover:text-stone-900" type="button" onclick={signOut}>
-				Sign out
+				Disconnect
 			</button>
 		{/if}
 	</header>
@@ -170,13 +129,16 @@
 		{/if}
 
 		{#if !signedIn}
-			<p class="text-sm text-stone-600">Sign in on the web app, then reopen this popup.</p>
+			<p class="text-sm text-stone-600">
+				Connect the extension to your Engage Form account. It opens Engage Form, where you're
+				already signed in.
+			</p>
 			<button
 				class="rounded-md bg-stone-950 px-3 py-2 text-sm font-medium text-white hover:bg-stone-800"
 				type="button"
-				onclick={signIn}
+				onclick={connect}
 			>
-				Sign in
+				Connect the extension
 			</button>
 		{:else}
 			{#if pendingFill !== null}
@@ -232,7 +194,7 @@
 			{/if}
 
 			<div class="flex items-center justify-between text-xs text-stone-500">
-				<span class="truncate">{email ?? ''}</span>
+				<span>Extension connected</span>
 				<button
 					class="hover:text-stone-900"
 					type="button"

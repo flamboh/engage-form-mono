@@ -15,8 +15,10 @@ export default defineConfig({
 	modules: ['@wxt-dev/module-svelte'],
 	manifest: ({ mode, browser }) => {
 		const env = loadBuildEnv(mode, browser);
-		const clerkFrontendApi = env.CLERK_FRONTEND_API ?? env.CLERK_FRONTEND_API_URL;
 		const allowLocalHosts = mode !== 'prod';
+		const webAppUrl = env.PUBLIC_WEB_APP_URL ?? 'http://localhost';
+		const keepHost = (value: string | null): value is string =>
+			value !== null && (allowLocalHosts || !isLocalHostPermission(value));
 
 		return {
 			name: 'Engage Form',
@@ -26,27 +28,22 @@ export default defineConfig({
 			action: {
 				default_title: 'Engage Form'
 			},
-			permissions: ['activeTab', 'cookies', 'scripting', 'storage'],
+			permissions: ['activeTab', 'alarms', 'storage', 'unlimitedStorage'],
 			host_permissions: [
 				...new Set(
 					[
-						'https://*.convex.cloud/*',
-						'https://*.convex.site/*',
+						hostPermission(requiredEnv(env, 'PUBLIC_CONVEX_SITE_URL')),
 						hostPermission(engageOrigin),
 						hostPermission(productionWebAppOrigin),
 						'http://localhost/*',
 						'http://127.0.0.1/*',
-						hostPermission(env.PUBLIC_WEB_APP_URL ?? 'http://localhost'),
-						hostPermission(
-							env.PUBLIC_CLERK_SYNC_HOST ?? env.PUBLIC_WEB_APP_URL ?? 'http://localhost'
-						),
-						clerkFrontendApi ? hostPermission(clerkFrontendApi) : null
-					].filter(
-						(value): value is string =>
-							value !== null && (allowLocalHosts || !isLocalHostPermission(value))
-					)
+						hostPermission(webAppUrl)
+					].filter(keepHost)
 				)
 			],
+			externally_connectable: {
+				matches: [...new Set([hostPermission(webAppUrl)].filter(keepHost))]
+			},
 			content_security_policy:
 				mode === 'development'
 					? {
@@ -62,23 +59,22 @@ export default defineConfig({
 		envDir: workspaceRoot,
 		envPrefix: ['VITE_', 'PUBLIC_'],
 		define: publicEnvDefines(loadBuildEnv(mode, browser)),
-		plugins: [tailwindcss()],
-		resolve: {
-			alias: {
-				'@clerk/ui/no-rhc': resolve(extensionRoot, 'src/lib/clerk-ui-background-stub.ts')
-			}
-		}
+		plugins: [tailwindcss()]
 	})
 });
 
 type BuildEnv = {
-	CLERK_FRONTEND_API?: string;
-	CLERK_FRONTEND_API_URL?: string;
 	CRX_PUBLIC_KEY?: string;
-	PUBLIC_CLERK_SYNC_HOST?: string;
+	PUBLIC_CONVEX_SITE_URL?: string;
 	PUBLIC_WEB_APP_URL?: string;
 	[key: string]: string | undefined;
 };
+
+function requiredEnv(env: BuildEnv, key: string) {
+	const value = env[key]?.trim();
+	if (!value) throw new Error(`Missing ${key} for the extension build.`);
+	return value;
+}
 
 function publicEnvDefines(env: BuildEnv) {
 	return Object.fromEntries(

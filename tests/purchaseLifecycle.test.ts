@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
-import { getReadyPurchaseForFill, listReadyPurchases } from '../convex/authed/extension';
+import { getReadyPurchaseForFill, listReadyPurchases } from '../convex/extension';
 import { saveDraftSnapshot } from '../convex/authed/purchaseBuilder';
 
 vi.stubEnv('FILES_BASE_URL', 'https://files.example');
@@ -126,7 +126,9 @@ test('extension lists only Ready Purchase Requests', async () => {
 		{ ...readyRequest, _id: 'purchase_2', status: 'draft', itemDescription: 'draft' }
 	] as Doc<'purchaseRequests'>[];
 
-	await expect(listReadyPurchases._handler(extensionListCtx(rows) as never, {})).resolves.toEqual([
+	await expect(
+		listReadyPurchases._handler(extensionListCtx(rows) as never, { owner: 'owner' })
+	).resolves.toEqual([
 		{
 			id: 'purchase_1',
 			status: 'ready',
@@ -145,6 +147,7 @@ test('extension refuses Draft fill payloads', async () => {
 		getReadyPurchaseForFill._handler(
 			extensionGetCtx({ ...readyRequest, status: 'draft' }) as never,
 			{
+				owner: 'owner',
 				id: readyRequest._id
 			}
 		)
@@ -154,6 +157,7 @@ test('extension refuses Draft fill payloads', async () => {
 test('extension fill payload includes resolved Business Purpose plain text', async () => {
 	await expect(
 		getReadyPurchaseForFill._handler(extensionGetCtx(readyRequest) as never, {
+			owner: 'owner',
 			id: readyRequest._id
 		})
 	).resolves.toMatchObject({

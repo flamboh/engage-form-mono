@@ -1,3 +1,7 @@
+<script lang="ts">
+	import ExtensionStatus from '$lib/extension/ExtensionStatus.svelte';
+</script>
+
 <ol class="flex flex-col gap-5 text-sm">
 	<li class="flex gap-4">
 		<span
@@ -31,9 +35,9 @@
 			class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#fee123] text-xs font-semibold text-[#154733]"
 			>2</span
 		>
-		<span class="flex flex-col gap-1">
-			<span class="font-medium text-stone-900">Sign in with this same account</span>
-			<span class="text-stone-600">Open the extension once and choose Sign in on web.</span>
+		<span class="flex flex-col gap-2">
+			<span class="font-medium text-stone-900">Connect it to this account</span>
+			<ExtensionStatus />
 		</span>
 	</li>
 	<li class="flex gap-4">

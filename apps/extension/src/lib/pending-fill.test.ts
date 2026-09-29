@@ -16,7 +16,7 @@ function decide(overrides: Partial<Parameters<typeof autoStartDecision>[0]> = {}
 		step: 'formStart',
 		activeRun: false,
 		state: { signedIn: true, pendingFill },
-		signInDismissed: false,
+		connectDismissed: false,
 		confirmDismissed: false,
 		...overrides
 	});
@@ -68,9 +68,9 @@ test('stays idle without a pending fill', () => {
 	expect(decide({ state: { signedIn: true, pendingFill: null } })).toEqual({ type: 'idle' });
 });
 
-test('asks to sign in when the extension has no session', () => {
-	expect(decide({ state: { signedIn: false } })).toEqual({ type: 'signIn' });
-	expect(decide({ state: { signedIn: false }, signInDismissed: true })).toEqual({ type: 'idle' });
+test('asks to connect when the extension has no token', () => {
+	expect(decide({ state: { signedIn: false } })).toEqual({ type: 'connect' });
+	expect(decide({ state: { signedIn: false }, connectDismissed: true })).toEqual({ type: 'idle' });
 });
 
 test('recognizes the first form step by URL or heading', () => {

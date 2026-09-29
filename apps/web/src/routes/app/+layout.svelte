@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ExtensionConnector from '$lib/extension/ExtensionConnector.svelte';
 	import OnboardingGate from '$lib/welcome/OnboardingGate.svelte';
 	import ClerkWrapper from '$lib/wrappers/ClerkWrapper.svelte';
 	import ConvexWrapper from '$lib/wrappers/ConvexWrapper.svelte';
@@ -12,8 +13,10 @@
 
 <ClerkWrapper>
 	<ConvexWrapper>
-		<OnboardingGate>
-			{@render children()}
-		</OnboardingGate>
+		<ExtensionConnector>
+			<OnboardingGate>
+				{@render children()}
+			</OnboardingGate>
+		</ExtensionConnector>
 	</ConvexWrapper>
 </ClerkWrapper>

@@ -1,4 +1,4 @@
-import type { PurchaseRequest } from '@engage-form/domain';
+import type { Document, PurchaseRequest } from '@engage-form/domain';
 import { detectStep, type EngageStep, type FillAction } from '@engage-form/fill-engine';
 import { browser } from 'wxt/browser';
 import { hideBanner, showBanner } from '../lib/banner';
@@ -13,23 +13,23 @@ import {
 	setSelect,
 	uploadMiss
 } from '../lib/form-controls';
-import type { FillMessage, FillResponse, RuntimeMessage, RuntimeResponse } from '../lib/messages';
+import {
+	type FillMessage,
+	type FillResponse,
+	isAuthRequired,
+	type RuntimeMessage,
+	type RuntimeResponse
+} from '../lib/messages';
 import { autoStartDecision, type PendingFill, type PendingFillState } from '../lib/pending-fill';
 
 const FILL_RUN_KEY = 'engageFormFillRun';
-const SIGN_IN_DISMISSED_KEY = 'engageFormSignInDismissed';
+const CONNECT_DISMISSED_KEY = 'engageFormConnectDismissed';
 const CONFIRM_DISMISSED_KEY = 'engageFormConfirmDismissed';
 const STEP_WAIT_MS = 10_000;
 const STEP_CHANGE_WAIT_MS = 20_000;
 const STEP_SETTLE_MS = 750;
 const cancelledMessage = 'Fill cancelled.';
 const runActiveMessage = 'Engage Form is already filling this page.';
-
-type UploadDocument = {
-	filename: string;
-	contentType: string;
-	dataUrl?: string;
-};
 
 export default defineContentScript({
 	matches: ['https://uoregon.campuslabs.com/engage/submitter/form/*'],
@@ -63,24 +63,16 @@ export default defineContentScript({
 					missed: []
 				});
 			}
-			if (fillMessage.type === 'START_FILL_RUN') {
-				showFilling(fillLabel(fillMessage.purchase), fillMessage.purchase.id);
-			}
+			showFilling(fillLabel(fillMessage.purchase), fillMessage.purchase.id);
 			busy = true;
 			runActive = true;
 			return runner
-				.handleMessage(fillMessage)
+				.startFillRun(fillMessage.purchase)
 				.then((response) => {
-					if (fillMessage.type === 'START_FILL_RUN') {
-						void drive(fillMessage.purchase.id, response).finally(() => {
-							busy = false;
-							runActive = false;
-						});
-					} else {
+					void drive(fillMessage.purchase.id, response).finally(() => {
 						busy = false;
 						runActive = false;
-						showBanner({ text: response.message, hideAfterMs: 5_000 });
-					}
+					});
 					return response;
 				})
 				.catch((error: unknown) => {
@@ -143,7 +135,7 @@ export default defineContentScript({
 				step,
 				activeRun: runActive || loadFillRun() !== null,
 				state: pendingFillState,
-				signInDismissed: window.sessionStorage.getItem(SIGN_IN_DISMISSED_KEY) !== null,
+				connectDismissed: window.sessionStorage.getItem(CONNECT_DISMISSED_KEY) !== null,
 				confirmDismissed:
 					pendingFillState.signedIn &&
 					pendingFillState.pendingFill !== null &&
@@ -151,8 +143,8 @@ export default defineContentScript({
 						pendingFillState.pendingFill.purchaseRequestId
 			});
 
-			if (decision.type === 'signIn') {
-				showSignIn();
+			if (decision.type === 'connect') {
+				showConnect();
 				return;
 			}
 
@@ -185,17 +177,26 @@ export default defineContentScript({
 			if (runActive || loadFillRun() !== null) return;
 			await runExclusive(async () => {
 				const claimed = await claimPendingFill(pendingFill.purchaseRequestId);
+				if (claimed === 'authRequired') {
+					showConnect();
+					return;
+				}
 				if (claimed === null) return;
 				showFilling(claimed.label, claimed.purchaseRequestId);
-				const purchase = await loadPurchaseRequest(claimed.purchaseRequestId);
-				if (purchase === null) {
+				const prepared = await preparePurchaseRequest(claimed.purchaseRequestId);
+				if (!prepared.ok) {
+					if (prepared.authRequired) {
+						showConnect();
+						return;
+					}
 					showBanner({
-						text: `Couldn’t load “${claimed.label}”. Open it in Engage Form and try again.`,
+						text: `Couldn’t load “${claimed.label}”: ${prepared.message}`,
 						tone: 'error',
 						actions: [dismissAction()]
 					});
 					return;
 				}
+				const purchase = prepared.purchase;
 				await drive(claimed.purchaseRequestId, await runner.startFillRun(purchase, claimed.label));
 			});
 		}
@@ -270,19 +271,25 @@ export default defineContentScript({
 			showBanner({ text: cancelledMessage, hideAfterMs: 3_000 });
 		}
 
-		function showSignIn() {
+		function showConnect() {
 			promptShown = true;
 			showBanner({
-				text: 'Sign in to Engage Form to fill this automatically.',
+				text: 'Connect the extension to Engage Form to fill this form.',
 				actions: [
 					{
-						label: 'Sign in',
-						onClick: () => void sendRuntimeMessage({ type: 'SIGN_IN' })
+						label: 'Connect the extension',
+						onClick: () => {
+							showBanner({
+								text: 'Finish connecting in the Engage Form tab, then come back here.',
+								actions: [dismissAction()]
+							});
+							void sendRuntimeMessage({ type: 'CONNECT' });
+						}
 					},
 					{
 						label: 'Not now',
 						onClick: () => {
-							window.sessionStorage.setItem(SIGN_IN_DISMISSED_KEY, '1');
+							window.sessionStorage.setItem(CONNECT_DISMISSED_KEY, '1');
 							promptShown = false;
 							hideBanner();
 						}
@@ -330,11 +337,27 @@ async function readPendingFillState(): Promise<PendingFillState | null> {
 	return response?.ok === true && 'pendingFillState' in response ? response.pendingFillState : null;
 }
 
-async function claimPendingFill(purchaseId: string): Promise<PendingFill | null> {
+async function claimPendingFill(purchaseId: string): Promise<PendingFill | 'authRequired' | null> {
 	const response = await sendRuntimeMessage({ type: 'CLAIM_PENDING_FILL', purchaseId });
 	if (response?.ok === true && 'claimedFill' in response) return response.claimedFill;
+	if (isAuthRequired(response)) return 'authRequired';
 	if (response?.ok === false) throw new Error(response.message);
 	return null;
+}
+
+async function preparePurchaseRequest(
+	purchaseId: string
+): Promise<
+	{ ok: true; purchase: PurchaseRequest } | { ok: false; message: string; authRequired: boolean }
+> {
+	const response = await sendRuntimeMessage({ type: 'PREPARE_FILL_RUN', purchaseId });
+	if (response?.ok === true && 'purchase' in response) {
+		return { ok: true, purchase: response.purchase };
+	}
+	if (response?.ok === false) {
+		return { ok: false, message: response.message, authRequired: isAuthRequired(response) };
+	}
+	return { ok: false, message: 'The extension didn’t respond.', authRequired: false };
 }
 
 async function sendRuntimeMessage(message: RuntimeMessage) {
@@ -378,19 +401,19 @@ async function applyFillPlan(actions: FillAction[]) {
 
 async function applyAction(action: Exclude<FillAction, { type: 'stop' }>) {
 	if (action.type === 'text') {
-		return setField(action.labelIncludes, action.value, 'input');
+		return setField(action.labelIncludes, action.alternatives ?? [], action.value, 'input');
 	}
 
 	if (action.type === 'textarea') {
-		return setField(action.labelIncludes, action.value, 'textarea');
+		return setField(action.labelIncludes, action.alternatives ?? [], action.value, 'textarea');
 	}
 
 	if (action.type === 'checkbox') {
-		return setChoice(action.labelIncludes, 'checkbox', action.checked);
+		return setChoice(action, 'checkbox', action.checked);
 	}
 
 	if (action.type === 'radio') {
-		return setChoice(action.labelIncludes, 'radio', true);
+		return setChoice(action, 'radio', true);
 	}
 
 	if (action.type === 'combobox') {
@@ -406,7 +429,7 @@ async function applyAction(action: Exclude<FillAction, { type: 'stop' }>) {
 
 async function uploadFiles(
 	selector: string,
-	files: UploadDocument[],
+	files: Document[],
 	dropSelector: string
 ): Promise<FileUploadResult> {
 	const input = document.querySelector(selector);
@@ -420,14 +443,15 @@ async function uploadFiles(
 
 async function assignFiles(
 	input: HTMLInputElement,
-	files: UploadDocument[],
+	files: Document[],
 	dropTarget: HTMLElement
 ): Promise<FileUploadResult> {
 	const transfer = new DataTransfer();
 
 	for (const file of files) {
-		if (file.dataUrl === undefined) return uploadMiss(`Upload asset missing: ${file.filename}.`);
-		const response = await fetch(file.dataUrl);
+		const dataUrl = await loadDocumentDataUrl(file.id);
+		if (dataUrl === null) return uploadMiss(`Upload asset missing: ${file.filename}.`);
+		const response = await fetch(dataUrl);
 		if (!response.ok) return uploadMiss(`Upload asset missing: ${file.filename}.`);
 
 		transfer.items.add(
@@ -493,6 +517,11 @@ function clearFillRun() {
 async function loadPurchaseRequest(purchaseId: string): Promise<PurchaseRequest | null> {
 	const response = await sendRuntimeMessage({ type: 'GET_FILL_PAYLOAD', purchaseId });
 	return response?.ok === true && 'purchase' in response ? response.purchase : null;
+}
+
+async function loadDocumentDataUrl(documentId: string) {
+	const response = await sendRuntimeMessage({ type: 'GET_FILL_DOCUMENT', documentId });
+	return response?.ok === true && 'dataUrl' in response ? response.dataUrl : null;
 }
 
 function parseFillRunState(value: unknown): FillRunState | null {

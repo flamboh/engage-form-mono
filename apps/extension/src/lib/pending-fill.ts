@@ -13,7 +13,7 @@ export type PendingFillState =
 
 export type AutoStartDecision =
 	| { type: 'idle' }
-	| { type: 'signIn' }
+	| { type: 'connect' }
 	| { type: 'confirm'; pendingFill: PendingFill }
 	| { type: 'start'; pendingFill: PendingFill };
 
@@ -29,12 +29,12 @@ export function autoStartDecision(input: {
 	step: EngageStep;
 	activeRun: boolean;
 	state: PendingFillState;
-	signInDismissed: boolean;
+	connectDismissed: boolean;
 	confirmDismissed: boolean;
 }): AutoStartDecision {
 	if (!isEngageFormUrl(input.url) || input.activeRun) return { type: 'idle' };
 	if (input.step === 'unknown' || input.step === 'review') return { type: 'idle' };
-	if (!input.state.signedIn) return input.signInDismissed ? { type: 'idle' } : { type: 'signIn' };
+	if (!input.state.signedIn) return input.connectDismissed ? { type: 'idle' } : { type: 'connect' };
 
 	const { pendingFill } = input.state;
 	if (pendingFill === null) return { type: 'idle' };
