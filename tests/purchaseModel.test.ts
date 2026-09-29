@@ -505,8 +505,8 @@ test('reports blocked Draft reasons grouped by section', async () => {
 				name: '',
 				uo95: '',
 				permanentAddress: '',
-				idCardFrontFileId: '' as never,
-				idCardBackFileId: '' as never
+				idCardFrontFileId: null,
+				idCardBackFileId: null
 			},
 			activity: { ...request.activity, dates: [] },
 			vendor: '',
@@ -538,7 +538,8 @@ test('reports blocked Draft reasons grouped by section', async () => {
 					'Purchaser name missing.',
 					'Purchaser UO 95 missing.',
 					'Purchaser address missing.',
-					'ID card document missing.'
+					'ID card document missing.',
+					'Back of ID card missing.'
 				]
 			},
 			{

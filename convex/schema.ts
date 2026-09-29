@@ -66,6 +66,11 @@ const activity = v.object({
 	openToAllStudents: v.boolean()
 });
 
+const budgetLine = v.object({
+	name: v.string(),
+	allocations: v.array(v.object({ fiscalYear: v.number(), amount: v.number() }))
+});
+
 const studentOrganizationDetails = v.object({
 	name: v.string(),
 	indexNumber: v.string(),
@@ -80,7 +85,7 @@ const requesterDetails = v.object({
 	phone: v.string(),
 	uo95: v.string(),
 	permanentAddress: v.string(),
-	idCardFrontFileId: v.id('files'),
+	idCardFrontFileId: v.union(v.id('files'), v.null()),
 	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
@@ -89,7 +94,7 @@ const purchaserDetails = v.object({
 	name: v.string(),
 	uo95: v.string(),
 	permanentAddress: v.string(),
-	idCardFrontFileId: v.id('files'),
+	idCardFrontFileId: v.union(v.id('files'), v.null()),
 	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
@@ -114,7 +119,7 @@ export default defineSchema({
 		permanentAddress: v.string(),
 		studentEmail: v.string(),
 		phone: v.string(),
-		idCardFrontFileId: v.id('files'),
+		idCardFrontFileId: v.union(v.id('files'), v.null()),
 		idCardBackFileId: v.union(v.id('files'), v.null()),
 		pendingFill: v.optional(
 			v.union(
@@ -129,7 +134,7 @@ export default defineSchema({
 		name: v.string(),
 		indexNumber: v.string(),
 		fundLetter,
-		budgetLines: v.array(v.string()),
+		budgetLines: v.array(budgetLine),
 		archived: v.boolean(),
 		updatedAt: v.number()
 	})

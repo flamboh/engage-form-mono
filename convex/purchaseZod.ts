@@ -73,6 +73,11 @@ export const activity = z.object({
 	openToAllStudents: z.boolean()
 });
 
+export const budgetLine = z.object({
+	name: z.string(),
+	allocations: z.array(z.object({ fiscalYear: z.number(), amount: z.number() }))
+});
+
 export const studentOrganizationDetails = z.object({
 	name: z.string(),
 	indexNumber: z.string(),
@@ -87,7 +92,7 @@ export const requesterDetails = z.object({
 	phone: z.string(),
 	uo95: z.string(),
 	permanentAddress: z.string(),
-	idCardFrontFileId: zid('files'),
+	idCardFrontFileId: zid('files').nullable(),
 	idCardBackFileId: zid('files').nullable()
 });
 
@@ -96,7 +101,7 @@ export const purchaserDetails = z.object({
 	name: z.string(),
 	uo95: z.string(),
 	permanentAddress: z.string(),
-	idCardFrontFileId: zid('files'),
+	idCardFrontFileId: zid('files').nullable(),
 	idCardBackFileId: zid('files').nullable()
 });
 
@@ -114,7 +119,7 @@ export const userDoc = z.object({
 	permanentAddress: z.string(),
 	studentEmail: z.string(),
 	phone: z.string(),
-	idCardFrontFileId: zid('files'),
+	idCardFrontFileId: zid('files').nullable(),
 	idCardBackFileId: zid('files').nullable(),
 	pendingFill: z
 		.object({ purchaseRequestId: zid('purchaseRequests'), requestedAt: z.number() })
@@ -130,7 +135,7 @@ export const organizationDoc = z.object({
 	name: z.string(),
 	indexNumber: z.string(),
 	fundLetter,
-	budgetLines: z.array(z.string()),
+	budgetLines: z.array(budgetLine),
 	archived: z.boolean(),
 	updatedAt: z.number()
 });

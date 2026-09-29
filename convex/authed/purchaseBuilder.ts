@@ -21,6 +21,7 @@ import {
 import { normalizeActivity } from './events';
 import {
 	fileKind,
+	budgetLine,
 	fundLetter,
 	nullReturn,
 	savedData,
@@ -33,7 +34,7 @@ const createOrganizationArgs = {
 	name: z.string(),
 	indexNumber: z.string(),
 	fundLetter,
-	budgetLines: z.array(z.string())
+	budgetLines: z.array(budgetLine)
 };
 
 const purchaserArgs = {
@@ -82,7 +83,7 @@ export const upsertUserProfile = authedMutation({
 		permanentAddress: z.string(),
 		studentEmail: z.string(),
 		phone: z.string(),
-		idCardFrontFileId: zid('files'),
+		idCardFrontFileId: zid('files').nullable(),
 		idCardBackFileId: zid('files').nullable()
 	},
 	returns: zid('users'),
@@ -93,9 +94,10 @@ export const upsertUserProfile = authedMutation({
 		requireText(args.permanentAddress, 'Permanent address missing.');
 		requireText(args.studentEmail, 'Student email missing.');
 		requireText(args.phone, 'Phone missing.');
-		await requireOwnedDoc(ctx, 'files', args.idCardFrontFileId, owner);
-		if (args.idCardBackFileId === null) throw new Error('Back of ID card missing.');
-		await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
+		if (args.idCardFrontFileId !== null)
+			await requireOwnedDoc(ctx, 'files', args.idCardFrontFileId, owner);
+		if (args.idCardBackFileId !== null)
+			await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
 		const fields = {
 			owner,
 			name: args.name,
@@ -174,7 +176,9 @@ export const upsertOrganization = authedMutation({
 		const owner = ownerFromIdentity(ctx.identity);
 		requireText(args.name, 'Organization name missing.');
 		requireText(args.indexNumber, 'Index number missing.');
-		const budgetLines = args.budgetLines.map((line) => line.trim()).filter((line) => line !== '');
+		const budgetLines = args.budgetLines
+			.map((line) => ({ ...line, name: line.name.trim() }))
+			.filter((line) => line.name !== '');
 		if (budgetLines.length === 0) throw new Error('Add at least one budget line.');
 		const fields = {
 			owner,
@@ -269,7 +273,7 @@ export const createDraftForOrganization = authedMutation({
 			...draft,
 			organizationSourceId: organization._id,
 			studentOrganization: studentOrganizationDetails(organization),
-			budgetLineItem: organization.budgetLines[0] ?? '',
+			budgetLineItem: organization.budgetLines[0]?.name ?? '',
 			...withSuggestedEvent(
 				previousRequestDefaults(
 					previous,

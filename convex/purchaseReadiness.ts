@@ -69,7 +69,7 @@ export async function evaluatePurchaseReadiness(
 	requireSectionText('Purchaser', request.purchaser.name, 'Purchaser name missing.');
 	requireSectionText('Purchaser', request.purchaser.uo95, 'Purchaser UO 95 missing.');
 	requireSectionText('Purchaser', request.purchaser.permanentAddress, 'Purchaser address missing.');
-	requireSectionText('Purchaser', request.purchaser.idCardFrontFileId, 'ID card document missing.');
+	if (request.purchaser.idCardFrontFileId === null) add('Purchaser', 'ID card document missing.');
 	if (request.purchaser.idCardBackFileId === null) add('Purchaser', 'Back of ID card missing.');
 
 	requireSectionText('Purchase details', request.vendor, 'Vendor missing.');
@@ -129,13 +129,15 @@ export async function evaluatePurchaseReadiness(
 	}
 
 	if (options.documentExists !== undefined) {
-		await requireOwnedDocument(
-			add,
-			options.documentExists,
-			request.purchaser.idCardFrontFileId,
-			'Purchaser',
-			'ID card document missing.'
-		);
+		if (request.purchaser.idCardFrontFileId !== null) {
+			await requireOwnedDocument(
+				add,
+				options.documentExists,
+				request.purchaser.idCardFrontFileId,
+				'Purchaser',
+				'ID card document missing.'
+			);
+		}
 		if (request.purchaser.idCardBackFileId !== null) {
 			await requireOwnedDocument(
 				add,

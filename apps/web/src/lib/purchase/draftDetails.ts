@@ -16,7 +16,7 @@ export type PurchaserDetails = {
 	name: string;
 	uo95: string;
 	permanentAddress: string;
-	idCardFrontFileId: Id<'files'>;
+	idCardFrontFileId: Id<'files'> | null;
 	idCardBackFileId: Id<'files'> | null;
 };
 

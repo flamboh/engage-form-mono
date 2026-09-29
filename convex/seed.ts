@@ -79,6 +79,7 @@ export const restoreOwner = internalMutation({
 			if (organizationId === undefined) {
 				organizationId = await ctx.db.insert('organizations', {
 					...organization,
+					budgetLines: organization.budgetLines.map((name) => ({ name, allocations: [] })),
 					owner: args.owner,
 					archived: false,
 					updatedAt: now
