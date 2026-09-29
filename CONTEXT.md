@@ -57,7 +57,7 @@ The University of Oregon platform where purchase requests are reviewed and submi
 _Avoid_: RTP, form backend
 
 **Business Purpose**:
-The narrative explanation of why a purchase request benefits the student organization or event.
+The narrative explanation of why a purchase request benefits the student organization or event. It is generated from the request's recorded facts unless the requester customizes it.
 _Avoid_: Purpose text, reimbursement description
 
 **Reimbursement Reason**:
@@ -84,13 +84,13 @@ _Avoid_: Gift path, apparel category
 The University of Oregon student group whose funding details may be copied into purchase requests.
 _Avoid_: Organization, account, workspace
 
-**Business Purpose Template**:
-A reusable Business Purpose source scoped to one Student Organization.
-_Avoid_: Event preset, recurring event record
+**Event**:
+A saved, named activity a Student Organization holds, such as a weekly listening event, with its usual weekday, time, location, typical attendance, and whether it is open to all students.
+_Avoid_: Meeting, event preset, template
 
-**Activity Date**:
-The date of the event or activity connected to a purchase request.
-_Avoid_: Event details, event occurrence
+**Activity**:
+The event facts a purchase request records for itself: which Event, its name, the date or dates the purchase was used, the time, location, attendance, and whether it was open to all students.
+_Avoid_: Event details, activity date
 
 **Document**:
 Evidence attached to a purchase request for Engage review.
@@ -116,10 +116,11 @@ _Avoid_: ID card image, ID file, card upload
 
 - A **Student Organization** funds one or more **Purchase Requests**
 - A **Student Organization** may provide default details copied into **Draft** purchase requests
-- A **Business Purpose Template** may provide a default **Business Purpose**
+- A **Student Organization** has zero or more **Events**
 - A **Purchaser** may provide default details copied into **Draft** personal reimbursement requests
 - A **Requester** may provide default details copied into **Draft** purchase requests
-- **Business Purpose Templates** may initialize or update **Draft** purchase requests
+- Choosing an **Event** copies its facts into a **Draft**'s **Activity**; later edits to either do not change the other
+- A new **Draft** copies the previous request's **Activity**, without its dates
 - **Ready** purchase requests stand on their recorded facts
 - A **Requester** owns one or more purchase requests
 - A **Purchaser** may be the same person as the **Requester**
@@ -133,8 +134,9 @@ _Avoid_: ID card image, ID file, card upload
 - A **Purchase Request** may have a **Purchaser** when its **Type of Purchase** is **Personal Reimbursement**
 - A **Personal Reimbursement** has exactly one **Purchaser**
 - A **Purchase Request** uses exactly one **Fund Letter**
-- A **Purchase Request** may record one **Activity Date**
-- A **Purchase Request** has exactly one **Business Purpose**
+- A **Purchase Request** records exactly one **Activity**, which may come from an **Event**
+- An **Activity** has one or more dates when the purchase was used
+- A **Purchase Request** has exactly one **Business Purpose**, generated from its facts or customized
 - A **Personal Reimbursement** has exactly one **Reimbursement Reason**
 - A **Purchase Request** charges exactly one **Budget Line Item**
 - A **Purchase Request** may have one or more **Recipients**
@@ -154,15 +156,16 @@ _Avoid_: ID card image, ID file, card upload
 > **Dev:** "If Oliver submits the request but Aidan paid for the prize, who is the purchaser?"
 > **Domain expert:** "Oliver is the **Requester**. Aidan is the **Purchaser**. The student who won the prize is the **Recipient**."
 >
-> **Dev:** "If a **Business Purpose Template** changes after a request is ready, should the request change too?"
-> **Domain expert:** "No. Templates help fill **Draft** purchase requests. **Ready** purchase requests stand on their recorded facts."
+> **Dev:** "If the club moves its weekly **Event** to a new room, do old requests change too?"
+> **Domain expert:** "No. The **Event** only fills a **Draft**'s **Activity**. **Ready** purchase requests stand on their recorded facts."
 
 ## Flagged Ambiguities
 
 - "person" was used for requester, purchaser, and recipient; resolved: use the explicit role names **Requester**, **Purchaser**, and **Recipient**.
 - "purchase" was used for both the real-world spending event and the app record; resolved: the app prepares a **Purchase Request**.
 - "organization" can mean a student group or an auth/workspace concept; resolved: use **Student Organization** for the domain term.
-- "event preset" describes removed implementation storage; resolved: use **Business Purpose Template** for reusable Business Purpose source text and **Event Details** for the facts recorded on a **Purchase Request**.
+- "event preset" and "Business Purpose Template" describe removed implementation storage; resolved: use **Event** for the saved, reusable activity and **Activity** for the facts recorded on a **Purchase Request**.
+- "meeting" was used for club events; resolved: say **Event**. Reviewers deny funding for meetings, and a private gathering should be recorded as not open to all students rather than renamed.
 - Autofill sources provide draft data; resolved: a **Purchase Request** records the facts it needs rather than depending on autofill sources for meaning.
 - "user profile" describes application state; resolved: use **Requester** for the domain source of requester autofill details.
 - "file" describes storage; resolved: use **Document** for evidence attached to a **Purchase Request**.

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
-	import type { DocumentSlot, RequestDocument } from '$convex/requestView';
+	import type { DocumentSlot, RequestCheck, RequestDocument } from '$convex/requestView';
 	import {
 		dismissUpload,
 		localPreviewFor,
@@ -11,28 +11,35 @@
 	import DocumentTile from './DocumentTile.svelte';
 	import DropTarget from './DropTarget.svelte';
 	import FilePick from './FilePick.svelte';
+	import PackagingQuestion from './PackagingQuestion.svelte';
 	import { kindLabels, slotHints, slotLabels } from './labels';
 
 	let {
 		documents,
 		pending,
 		missingSlots,
+		checks = [],
+		packaged = null,
 		locked = false,
 		onfiles,
 		onremove,
 		onretryreading,
 		refreshpreview,
-		onapproval
+		onapproval,
+		onpackaged
 	}: {
 		documents: RequestDocument[];
 		pending: PendingUpload[];
 		missingSlots: DocumentSlot[];
+		checks?: RequestCheck[];
+		packaged?: boolean | null;
 		onfiles: (files: File[], slot: UploadSlot) => void;
 		locked?: boolean;
 		onremove: (fileId: Id<'files'>) => void;
 		onretryreading: (fileId: Id<'files'>) => void;
 		refreshpreview: (fileId: Id<'files'>) => Promise<string | null>;
 		onapproval: () => void;
+		onpackaged: (packaged: boolean) => void;
 	} = $props();
 
 	let freshUrls = $state<Record<string, string>>({});
@@ -59,12 +66,23 @@
 		else freshUrls = { ...freshUrls, [fileId]: url };
 	}
 
+	const readable = new Set(['receipt', 'publicity', 'second_approval']);
 	const knownIds = $derived(new Set(documents.map((document) => document.fileId)));
 	const inFlight = $derived(
 		pending.filter((upload) => upload.fileId === null || !knownIds.has(upload.fileId))
 	);
 	const receiptMissing = $derived(missingSlots.includes('receipt'));
-	const targetSlots = $derived(missingSlots.filter((slot) => slot !== 'receipt'));
+	const waiverNeeded = $derived(checks.some((check) => check.id === 'catering-waiver'));
+	const targetSlots = $derived([
+		...missingSlots.filter((slot) => slot !== 'receipt' && slot !== 'catering_waiver'),
+		...(waiverNeeded ? (['catering_waiver'] as const) : [])
+	]);
+
+	function notesFor(fileId: Id<'files'>) {
+		return checks
+			.filter((check) => check.fileId === fileId)
+			.map((check) => ({ title: check.title, blocking: check.severity === 'blocking' }));
+	}
 	const empty = $derived(documents.length === 0 && inFlight.length === 0);
 </script>
 
@@ -106,8 +124,9 @@
 						status={document.reading ? 'reading' : document.readFailed ? 'unreadable' : 'saved'}
 						expired={expired[document.fileId] ?? false}
 						renderable={!unrenderable[document.fileId]}
+						notes={notesFor(document.fileId)}
 						onremove={locked ? undefined : () => onremove(document.fileId)}
-						onretryreading={document.kind === 'receipt' && !locked
+						onretryreading={readable.has(document.kind) && !locked
 							? () => onretryreading(document.fileId)
 							: undefined}
 						onpreviewerror={() =>
@@ -165,6 +184,16 @@
 			{onfiles}
 		/>
 	</div>
+
+	{#if packaged !== null}
+		<div
+			id="field-packaging"
+			class="flex items-center justify-between gap-3 border-t border-(--line) pt-3"
+		>
+			<span class="text-sm text-(--ink)">Snacks individually packaged?</span>
+			<PackagingQuestion value={packaged} disabled={locked} onanswer={onpackaged} />
+		</div>
+	{/if}
 
 	{#if targetSlots.length > 0}
 		<div class="hidden flex-col gap-2 lg:flex">

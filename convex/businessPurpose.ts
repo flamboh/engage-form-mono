@@ -1,5 +1,5 @@
 import type { Doc } from './_generated/dataModel';
-import { formatEventDates, formatEventTime, joinList, normalizeEventDates } from './events';
+import { eventDatesPhrase, formatEventTime, joinList, normalizeEventDates } from './events';
 
 export type MissingFact =
 	| 'vendor'
@@ -152,17 +152,18 @@ export function generateBusinessPurpose(facts: BusinessPurposeFacts): GeneratedB
 			? `${organization || 'Our student organization'} ${purchase}.`
 			: `${organization || 'Our student organization'} wishes to reimburse ${purchaser} because they ${purchase}.`;
 
-	const plural = items !== '' && isPlural(items);
-	const upcoming = facts.today !== null && dates.some((date) => date > (facts.today ?? ''));
-	const be = upcoming ? 'will be' : plural ? 'were' : 'was';
-	const subject = subjectFor(items, plural);
+	const subject = subjectFor(items);
+	const be = tense(subject.plural, dates, facts.today);
+	const purpose = clean(facts.purpose);
 	const use =
 		recipients.length > 0
 			? `given to ${joinList(recipients.map(recipientText))}`
-			: purposeUse(clean(facts.purpose));
+			: purpose === '' && foodWords.has(subject.noun.toLowerCase())
+				? 'served'
+				: purposeUse(purpose);
 	const where = [
-		` at ${eventPhrase(organization, eventName)}`,
-		dates.length === 0 ? '' : ` on ${formatEventDates(dates)}`,
+		` at ${eventPhrase(organization, eventName, dates.length > 1)}`,
+		dates.length === 0 ? '' : ` ${eventDatesPhrase(dates)}`,
 		time === '' ? '' : ` at ${formatEventTime(time)}`,
 		location === '' ? '' : ` ${locationPhrase(location)}`,
 		attendance === null
@@ -170,7 +171,7 @@ export function generateBusinessPurpose(facts: BusinessPurposeFacts): GeneratedB
 			: `, with about ${attendance} ${facts.openToAllStudents ? 'students' : 'members'} ${dates.length > 1 ? 'at each event' : 'in attendance'}`
 	].join('');
 
-	return { text: `${opening} ${subject} ${be} ${use}${where}.`, missing };
+	return { text: `${opening} ${subject.text} ${be} ${use}${where}.`, missing };
 }
 
 export function customTextOmissions(text: string, facts: BusinessPurposeFacts): MissingFact[] {
@@ -196,6 +197,13 @@ export function customTextOmissions(text: string, facts: BusinessPurposeFacts): 
 	return omissions;
 }
 
+function tense(plural: boolean, dates: string[], today: string | null) {
+	const upcoming = today === null ? 0 : dates.filter((date) => date > today).length;
+	if (upcoming === 0) return plural ? 'were' : 'was';
+	if (upcoming === dates.length) return 'will be';
+	return plural ? 'are' : 'is';
+}
+
 function recipientText(recipient: BusinessPurposeRecipient) {
 	const id = recipient.uo95 === '' ? '' : ` (${recipient.uo95})`;
 	const reason = recipient.reason === '' ? '' : ` ${reasonPhrase(recipient.reason)}`;
@@ -210,51 +218,90 @@ function reasonPhrase(reason: string) {
 function purposeUse(purpose: string) {
 	if (purpose === '') return 'used';
 	const text = midSentence(purpose).replace(/[.!]+$/, '');
+	const giving = /^(gifts?|prizes?|giveaways?|awards?)\s+(?:for|to)\s+(.+)$/i.exec(text);
+	if (giving !== null) return `given as ${giving[1].toLowerCase()} to ${giving[2]}`;
 	if (/^(to|as|in|during)\b/i.test(text)) return `used ${text}`;
 	return `used for ${text.replace(/^for\s+/i, '')}`;
 }
 
-function eventPhrase(organization: string, eventName: string) {
-	if (eventName === '')
-		return organization === '' ? 'our event' : `${possessive(organization)} event`;
-	const named = namedEvent(eventName);
+function eventPhrase(organization: string, eventName: string, several: boolean) {
+	if (eventName === '') {
+		const noun = several ? 'events' : 'event';
+		return organization === '' ? `our ${noun}` : `${possessive(organization)} ${noun}`;
+	}
+	const named = namedEvent(eventName, several);
 	if (organization === '' || named.toLowerCase().includes(organization.toLowerCase())) {
 		return `the ${named}`;
 	}
 	return `${possessive(organization)} ${named}`;
 }
 
-export function eventReference(eventName: string) {
-	return `the ${namedEvent(clean(eventName))}`;
+export function eventReference(eventName: string, several = false) {
+	return `the ${namedEvent(clean(eventName), several)}`;
 }
 
-function namedEvent(eventName: string) {
+function namedEvent(eventName: string, several: boolean) {
 	const name = midSentence(eventName).replace(/^the\s+/i, '');
-	return eventWords.test(name) ? name : `${name} event`;
+	const last = name.split(' ').at(-1) ?? '';
+	if (eventNouns.test(last)) {
+		return several ? `${name.slice(0, name.length - last.length)}${pluralNoun(last)}` : name;
+	}
+	if (name.split(' ').some((word) => eventNouns.test(word)) || eventWords.test(name)) return name;
+	return `${name} ${several ? 'events' : 'event'}`;
 }
 
-const eventWords =
-	/\b(event|events|workshop|session|sessions|night|party|social|show|concert|festival|fair|conference|tournament|meetup|gala|retreat|screening|contest|competition|trip|dinner|lunch|breakfast|potluck|celebration|meeting|club|trivia|game|games|hike|clinic|lecture|talk|panel|performance|recital|drive|sale|market)\b/i;
+function pluralNoun(word: string) {
+	if (/(s|x|ch|sh)$/i.test(word)) return `${word}es`;
+	if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
+	return `${word}s`;
+}
+
+const eventNouns =
+	/^(event|workshop|session|night|party|social|show|concert|festival|fair|conference|tournament|meetup|gala|retreat|screening|contest|competition|trip|dinner|lunch|breakfast|potluck|celebration|meeting|hike|clinic|lecture|talk|panel|performance|recital|drive|sale|market|mixer|picnic|jam|meet|game|practice|rehearsal|class|lesson|tour|walk|ride|run|cleanup|fundraiser)$/i;
+
+const eventWords = /\b(events|sessions|trivia|games|club|week|weekend|day|days|series)\b/i;
 
 function locationPhrase(location: string) {
 	return /^(in|at|on)\s/i.test(location) ? location : `in ${location}`;
 }
 
-function subjectFor(items: string, plural: boolean) {
-	if (items === '') return 'The items';
-	const bare = midSentence(items)
+function subjectFor(items: string) {
+	if (items === '') return { text: 'The items', noun: 'items', plural: true };
+	let bare = midSentence(items)
+		.replace(/\s*\([^)]*\)/g, '')
+		.trim()
 		.replace(/^(a|an|one|the|this|these|some)\s+/i, '')
-		.replace(/^\d+\s+(x\s+)?/i, '');
-	const words = bare.split(/\s+/).length;
-	if (words <= 5 && !/\bmore$/i.test(bare)) return `The ${bare}`;
-	return plural ? 'These items' : 'This item';
+		.replace(/^\d+\s+(x\s+)?/i, '')
+		.replace(
+			/^(two|three|four|five|six|seven|eight|nine|ten|dozen|several|many|multiple|assorted|various|bulk)\s+/i,
+			''
+		);
+	if (/\bmore$/i.test(bare)) return { text: 'These items', noun: 'items', plural: true };
+	const list = isList(bare);
+	const partOf = / of (.+)$/i.exec(bare);
+	if (!list && partOf !== null) bare = partOf[1].replace(/^(a|an|the)\s+/i, '');
+	const words = bare.split(' ');
+	if (list) {
+		return { text: words.length <= 4 ? `The ${bare}` : 'These items', noun: 'items', plural: true };
+	}
+	const phrase = words.length <= 3 ? bare : (words.at(-1) ?? bare);
+	return { text: `The ${phrase}`, noun: words.at(-1) ?? bare, plural: isPlural(phrase) };
 }
+
+function isList(text: string) {
+	return /,|\band\b|&|\//.test(text);
+}
+
+const foodWords = new Set(
+	`pizza pizzas snacks snack food coffee tea drinks cookies chips candy donuts bagels sandwiches fruit
+	juice soda cake cupcakes tacos burritos refreshments popcorn pastries muffins`.split(/\s+/)
+);
 
 const singularEndingInS = new Set(['canvas', 'atlas', 'gas', 'lens', 'series', 'news', 'chess']);
 
 function isPlural(items: string) {
 	const text = items.trim().toLowerCase();
-	if (/,|\band\b|&|\+|\//.test(text)) return true;
+	if (isList(text)) return true;
 	const count = /^(\d+)\s/.exec(text);
 	if (count !== null) return Number(count[1]) !== 1;
 	if (
@@ -276,12 +323,25 @@ function isPlural(items: string) {
 }
 
 export function midSentence(text: string) {
-	const words = text.split(/\s+/);
-	const [first, ...rest] = words;
-	if (first === undefined || !/^[A-Z][a-z'’]+$/.test(first)) return text;
-	if (rest.some((word) => /[A-Z]/.test(word))) return text;
-	return `${first.charAt(0).toLowerCase()}${first.slice(1)}${rest.length === 0 ? '' : ' '}${rest.join(' ')}`;
+	const match = /^([A-Z][a-z]+)(?=$|[\s-])/.exec(text);
+	if (match === null || !commonWords.has(match[1].toLowerCase())) return text;
+	if (/^\s+[A-Z]/.test(text.slice(match[1].length))) return text;
+	return `${match[1].toLowerCase()}${text.slice(match[1].length)}`;
 }
+
+const commonWords = new Set(
+	`weekly monthly biweekly daily annual general music study collab collaborative club member members
+	officer officers team group social board game games movie trivia craft crafts bake final first last
+	welcome kickoff info volunteer community listening discussion meeting event events workshop concert
+	party night dinner lunch breakfast open mixer potluck picnic hike trip end spring fall winter summer
+	snacks snack pizza pizzas candy food drinks drink coffee tea water plates plate napkins cups utensils
+	tablecloths tablecloth nametags name markers marker pens stickers paint supplies decorations trophy
+	trophies prizes prize gift gifts vinyl record records cassette tape paper posters poster flyers prints
+	shirts bags bag baggies chips cookies fruit juice soda cake cupcakes donuts bagels sandwiches costumes
+	lights balloons streamers books book puzzles figurines senior seniors blank bulk assorted string`.split(
+		/\s+/
+	)
+);
 
 function possessive(name: string) {
 	return /s$/i.test(name) ? `${name}’` : `${name}’s`;

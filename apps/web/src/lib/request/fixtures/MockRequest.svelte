@@ -21,6 +21,7 @@
 		scenarioView,
 		withReadiness
 	} from './fixtures';
+	import { confirmMockCheck } from './checks';
 
 	let { scenario }: { scenario: string } = $props();
 
@@ -48,6 +49,7 @@
 		view.readiness = next.readiness;
 		view.businessPurposeText = next.businessPurposeText;
 		view.businessPurposeMissing = next.businessPurposeMissing;
+		view.checks = next.checks;
 	}
 
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -180,6 +182,16 @@
 		forgetApprover: async (id) => {
 			await wait(120);
 			approvers = approvers.filter((saved) => saved.id !== id);
+		},
+		answerFoodPackaging: async (packaged) => {
+			await wait(120);
+			view.purchase.foodIndividuallyPackaged = packaged;
+			await refresh();
+		},
+		confirmCheck: async (checkId) => {
+			await wait(120);
+			view.purchase.checkConfirmations = confirmMockCheck(view, checkId);
+			await refresh();
 		},
 		upload: (files, slot) => {
 			startUploads(session, mockRequestId, files, slot, transport);

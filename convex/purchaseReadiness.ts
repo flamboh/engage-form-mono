@@ -109,8 +109,6 @@ export async function evaluatePurchaseReadiness(
 	}
 	const asuoFunds = effectiveDocumentationCategories(request).includes('asuo_funds');
 	if (asuoFunds && request.publicityFileId === null) add('Files', 'Publicity proof missing.');
-	const food = effectiveDocumentationCategories(request).includes('food');
-	if (food && request.cateringWaiverFileId === null) add('Files', 'Catering waiver missing.');
 	const printingServices = effectiveDocumentationCategories(request).includes('printing_services');
 	if (printingServices && request.printingInvoiceFileId === null) {
 		add('Files', 'Printing invoice missing.');
@@ -167,15 +165,6 @@ export async function evaluatePurchaseReadiness(
 				'Publicity proof missing.'
 			);
 		}
-		if (food && request.cateringWaiverFileId !== null) {
-			await requireOwnedDocument(
-				add,
-				options.documentExists,
-				request.cateringWaiverFileId,
-				'Files',
-				'Catering waiver missing.'
-			);
-		}
 		if (printingServices && request.printingInvoiceFileId !== null) {
 			await requireOwnedDocument(
 				add,
@@ -200,6 +189,19 @@ export async function evaluatePurchaseReadiness(
 }
 
 const eventFacts: MissingFact[] = ['eventName', 'dates', 'time', 'location', 'attendance'];
+
+const checksSection = 'Document checks';
+
+export function withBlockingChecks(
+	readiness: PurchaseReadiness,
+	checks: { severity: 'blocking' | 'warning'; title: string }[]
+): PurchaseReadiness {
+	const reasons = checks
+		.filter((check) => check.severity === 'blocking')
+		.map((check) => check.title);
+	if (reasons.length === 0) return readiness;
+	return { ready: false, sections: [...readiness.sections, { section: checksSection, reasons }] };
+}
 
 export function formatReadinessBlockers(readiness: PurchaseReadiness) {
 	return [

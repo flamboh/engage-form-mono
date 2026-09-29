@@ -8,6 +8,7 @@
 		error = '',
 		expired = false,
 		renderable = true,
+		notes = [],
 		onremove,
 		onretry,
 		ondismiss,
@@ -22,6 +23,7 @@
 		error?: string;
 		expired?: boolean;
 		renderable?: boolean;
+		notes?: { title: string; blocking: boolean }[];
 		onremove?: () => void;
 		onretry?: () => void;
 		ondismiss?: () => void;
@@ -44,6 +46,7 @@
 	class="slip-shadow"
 	class:is-failed={status === 'failed'}
 	class:is-unreadable={status === 'unreadable'}
+	class:is-flagged={notes.some((note) => note.blocking)}
 >
 	<div class="slip relative flex bg-white max-lg:min-h-14 max-lg:items-center lg:flex-col">
 		<div
@@ -116,6 +119,23 @@
 					>
 				</span>
 			{/if}
+			{#each notes as note (note.title)}
+				<span
+					class={[
+						'flex items-start gap-1.5 text-xs lg:mt-1',
+						note.blocking ? 'text-(--alert)' : 'text-(--ink)'
+					]}
+				>
+					<span
+						class={[
+							'mt-1 size-1.5 shrink-0',
+							note.blocking ? 'bg-(--alert)' : 'bg-(--marker-deep)'
+						]}
+						aria-hidden="true"
+					></span>
+					{note.title}
+				</span>
+			{/each}
 			{#if status === 'unreadable'}
 				<span class="text-xs text-(--alert)">Couldn’t read this — fill it in</span>
 				{#if onretryreading}
@@ -175,7 +195,8 @@
 	}
 
 	.slip-shadow.is-failed,
-	.slip-shadow.is-unreadable {
+	.slip-shadow.is-unreadable,
+	.slip-shadow.is-flagged {
 		filter: drop-shadow(0 0 1px var(--alert));
 	}
 

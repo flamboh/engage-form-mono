@@ -56,6 +56,8 @@ export type RequestBackend = {
 	upload(files: File[], slot: UploadSlot): void;
 	rememberApprover(approver: Approver): Promise<void>;
 	forgetApprover(id: Id<'approvers'>): Promise<void>;
+	answerFoodPackaging(packaged: boolean): Promise<void>;
+	confirmCheck(checkId: string): Promise<void>;
 };
 
 export type FillPhase = 'idle' | 'opening' | 'sent';
@@ -275,6 +277,14 @@ export class RequestEditor {
 
 	async retryReading(fileId: Id<'files'>) {
 		await this.#run(() => this.#backend().retryReading(fileId));
+	}
+
+	async answerFoodPackaging(packaged: boolean) {
+		await this.#run(() => this.#backend().answerFoodPackaging(packaged));
+	}
+
+	async confirmCheck(checkId: string) {
+		await this.#run(() => this.#backend().confirmCheck(checkId));
 	}
 
 	upload(files: File[], slot: UploadSlot) {

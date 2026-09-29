@@ -88,6 +88,15 @@
 		forgetApprover: async (id) => {
 			await client.mutation(api.authed.approvers.forgetApprover, { id });
 		},
+		answerFoodPackaging: async (packaged) => {
+			await client.mutation(api.authed.checks.answerFoodPackaging, {
+				purchaseRequestId,
+				packaged
+			});
+		},
+		confirmCheck: async (checkId) => {
+			await client.mutation(api.authed.checks.confirmCheck, { purchaseRequestId, checkId });
+		},
 		upload: (files, slot) => {
 			const session = clerkContext.currentSession;
 			if (!session) return;

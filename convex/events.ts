@@ -69,10 +69,19 @@ export function formatEventDates(dates: string[]) {
 	if (valid.length === 0) return '';
 	const weekdays = new Set(valid.map((date) => weekdayOf(date)));
 	if (valid.length > 1 && weekdays.size === 1) {
-		const [weekday] = [...weekdays];
-		return `${weekdayName(weekday ?? 0)}s (${valid.map(monthDay).join(', ')})`;
+		const day = weekdayName([...weekdays][0] ?? 0);
+		if (valid.length >= 5 && everyWeek(valid)) {
+			return `every ${day} from ${monthDay(valid[0])} through ${monthDay(valid.at(-1) ?? '')}`;
+		}
+		return `${day}s (${valid.map(monthDay).join(', ')})`;
 	}
 	return joinList(valid.map((date) => `${weekdayName(weekdayOf(date) ?? 0)} ${monthDay(date)}`));
+}
+
+export function eventDatesPhrase(dates: string[]) {
+	const text = formatEventDates(dates);
+	if (text === '') return '';
+	return text.startsWith('every ') ? text : `on ${text}`;
 }
 
 export function formatEventTime(value: string) {
@@ -90,6 +99,15 @@ export function joinList(values: string[]) {
 	if (values.length <= 1) return values[0] ?? '';
 	if (values.length === 2) return `${values[0]} and ${values[1]}`;
 	return `${values.slice(0, -1).join(', ')}, and ${values.at(-1)}`;
+}
+
+function everyWeek(dates: string[]) {
+	return dates.every(
+		(date, index) =>
+			index === 0 ||
+			(parseIsoDate(date)?.getTime() ?? 0) - (parseIsoDate(dates[index - 1])?.getTime() ?? 0) ===
+				7 * dayMs
+	);
 }
 
 function monthDay(value: string) {

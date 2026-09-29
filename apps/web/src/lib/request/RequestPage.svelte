@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import type { MissingFact } from '$convex/businessPurpose';
-	import type { DocumentSlot, RequestView } from '$convex/requestView';
+	import type { DocumentSlot, RequestCheck, RequestView } from '$convex/requestView';
 	import { requirementPanelsFor, type RequirementPanel } from '$lib/purchase/builderFlow';
 	import type { SavedData } from '$lib/purchase/draftDetails';
 	import { goto } from '$app/navigation';
@@ -104,6 +104,7 @@
 			: whatsLeft({
 					readiness: view.readiness,
 					reviews: editor.reviews,
+					checks: view.checks,
 					reading
 				}).filter((item) => item.target.kind !== 'slot' || !uploadingSlots.has(item.target.slot))
 	);
@@ -189,15 +190,24 @@
 		jumpTo({ kind: 'field', field });
 	}
 
+	function checkAnchor(check: RequestCheck) {
+		if (check.action === 'answer') return 'whats-left';
+		if (check.slot === null) return 'field-recipients';
+		return check.fileId === null ? `slot-${check.slot}` : 'field-documents';
+	}
+
 	function jumpTo(target: LeftTarget) {
 		if (target.kind === 'link') return;
 		if (target.kind === 'field' && target.field === 'details') detailsOpen = true;
 		jumpToId(
-			target.kind === 'slot'
-				? `slot-${target.slot}`
-				: target.kind === 'review'
-					? `review-${target.field}`
-					: `field-${target.field}`
+			target.kind === 'check'
+				? checkAnchor(target.check)
+				: target.kind === 'slot'
+					? `slot-${target.slot}`
+					: target.kind === 'review'
+						? `review-${target.field}`
+						: `field-${target.field}`,
+			'field-event'
 		);
 	}
 
@@ -258,6 +268,9 @@
 				documents={view?.documents ?? []}
 				{pending}
 				{missingSlots}
+				checks={view?.checks ?? []}
+				packaged={purchase?.foodIndividuallyPackaged ?? null}
+				onpackaged={(packaged) => void editor.answerFoodPackaging(packaged)}
 				onfiles={upload}
 				locked={approved}
 				onremove={(fileId) => void editor.removeDocument(fileId)}
@@ -286,6 +299,8 @@
 						onjump={jump}
 						onfiles={upload}
 						onapproval={() => approvalDialog?.show()}
+						onconfirm={(checkId) => void editor.confirmCheck(checkId)}
+						onpackaged={(packaged) => void editor.answerFoodPackaging(packaged)}
 					/>
 				{/if}
 				<div class="contents" inert={approved}>

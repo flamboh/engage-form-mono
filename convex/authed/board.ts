@@ -31,7 +31,6 @@ const nextStepRules: [RegExp, string][] = [
 	[/^Office location missing/, 'Add where it will be kept'],
 	[/^Second approval missing/, 'Add a second approval'],
 	[/^Publicity proof missing/, 'Add proof the event was advertised'],
-	[/^Catering waiver missing/, 'Add the catering waiver'],
 	[/^Printing invoice missing/, 'Add the printing invoice'],
 	[/^Purchaser profile must belong/, 'Choose who paid again'],
 	[/^(Purchaser|ID card)/, 'Finish who paid'],
