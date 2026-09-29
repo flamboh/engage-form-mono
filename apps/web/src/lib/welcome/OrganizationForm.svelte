@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import Button from '$lib/ui/Button.svelte';
 	import Chip from '$lib/ui/Chip.svelte';
 	import InlineError from '$lib/ui/InlineError.svelte';

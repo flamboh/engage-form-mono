@@ -7,7 +7,7 @@
 	import type { BoardItem } from '$convex/authed/board';
 	import { todayInEugene } from '$convex/lifecycle';
 	import AppShell from '$lib/app/AppShell.svelte';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import ReceiptDrop from '$lib/board/ReceiptDrop.svelte';
 	import RequestRow from '$lib/board/RequestRow.svelte';
 	import SentBackDialog from '$lib/board/SentBackDialog.svelte';

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { weekdayName } from '$convex/events';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import type { EventDetails } from '$lib/purchase/draftDetails';
 	import Button from '$lib/ui/Button.svelte';
 	import InlineError from '$lib/ui/InlineError.svelte';

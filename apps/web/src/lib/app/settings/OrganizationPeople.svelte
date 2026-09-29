@@ -2,7 +2,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import PurchaserForm from '$lib/app/PurchaserForm.svelte';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import Button from '$lib/ui/Button.svelte';
 	import EmptyState from '$lib/ui/EmptyState.svelte';
 	import FieldRow from '$lib/ui/FieldRow.svelte';

@@ -10,6 +10,7 @@ import {
 	type Recipient,
 	type SavedData
 } from '$lib/purchase/draftDetails';
+import { errorMessage } from '$lib/errors';
 import { createSingleFlight } from '$lib/singleFlight';
 import { SvelteSet } from 'svelte/reactivity';
 import type { UploadSlot } from '$lib/uploads.svelte';
@@ -278,7 +279,7 @@ export class RequestEditor {
 				else delete overrides[key];
 				this.overrides = overrides;
 			}
-			this.error = message(err);
+			this.error = errorMessage(err);
 		}
 	}
 
@@ -335,7 +336,7 @@ export class RequestEditor {
 		} catch (err) {
 			tab?.close();
 			this.fillPhase = 'idle';
-			this.error = message(err);
+			this.error = errorMessage(err);
 		}
 	}
 
@@ -346,7 +347,7 @@ export class RequestEditor {
 			await this.#backend().confirmFields(fields);
 		} catch (err) {
 			this.confirmed = previous;
-			this.error = message(err);
+			this.error = errorMessage(err);
 		}
 	}
 
@@ -370,7 +371,7 @@ export class RequestEditor {
 				this.form?.purchaserSource ?? form.purchaserSource
 			);
 		} catch (err) {
-			this.error = message(err);
+			this.error = errorMessage(err);
 		} finally {
 			this.idUploading = null;
 		}
@@ -409,7 +410,7 @@ export class RequestEditor {
 
 	#save() {
 		this.#saver.run().catch((err: unknown) => {
-			this.error = message(err);
+			this.error = errorMessage(err);
 		});
 	}
 
@@ -419,7 +420,7 @@ export class RequestEditor {
 		try {
 			await action();
 		} catch (err) {
-			this.error = message(err);
+			this.error = errorMessage(err);
 		} finally {
 			this.busy = false;
 		}
@@ -459,12 +460,4 @@ function omitFileFields(overrides: Partial<FormState>) {
 	delete next.receiptFileIds;
 	for (const field of Object.values(slotField)) delete next[field];
 	return next;
-}
-
-function message(err: unknown) {
-	const text = err instanceof Error ? err.message : String(err);
-	return text
-		.replace(/^\[CONVEX[^\]]*\]\s*/, '')
-		.replace(/^Uncaught Error:\s*/, '')
-		.split('\n')[0];
 }

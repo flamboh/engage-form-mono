@@ -3,7 +3,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import DocumentPicker from '$lib/app/DocumentPicker.svelte';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import Button from '$lib/ui/Button.svelte';
 	import InlineError from '$lib/ui/InlineError.svelte';
 	import { useConvexClient } from 'convex-svelte';

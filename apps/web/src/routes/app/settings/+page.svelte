@@ -6,7 +6,7 @@
 	import ExtensionSteps from '$lib/app/ExtensionSteps.svelte';
 	import SettingsOrganization from '$lib/app/settings/SettingsOrganization.svelte';
 	import SettingsYou from '$lib/app/settings/SettingsYou.svelte';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import { getExtensionConnection } from '$lib/extension/connection.svelte';
 	import ExtensionStatus from '$lib/extension/ExtensionStatus.svelte';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';

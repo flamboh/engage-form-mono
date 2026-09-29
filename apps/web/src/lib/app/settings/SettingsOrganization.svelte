@@ -4,7 +4,7 @@
 	import OrganizationEvents from '$lib/app/OrganizationEvents.svelte';
 	import BudgetLines from '$lib/app/settings/BudgetLines.svelte';
 	import OrganizationPeople from '$lib/app/settings/OrganizationPeople.svelte';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import Button from '$lib/ui/Button.svelte';
 	import Chip from '$lib/ui/Chip.svelte';
 	import FieldRow from '$lib/ui/FieldRow.svelte';

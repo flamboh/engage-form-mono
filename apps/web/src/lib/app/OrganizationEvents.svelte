@@ -3,7 +3,7 @@
 	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import { formatEventTime } from '$convex/events';
 	import EventForm from '$lib/app/EventForm.svelte';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import type { EventDetails } from '$lib/purchase/draftDetails';
 	import Button from '$lib/ui/Button.svelte';
 	import EmptyState from '$lib/ui/EmptyState.svelte';

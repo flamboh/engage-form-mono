@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { api } from '$convex/_generated/api';
 	import ExtensionSteps from '$lib/app/ExtensionSteps.svelte';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import ReceiptDrop from '$lib/board/ReceiptDrop.svelte';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
 	import { prefetchRequest } from '$lib/request/prefetch';

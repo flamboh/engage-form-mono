@@ -4,7 +4,7 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import { hasAllocations } from '$convex/budget';
 	import AppShell from '$lib/app/AppShell.svelte';
-	import { errorMessage } from '$lib/app/styles';
+	import { errorMessage } from '$lib/errors';
 	import { formatMoney } from '$lib/board/format';
 	import Ledger from '$lib/budget/Ledger.svelte';
 	import LineMeter from '$lib/budget/LineMeter.svelte';
