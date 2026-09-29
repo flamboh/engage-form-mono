@@ -30,7 +30,7 @@
 	let weekday = $state<number | null>(start?.weekday ?? null);
 	let time = $state(start?.time ?? '');
 	let location = $state(start?.location ?? '');
-	let attendance = $state(start?.attendance == null ? '' : String(start.attendance));
+	let attendance = $state<number | null>(start?.attendance ?? null);
 	let openToAllStudents = $state(start?.openToAllStudents ?? true);
 	let saving = $state(false);
 	let error = $state('');
@@ -42,8 +42,9 @@
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
-		const count = attendance.trim() === '' ? null : Math.round(Number(attendance));
-		if (count !== null && (!Number.isFinite(count) || count < 0)) {
+		const count =
+			typeof attendance === 'number' && Number.isFinite(attendance) ? Math.round(attendance) : null;
+		if (count !== null && count < 0) {
 			error = 'Attendance should be a number of students.';
 			return;
 		}
