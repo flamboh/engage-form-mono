@@ -29,16 +29,16 @@ One row per Clerk user. Existence of this row is the wizard's profile-step gate.
 - `permanentAddress: string`
 - `studentEmail: string` — separate from Clerk auth email; users may OAuth with Google but submit forms under a UO student address.
 - `phone: string`
-- `idCardFrontFileId: Id<"files">`
-- `idCardBackFileId: Id<"files">`
+- `idCardFrontFileId: Id<"files"> | null`
+- `idCardBackFileId: Id<"files"> | null`
 - `updatedAt: number`
 
-All fields required at creation. Index on `clerkUserId`.
+Text fields are required at creation. ID photos are added when a request first needs them, or from Settings > You. Index on `clerkUserId`.
 
 ### Student Organizations
 
 - Drop `defaultBudgetLineItem`.
-- Add `budgetLines: string[]` (ordered list of label strings).
+- Add `budgetLines: { name: string; allocations: { fiscalYear: number; amount: number }[] }[]` (ordered; allocations are optional per fiscal year).
 - Keep `name`, `indexNumber`, `fundLetter`, `archived`, `owner`, `updatedAt`.
 
 ### Purchasers
@@ -71,9 +71,10 @@ Renamed and narrowed. Purchasers are _other people_ who paid for something. The 
 
 Route: `/app/welcome/[step]`. Steps in order:
 
-1. `profile` — Create `users` row. Fields above. ID card documents uploaded inline. No skip.
-2. `org` — Create first student organization with `budgetLines` as a repeatable list of strings. No skip.
-3. `done` — Success screen with the primary CTA: **Build your first request** → a new draft on the Student Organization board.
+1. `profile` — Create `users` row. Fields above, without ID photos. No skip.
+2. `org` — Create first student organization with `budgetLines` as a repeatable list of names. No skip.
+3. `event` — Save a recurring Event. Skippable.
+4. `extension` — Install and connect the extension, then land on the Student Organization board.
 
 ### Gating
 
@@ -96,19 +97,15 @@ Triggered by the layout guard above, not by a sign-in event. This means the wiza
 ### Dashboard (`/app`)
 
 - Remove the "Extension link" side panel.
-- Add a header link to `/app/extension`.
-- Split the recent list into **Drafts / Ready** sections (separate from this doc's scope but enabled by the cleaner flow).
+- The account menu links to Settings and to `/app/settings#extension`, with a live connection dot.
 
-### New: `/app/extension`
+### Settings (`/app/settings`)
 
-- Explains that the extension signs in with the same Clerk account as the web app.
-- No device tokens, linked-device list, or manual sync action.
-
-### Saved (`/app/saved`)
-
-- Rename the old "People" tab to "Purchasers."
-- Remove the requester-related UI (no `isRequester` toggle, no email/phone fields on the form).
-- Add a "Profile" entry point that opens an edit view of the current `users` row.
+- `#you`: the current `users` row, including both ID photos.
+- `#org-{id}`: organization details, budget lines with allocations, Events, purchasers and approvers.
+- `#extension`: explains that the extension connects with a session token from the web app. The extension's Connect banner opens `/app/settings?connect=1#extension`.
+- `#account`: sign-in email, Manage sign-in and Sign out.
+- No requester-related UI (no `isRequester` toggle, no email/phone fields on the purchaser form).
 
 ### Request page (`/app/org/[organizationId]/purchase/[purchaseRequestId]`)
 
@@ -128,10 +125,10 @@ Triggered by the layout guard above, not by a sign-in event. This means the wiza
 1. Schema rewrite: add `users`, change Student Organization fields, add `purchasers`, update `purchaseRequests.purchaser` shape. Delete now-invalid backend code.
 2. Backend mutations: `upsertUserProfile`, `createOrganization` (with `budgetLines`), `createPurchaser`, `createEventPreset`.
 3. `/app/welcome/[step]` routes and the `/app/*` layout guard.
-4. `/app/extension` page.
+4. Extension section in `/app/settings`.
 5. Builder updates: drop requester picker, add purchaser-self toggle, retarget token resolution to `users`.
-6. Saved page updates: rename, drop requester UI, add profile edit entry.
-7. Dashboard cleanup: remove side panel, add extension page link.
+6. Settings page: profile, organizations, extension and account sections.
+7. Dashboard cleanup: remove side panel, add the account menu.
 8. Engage fill updates: rewire requester source to `users`.
 
 ## Open Questions

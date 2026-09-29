@@ -296,7 +296,11 @@
 								onclick={() => jump(field)}>{copy.ask}</button
 							>
 						{:else if copy}
-							<a class="text-(--pine) underline" href="/app/saved">{copy.ask}</a>
+							<a
+								class="text-(--pine) underline"
+								href={`/app/settings#org-${editor.view?.purchase.organizationSourceId ?? ''}`}
+								>{copy.ask}</a
+							>
 						{:else}
 							{variable}
 						{/if}

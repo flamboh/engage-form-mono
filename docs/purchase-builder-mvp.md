@@ -32,9 +32,10 @@ Out of scope:
 - `/app`: Student Organization picker
 - `/app/org/[organizationId]`: board with the organization's purchase requests and receipt drop to start a new one
 - `/app/org/[organizationId]/purchase/[purchaseRequestId]`: purchase request page
-- `/app/saved`: one page for student organizations, purchasers, and Events
+- `/app/org/[organizationId]/budget`: allocations, spending per budget line, and the purchases ledger
+- `/app/settings`: one page for your profile (`#you`), each student organization with its purchasers, Events and approvers (`#org-{id}`), the extension (`#extension`), and sign-in (`#account`)
 
-The request page may create autofill sources inline. Autofill sources can also be managed from `/app/saved`.
+The request page may create autofill sources inline. Autofill sources can also be managed from `/app/settings`.
 
 ## Autofill Sources
 
