@@ -3,7 +3,8 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import type { BudgetSummary, LedgerRow } from '$convex/authed/budget';
 	import { errorMessage } from '$lib/errors';
-	import { formatMoney, formatShortDate } from '$lib/board/format';
+	import { formatMoney } from '$lib/board/format';
+	import { monthDay } from '$lib/request/labels';
 	import Button from '$lib/ui/Button.svelte';
 	import Chip from '$lib/ui/Chip.svelte';
 	import StatusPill from '$lib/ui/StatusPill.svelte';
@@ -177,7 +178,7 @@
 			<tbody>
 				{#each rows as row (row.id)}
 					<tr>
-						<td class="whitespace-nowrap tabular-nums">{formatShortDate(row.receiptDate)}</td>
+						<td class="whitespace-nowrap tabular-nums">{monthDay(row.receiptDate)}</td>
 						<td class="min-w-0">
 							<a
 								class="font-medium underline-offset-4 hover:underline"

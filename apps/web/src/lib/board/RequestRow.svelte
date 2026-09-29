@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { BoardItem } from '$convex/authed/board';
-	import { formatDay, formatMoney, formatShortDate } from '$lib/board/format';
+	import { formatMoney } from '$lib/board/format';
+	import { monthDay } from '$lib/request/labels';
 
 	let {
 		item,
@@ -26,7 +27,7 @@
 		[
 			item.totalAmount > 0 ? formatMoney(item.totalAmount) : '',
 			item.budgetLineItem.trim(),
-			item.receiptDate ? formatShortDate(item.receiptDate) : ''
+			item.receiptDate ? monthDay(item.receiptDate) : ''
 		].filter((part) => part !== '')
 	);
 </script>
@@ -41,7 +42,7 @@
 			{#each meta as part, index (index)}
 				<span>{part}</span>
 			{:else}
-				<span>Started {formatDay(item.updatedAt)}</span>
+				<span>Started {monthDay(item.updatedAt)}</span>
 			{/each}
 		</span>
 	</a>

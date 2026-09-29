@@ -11,13 +11,8 @@
 	import ReceiptDrop from '$lib/board/ReceiptDrop.svelte';
 	import RequestRow from '$lib/board/RequestRow.svelte';
 	import SentBackDialog from '$lib/board/SentBackDialog.svelte';
-	import {
-		daysLeftLabel,
-		daysLeftTone,
-		formatDay,
-		formatEventDay,
-		formatMoney
-	} from '$lib/board/format';
+	import { daysLeftLabel, daysLeftTone, formatMoney } from '$lib/board/format';
+	import { monthDay, shortDate } from '$lib/request/labels';
 	import { prefetchRequest } from '$lib/request/prefetch';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
 	import Banner from '$lib/ui/Banner.svelte';
@@ -66,7 +61,7 @@
 
 	function trackedMessage(item: BoardItem) {
 		if (item.stage !== 'after_event') return `${titleOf(item)} is saved in To finish.`;
-		const when = item.finishAfter ? formatEventDay(item.finishAfter) : 'the event';
+		const when = item.finishAfter ? shortDate(item.finishAfter) : 'the event';
 		return `${titleOf(item)} is tracked. It moves to To finish after ${when}.`;
 	}
 
@@ -192,9 +187,9 @@
 	{:else if item.finishAfter === null}
 		Everything's in
 	{:else if item.finishAfter < today}
-		Event was {formatEventDay(item.finishAfter)}
+		Event was {shortDate(item.finishAfter)}
 	{:else}
-		Event is {formatEventDay(item.finishAfter)}
+		Event is {shortDate(item.finishAfter)}
 	{/if}
 	<span class="sm:hidden">{@render days(item)}</span>
 {/snippet}
@@ -241,7 +236,7 @@
 {#snippet afterNext(item: BoardItem)}
 	<span class="square hollow" aria-hidden="true"></span>
 	<span class="truncate">
-		Come back after {item.finishAfter ? formatEventDay(item.finishAfter) : 'the event'}
+		Come back after {item.finishAfter ? shortDate(item.finishAfter) : 'the event'}
 	</span>
 	{@render days(item)}
 {/snippet}
@@ -254,7 +249,7 @@
 
 {#snippet waitingNext(item: BoardItem)}
 	<span class="square hollow border-pine" aria-hidden="true"></span>
-	{item.lastFilledAt === null ? 'Filled' : `Filled ${formatDay(item.lastFilledAt)}`}
+	{item.lastFilledAt === null ? 'Filled' : `Filled ${monthDay(item.lastFilledAt)}`}
 {/snippet}
 
 {#snippet waitingActions(item: BoardItem)}
