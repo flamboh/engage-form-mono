@@ -77,9 +77,6 @@
 		...missingSlots.filter((slot) => slot !== 'receipt' && slot !== 'catering_waiver'),
 		...(waiverNeeded ? (['catering_waiver'] as const) : [])
 	]);
-	const packagingAsked = $derived(
-		packaged !== null || checks.some((check) => check.id === 'food-packaging')
-	);
 
 	function notesFor(fileId: Id<'files'>) {
 		return checks
@@ -188,7 +185,7 @@
 		/>
 	</div>
 
-	{#if packagingAsked}
+	{#if packaged !== null}
 		<div
 			id="field-packaging"
 			class="flex items-center justify-between gap-3 border-t border-(--line) pt-3"

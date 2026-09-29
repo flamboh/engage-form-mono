@@ -188,7 +188,7 @@
 	}
 
 	function checkAnchor(check: RequestCheck) {
-		if (check.action === 'answer') return 'field-packaging';
+		if (check.action === 'answer') return 'whats-left';
 		if (check.slot === null) return 'field-recipients';
 		return check.fileId === null ? `slot-${check.slot}` : 'field-documents';
 	}
