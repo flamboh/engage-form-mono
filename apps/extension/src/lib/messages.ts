@@ -7,6 +7,7 @@ export type ReadyPurchaseRequest = {
 	status: 'ready';
 	organization: string;
 	purchaser: string;
+	vendor: string;
 	itemDescription: string;
 	totalAmount: number;
 	updatedAt: number;

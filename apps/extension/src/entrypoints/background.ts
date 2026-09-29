@@ -91,7 +91,7 @@ async function handleRuntimeMessage(message: RuntimeMessage): Promise<RuntimeRes
 			return { ok: true, signedIn: (await readConnection()) !== null };
 		case 'CONNECT':
 			await browser.storage.local.remove(signedOutKey);
-			await browser.tabs.create({ url: `${readWebAppUrl()}/app/extension?connect=1` });
+			await browser.tabs.create({ url: `${readWebAppUrl()}/app/settings?connect=1#extension` });
 			return { ok: true, message: 'Opening Engage Form to connect.' };
 		case 'SIGN_OUT':
 			await signOut();

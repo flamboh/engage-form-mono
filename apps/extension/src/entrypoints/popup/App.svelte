@@ -108,33 +108,41 @@
 		}
 	}
 
+	function title(purchase: ReadyPurchaseRequest) {
+		return purchase.vendor.trim() || purchase.itemDescription.trim() || 'Untitled request';
+	}
+
 	function money(value: number) {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 	}
 </script>
 
-<main class="w-80 bg-stone-50 font-sans text-stone-950">
-	<header class="flex items-center justify-between border-b border-stone-200 bg-white px-4 py-3">
-		<h1 class="text-sm font-semibold">Engage Form</h1>
+<main class="w-80 bg-paper font-sans text-ink">
+	<header class="flex items-center justify-between border-b border-line bg-surface px-4 py-3">
+		<h1 class="text-sm font-[650] tracking-tight text-pine">Engage Form</h1>
 		{#if signedIn}
-			<button class="text-xs text-stone-500 hover:text-stone-900" type="button" onclick={signOut}>
+			<button
+				class="text-xs text-quiet underline underline-offset-3 hover:text-ink"
+				type="button"
+				onclick={signOut}
+			>
 				Disconnect
 			</button>
 		{/if}
 	</header>
 
-	<section class="space-y-3 p-4">
+	<section class="flex flex-col gap-3 p-4">
 		{#if status}
-			<p class="text-sm text-stone-600">{status}</p>
+			<p class="text-sm text-quiet">{status}</p>
 		{/if}
 
 		{#if !signedIn}
-			<p class="text-sm text-stone-600">
-				Connect the extension to your Engage Form account. It opens Engage Form, where you're
+			<p class="text-sm text-quiet">
+				Connect the extension to your Engage Form account. It opens Engage Form, where you’re
 				already signed in.
 			</p>
 			<button
-				class="rounded-md bg-stone-950 px-3 py-2 text-sm font-medium text-white hover:bg-stone-800"
+				class="inline-flex min-h-[42px] items-center justify-center self-start bg-pine px-[18px] text-sm font-semibold text-white hover:bg-pine-deep"
 				type="button"
 				onclick={connect}
 			>
@@ -143,19 +151,22 @@
 		{:else}
 			{#if pendingFill !== null}
 				{@const pending = pendingFill}
-				<div class="rounded-md border border-stone-900 bg-white p-3">
-					<p class="text-xs text-stone-500">Waiting for Engage</p>
-					<p class="mt-0.5 text-sm font-semibold">{pending.label}</p>
-					<div class="mt-2 flex gap-3 text-sm">
+				<div class="border border-marker-deep bg-marker-soft p-3">
+					<p class="flex items-center gap-1.5 text-xs font-medium text-ink">
+						<span class="size-[7px] animate-pulse bg-marker-deep" aria-hidden="true"></span>
+						Waiting for Engage
+					</p>
+					<p class="mt-1 text-sm font-semibold">{pending.label}</p>
+					<div class="mt-2 flex gap-4 text-sm">
 						<button
-							class="font-medium underline"
+							class="font-semibold text-ink underline underline-offset-3"
 							type="button"
 							onclick={() => openTab(pending.engageUrl)}
 						>
 							Open Engage
 						</button>
 						<button
-							class="text-stone-500 hover:text-stone-900"
+							class="text-quiet underline underline-offset-3 hover:text-ink"
 							type="button"
 							onclick={() => cancelPendingFill(pending.purchaseRequestId)}
 						>
@@ -166,26 +177,42 @@
 			{/if}
 
 			{#if purchases === null}
-				<p class="text-sm text-stone-500">Loading…</p>
+				<p class="text-sm text-quiet">Loading…</p>
 			{:else if purchases.length === 0}
-				<p class="text-sm text-stone-600">
-					No ready purchase requests. Use <strong>Fill on Engage</strong> in the web app.
+				<p class="text-sm text-quiet">
+					<b class="font-semibold text-ink">Nothing ready to fill.</b> Press Fill on Engage on a request
+					in the web app.
 				</p>
 			{:else}
-				<div class="space-y-2">
-					<p class="text-xs text-stone-500">Fill the open Engage tab with:</p>
+				<div class="flex flex-col">
+					<p class="border-b border-ink pb-2 text-xs text-quiet">Fill the open Engage tab with</p>
 					{#each purchases as purchase (purchase.id)}
 						<button
-							class="flex w-full items-start justify-between gap-3 rounded-md border border-stone-200 bg-white p-3 text-left hover:bg-stone-100 disabled:opacity-60"
+							class="flex w-full items-start justify-between gap-3 border-b border-line bg-surface px-3 py-2.5 text-left hover:bg-pine-soft disabled:opacity-60"
 							type="button"
 							disabled={fillingPurchaseId !== null}
 							onclick={() => fillPurchase(purchase.id)}
 						>
-							<span>
-								<span class="block text-sm font-medium">
-									{purchase.itemDescription || 'Untitled purchase request'}
+							<span class="min-w-0">
+								<span class="block truncate text-sm font-semibold">{title(purchase)}</span>
+								<span class="block truncate text-xs text-quiet">
+									{purchase.vendor.trim() && purchase.itemDescription.trim()
+										? `${purchase.itemDescription} · ${purchase.organization}`
+										: purchase.organization}
 								</span>
-								<span class="block text-xs text-stone-500">{purchase.organization}</span>
+								<span
+									class="mt-1.5 inline-flex h-5 items-center gap-1.5 border px-1.5 text-[11.5px] font-medium {purchase.lastFilledAt
+										? 'border-pine text-pine-deep'
+										: 'border-pine bg-pine-soft text-pine-deep'}"
+								>
+									<span
+										class="size-[6px] {purchase.lastFilledAt
+											? 'border-[1.5px] border-pine'
+											: 'bg-current'}"
+										aria-hidden="true"
+									></span>
+									{purchase.lastFilledAt ? 'Filled' : 'Ready'}
+								</span>
 							</span>
 							<span class="text-sm tabular-nums">{money(purchase.totalAmount)}</span>
 						</button>
@@ -193,10 +220,13 @@
 				</div>
 			{/if}
 
-			<div class="flex items-center justify-between text-xs text-stone-500">
-				<span>Extension connected</span>
+			<div class="flex items-center justify-between text-xs text-quiet">
+				<span class="inline-flex items-center gap-1.5">
+					<span class="size-2 rounded-full bg-ok" aria-hidden="true"></span>
+					Extension connected
+				</span>
 				<button
-					class="hover:text-stone-900"
+					class="underline underline-offset-3 hover:text-ink"
 					type="button"
 					onclick={() => openTab(`${webAppUrl}/app`)}
 				>

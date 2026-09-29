@@ -79,6 +79,7 @@ export const listReadyPurchases = internalQuery({
 			status: 'ready' as const,
 			organization: request.studentOrganization.name,
 			purchaser: request.purchaser.name,
+			vendor: request.vendor,
 			itemDescription: request.itemDescription,
 			totalAmount: request.totalAmount,
 			updatedAt: request.updatedAt,
