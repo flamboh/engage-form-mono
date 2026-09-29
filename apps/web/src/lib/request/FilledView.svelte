@@ -23,7 +23,11 @@
 		},
 		{ label: 'Event', value: eventDate === null ? '' : monthDay(eventDate), done: true },
 		{ label: 'Filled', value: filledOn, done: purchase.lastFilledAt !== null },
-		{ label: 'Approved', value: approved ? monthDay(purchase.updatedAt) : '', done: approved }
+		{
+			label: 'Approved',
+			value: purchase.approvedAt === null ? '' : monthDay(purchase.approvedAt),
+			done: approved
+		}
 	]);
 	const eventText = $derived(
 		[purchase.activity.name, ...purchase.activity.dates.map(shortDate)].filter(Boolean).join(', ')
