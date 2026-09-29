@@ -15,7 +15,7 @@
 	import { RequestEditor, type RequestBackend } from './editor.svelte';
 	import FilledView from './FilledView.svelte';
 	import RequestMenu from './RequestMenu.svelte';
-	import SentBackDialog from './SentBackDialog.svelte';
+	import SentBackDialog from '$lib/board/SentBackDialog.svelte';
 	import StepBody from './StepBody.svelte';
 	import StepList from './StepList.svelte';
 	import { requestSteps, stepsLeft } from './steps';
@@ -53,7 +53,7 @@
 
 	let finishing = $state(false);
 	let approvalDialog = $state<ApprovalDialog | null>(null);
-	let sentBackDialog = $state<SentBackDialog | null>(null);
+	let sendingBack = $state(false);
 
 	onDestroy(() => void editor.flush());
 
@@ -330,11 +330,16 @@
 		onjump={jumpToStep}
 	/>
 
-	<SentBackDialog
-		bind:this={sentBackDialog}
-		busy={editor.busy}
-		onsend={(note) => editor.sendBack(note)}
-	/>
+	{#if sendingBack}
+		<SentBackDialog
+			vendor={title}
+			busy={editor.busy}
+			onconfirm={async (note) => {
+				if (await editor.sendBack(note)) sendingBack = false;
+			}}
+			oncancel={() => (sendingBack = false)}
+		/>
+	{/if}
 
 	<ActionBar
 		{editor}
@@ -342,7 +347,7 @@
 		{boardHref}
 		{trackedHref}
 		onfinish={finishNow}
-		onsentback={() => sentBackDialog?.show()}
+		onsentback={() => (sendingBack = true)}
 	/>
 </div>
 
