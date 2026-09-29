@@ -3,23 +3,14 @@ import type { Doc } from '../convex/_generated/dataModel';
 import {
 	assemblePurchase,
 	assertReady,
-	businessPurposeTemplateDraftPatch,
-	businessPurposeTemplateFields,
-	businessPurposeTemplateUpdateFields,
-	filterBusinessPurposeTemplates,
-	formatBusinessPurposeSource,
-	parseBusinessPurposeText,
+	previousRequestDefaults,
 	renderBusinessPurpose,
-	userAsPurchaserDetails,
-	validateBusinessPurposeText
+	userAsPurchaserDetails
 } from '../convex/purchaseModel';
 import { evaluatePurchaseReadiness } from '../convex/purchaseReadiness';
 
 vi.stubEnv('FILES_BASE_URL', 'https://files.example');
 vi.stubEnv('FILES_SIGNING_SECRET', 'test-secret');
-
-const businessPurposeTemplate =
-	'{Student Organization} reimburses {Purchaser} for {Item Description} from {Vendor} for {Total Amount} on {Activity Date}.';
 
 const request = {
 	_id: 'purchase_1',
@@ -34,8 +25,7 @@ const request = {
 		name: 'Album Listening Club',
 		indexNumber: 'OS353i',
 		fundLetter: 'I',
-		budgetLines: ['Event Expenses'],
-		businessPurposeTemplate
+		budgetLines: ['Event Expenses']
 	},
 	requester: {
 		id: 'user_1',
@@ -55,14 +45,21 @@ const request = {
 		idCardFrontFileId: 'file_front',
 		idCardBackFileId: 'file_back'
 	},
-	activityDate: '2026-05-22',
+	activity: {
+		eventId: null,
+		name: 'Weekly listening event',
+		dates: ['2026-05-19'],
+		time: '18:30',
+		location: 'McKenzie 240A',
+		attendance: 50,
+		openToAllStudents: true
+	},
 	vendor: 'Amazon',
 	itemDescription: 'record',
 	totalAmount: 22.98,
 	budgetLineItem: 'Event Expenses',
 	reimbursementReason: 'Other processes are too slow.',
-	businessPurposeSource: parseBusinessPurposeText(businessPurposeTemplate),
-	businessPurposeTouched: false,
+	businessPurposeOverride: null,
 	receiptFileIds: ['file_receipt'],
 	secondApprovalFileId: 'file_approval',
 	publicityFileId: 'file_publicity',
@@ -78,223 +75,93 @@ const request = {
 	lastFilledAt: null
 } as Doc<'purchaseRequests'>;
 
-test('renders business purpose from current recorded facts', () => {
-	expect(renderBusinessPurpose(request)).toBe(
-		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98 on May 22, 2026.'
+test('renders the generated Business Purpose from recorded facts', () => {
+	expect(renderBusinessPurpose(request, Date.UTC(2026, 5, 1))).toBe(
+		'Album Listening Club wishes to reimburse Oliver Boorstein because they purchased record from Amazon for $22.98. The record was given to Aidan (951951840) for winning trivia at Album Listening Club’s weekly listening event on Tuesday 05/19 at 6:30pm in McKenzie 240A, with about 50 students in attendance.'
 	);
 });
 
-test('keeps missing variables as placeholders', () => {
+test('a customized Business Purpose replaces the generated text', () => {
 	expect(
-		renderBusinessPurpose({
-			...request,
-			businessPurposeSource: parseBusinessPurposeText('Prizes for {Recipients}.'),
-			recipients: []
-		})
-	).toBe('Prizes for {Recipients}.');
+		renderBusinessPurpose({ ...request, businessPurposeOverride: '  Custom purpose.  ' })
+	).toBe('Custom purpose.');
 });
 
-test('keeps unknown Business Purpose tokens as literal text', () => {
-	expect(parseBusinessPurposeText('Reimburse {Purchaser} for {Bad Variable} at {vendor}.')).toEqual(
-		{
-			parts: [
-				{ kind: 'text', text: 'Reimburse ' },
-				{ kind: 'variable', variable: 'purchaser' },
-				{ kind: 'text', text: ' for {Bad Variable} at ' },
-				{ kind: 'variable', variable: 'vendor' },
-				{ kind: 'text', text: '.' }
-			]
-		}
-	);
-	expect(parseBusinessPurposeText('{oops}')).toEqual({ parts: [{ kind: 'text', text: '{oops}' }] });
-	expect(
-		formatBusinessPurposeSource(parseBusinessPurposeText('Snacks {Vendor} {x} {Total Amount}'))
-	).toBe('Snacks {Vendor} {x} {Total Amount}');
-});
-
-test('templates still reject unknown Business Purpose variables', () => {
-	expect(() => validateBusinessPurposeText('Reimburse {Purchaser} for {Bad Variable}.')).toThrow(
-		'Unknown Business Purpose variable: Bad Variable.'
-	);
-});
-
-test('resolves structured Business Purpose source with plural recipient variables', () => {
-	const purchase = {
-		...request,
-		businessPurposeSource: parseBusinessPurposeText(
-			'{Student Organization} reimburses {Purchaser} for {Item Description} from {Vendor} for {Total Amount}. Recipients: {Recipients}. UO 95 IDs: {Recipient UO 95 IDs}. Activity: {Activity Date}.'
-		),
-		recipients: [
-			{ name: 'Aidan', uo95: '951951840', reason: 'winning trivia', value: 12 },
-			{ name: 'Maya', uo95: '950000002', reason: 'winning trivia', value: 10.98 }
-		]
-	} as Doc<'purchaseRequests'>;
-
-	expect(renderBusinessPurpose(purchase)).toBe(
-		'Album Listening Club reimburses Oliver Boorstein for record from Amazon for $22.98. Recipients: Aidan, Maya. UO 95 IDs: 951951840, 950000002. Activity: May 22, 2026.'
-	);
-});
-
-test('Ready blocks unresolved Business Purpose variables from source', async () => {
+test('Ready reports each missing event fact in plain words', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
-			businessPurposeSource: parseBusinessPurposeText('Move supplies to {Office Location}.'),
-			officeLocation: ''
+			activity: {
+				...request.activity,
+				name: '',
+				dates: [],
+				time: '',
+				location: '',
+				attendance: null
+			}
 		} as Doc<'purchaseRequests'>)
 	).resolves.toEqual({
 		ready: false,
 		sections: [
-			{ section: 'Business purpose', reasons: ['Business purpose has unresolved variables.'] }
+			{
+				section: 'Event',
+				reasons: [
+					'Choose the event.',
+					'Add the event date.',
+					'Add the event time.',
+					'Add where the event was.',
+					'Add how many students attended.'
+				]
+			}
 		]
 	});
 });
 
-test('freeform Business Purpose text stays allowed', async () => {
+test('Ready still checks facts while the Business Purpose is customized', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
-			businessPurposeSource: parseBusinessPurposeText('Reimburse Oliver for records.')
+			businessPurposeOverride: 'Everything is here, trust me.',
+			activity: { ...request.activity, attendance: null }
 		} as Doc<'purchaseRequests'>)
 	).resolves.toEqual({
-		ready: true,
-		sections: []
+		ready: false,
+		sections: [{ section: 'Event', reasons: ['Add how many students attended.'] }]
 	});
 });
 
-test('fill payload resolves Business Purpose at read time', async () => {
-	await expect(
-		assemblePurchase(fileCtx(), {
-			...request,
-			businessPurposeSource: parseBusinessPurposeText(
-				'Reimburse {Purchaser} for {Item Description}.'
-			)
-		} as Doc<'purchaseRequests'>)
-	).resolves.toMatchObject({
-		businessPurposeText: 'Reimburse Oliver Boorstein for record.'
-	});
+test('fill payload carries the generated Business Purpose', async () => {
+	const payload = await assemblePurchase(fileCtx(), request);
+	expect(payload.businessPurposeText).toContain('because they purchased record from Amazon');
+	expect(payload).not.toHaveProperty('activityDate');
 });
 
-test('Business Purpose Template creation requires a title and valid template source', () => {
-	expect(
-		businessPurposeTemplateFields(
-			'owner',
-			{
-				organizationId: 'org_1' as never,
-				title: '  Weekly gift prize  ',
-				businessPurposeTemplate: 'Reimburse {Purchaser} for {Item Description}.'
-			},
-			10
-		)
-	).toMatchObject({
-		owner: 'owner',
+test('new drafts copy the previous event facts without its dates', () => {
+	const event = {
+		_id: 'event_1',
 		organizationId: 'org_1',
-		title: 'Weekly gift prize',
-		businessPurposeTemplate: 'Reimburse {Purchaser} for {Item Description}.',
-		searchText: 'Weekly gift prize Reimburse {Purchaser} for {Item Description}.',
-		archived: false,
-		updatedAt: 10
-	});
-
-	expect(() =>
-		businessPurposeTemplateFields(
-			'owner',
-			{
-				organizationId: 'org_1' as never,
-				title: ' ',
-				businessPurposeTemplate: 'Reimburse {Purchaser}.'
-			},
-			10
-		)
-	).toThrow('Business Purpose Template title missing.');
-
-	expect(() =>
-		businessPurposeTemplateFields(
-			'owner',
-			{
-				organizationId: 'org_1' as never,
-				title: 'Broken',
-				businessPurposeTemplate: 'Reimburse {Unknown}.'
-			},
-			10
-		)
-	).toThrow('Unknown Business Purpose variable: Unknown.');
-});
-
-test('Business Purpose Template updates do not unarchive archived templates', () => {
-	expect(
-		businessPurposeTemplateUpdateFields(
-			{
-				title: 'Updated',
-				businessPurposeTemplate: 'Updated {Purchaser}.'
-			},
-			20
-		)
-	).toEqual({
-		title: 'Updated',
-		businessPurposeTemplate: 'Updated {Purchaser}.',
-		searchText: 'Updated Updated {Purchaser}.',
-		updatedAt: 20
-	});
-});
-
-test('Business Purpose Template search hides archived templates by default', () => {
-	const templates = [
-		{
-			_id: 'template_1',
-			title: 'Weekly prizes',
-			businessPurposeTemplate: 'Reimburse records.',
-			archived: false
-		},
-		{
-			_id: 'template_2',
-			title: 'Old prizes',
-			businessPurposeTemplate: 'Reimburse shirts.',
-			archived: true
-		}
-	];
-
-	expect(
-		filterBusinessPurposeTemplates(templates, 'prizes').map((template) => template._id)
-	).toEqual(['template_1']);
-	expect(
-		filterBusinessPurposeTemplates(templates, 'shirts', { includeArchived: true }).map(
-			(template) => template._id
-		)
-	).toEqual(['template_2']);
-});
-
-test('Draft Business Purpose initialization copies template source', () => {
-	const template = {
-		businessPurposeTemplate: 'Reimburse {Purchaser} for {Item Description}.',
 		archived: false
-	};
-	const initialized = {
+	} as Doc<'events'>;
+	const previous = {
 		...request,
-		...businessPurposeTemplateDraftPatch(template)
-	} as Doc<'purchaseRequests'>;
-
-	template.businessPurposeTemplate = 'Changed {Vendor}.';
-	template.archived = true;
-
-	expect(renderBusinessPurpose(initialized)).toBe('Reimburse Oliver Boorstein for record.');
-	expect(initialized.businessPurposeTouched).toBe(true);
-});
-
-test('Ready Purchase Requests keep copied Business Purpose when a template changes', () => {
-	const template = {
-		businessPurposeTemplate: 'Reimburse {Purchaser} for {Item Description}.',
-		archived: false
+		activity: { ...request.activity, eventId: event._id }
 	};
-	const readyRequest = {
-		...request,
-		...businessPurposeTemplateDraftPatch(template),
-		status: 'ready'
-	} as Doc<'purchaseRequests'>;
-
-	template.businessPurposeTemplate = 'Changed {Vendor}.';
-
-	expect(renderBusinessPurpose(readyRequest)).toBe('Reimburse Oliver Boorstein for record.');
+	const defaults = previousRequestDefaults(
+		previous,
+		{ _id: 'org_1' as never, budgetLines: ['Event Expenses'] },
+		null,
+		event
+	);
+	expect(defaults.activity).toEqual({ ...request.activity, eventId: 'event_1', dates: [] });
+	expect(defaults.fieldSources).toMatchObject({ activity: 'previous' });
+	expect(
+		previousRequestDefaults(
+			previous,
+			{ _id: 'org_1' as never, budgetLines: ['Event Expenses'] },
+			null,
+			{ ...event, archived: true }
+		).activity?.eventId
+	).toBeNull();
 });
 
 test('Requester-as-Purchaser uses Requester details without a Purchaser Profile', () => {
@@ -324,21 +191,6 @@ test('Requester-as-Purchaser uses Requester details without a Purchaser Profile'
 
 test('reports a complete Personal Reimbursement purchase request as Ready', async () => {
 	await expect(evaluatePurchaseReadiness(request)).resolves.toEqual({
-		ready: true,
-		sections: []
-	});
-});
-
-test('final common facts do not require Activity Date for Ready', async () => {
-	await expect(
-		evaluatePurchaseReadiness({
-			...request,
-			activityDate: '',
-			businessPurposeSource: parseBusinessPurposeText(
-				'Reimburse {Purchaser} for {Item Description} from {Vendor} for {Total Amount}.'
-			)
-		} as Doc<'purchaseRequests'>)
-	).resolves.toEqual({
 		ready: true,
 		sections: []
 	});
@@ -544,6 +396,7 @@ test('Merchandise/Apparel and Gifts/Prizes require recipients', async () => {
 					reasons: [
 						'Recipient name missing.',
 						'Recipient UO 95 missing.',
+						'Recipient reason missing.',
 						'Recipient value missing.'
 					]
 				}
@@ -552,17 +405,30 @@ test('Merchandise/Apparel and Gifts/Prizes require recipients', async () => {
 	}
 });
 
-test('Recipient reason, dollar limits, total matching, and Brand Approval do not block Ready', async () => {
+test('Dollar limits, total matching, and Brand Approval do not block Ready', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
 			documentationCategories: ['merchandise_apparel'],
 			totalAmount: 10,
-			recipients: [{ name: 'Aidan', uo95: '951951840', reason: '', value: 75 }]
+			recipients: [{ name: 'Aidan', uo95: '951951840', reason: 'winning trivia', value: 75 }]
 		})
 	).resolves.toEqual({
 		ready: true,
 		sections: []
+	});
+});
+
+test('Gift recipients need a reason for the Business Purpose', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			documentationCategories: ['gifts_prizes'],
+			recipients: [{ name: 'Aidan', uo95: '951951840', reason: '', value: 22.98 }]
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [{ section: 'Recipients', reasons: ['Recipient reason missing.'] }]
 	});
 });
 
@@ -645,12 +511,11 @@ test('reports blocked Draft reasons grouped by section', async () => {
 				idCardFrontFileId: '' as never,
 				idCardBackFileId: '' as never
 			},
-			activityDate: '',
+			activity: { ...request.activity, dates: [] },
 			vendor: '',
 			itemDescription: '',
 			totalAmount: 0,
 			budgetLineItem: '',
-			businessPurposeSource: parseBusinessPurposeText('Move supplies to {Office Location}.'),
 			receiptFileIds: [],
 			secondApprovalFileId: null,
 			publicityFileId: null
@@ -689,8 +554,8 @@ test('reports blocked Draft reasons grouped by section', async () => {
 				]
 			},
 			{
-				section: 'Business purpose',
-				reasons: ['Business purpose has unresolved variables.']
+				section: 'Event',
+				reasons: ['Add the event date.']
 			},
 			{
 				section: 'Files',
@@ -714,14 +579,14 @@ test('Ready gate rejects blocked Drafts with sectioned reasons', async () => {
 	await expect(
 		assertReady(ctx as never, {
 			...request,
-			businessPurposeSource: parseBusinessPurposeText('Move supplies to {Office Location}.'),
+			activity: { ...request.activity, attendance: null },
 			receiptFileIds: [],
 			publicityFileId: null
 		})
 	).rejects.toThrow(
 		[
 			'Purchase request is not ready.',
-			'Business purpose: Business purpose has unresolved variables.',
+			'Event: Add how many students attended.',
 			'Files: Receipt document missing. Publicity proof missing.'
 		].join('\n')
 	);

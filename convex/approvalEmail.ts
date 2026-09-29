@@ -1,41 +1,67 @@
-import {
-	parseBusinessPurposeText,
-	valueForVariable,
-	type BusinessPurposeRequest,
-	type BusinessPurposeVariable
-} from './businessPurpose';
+import type { Doc } from './_generated/dataModel';
+import { eventReference, formatMoney, midSentence } from './businessPurpose';
+import { eventDatesPhrase } from './events';
 
-export const approvalEmailTemplate = {
-	subject: '{Item Description} purchase approval',
-	body: 'Hello,\n\nI approve {Purchaser}’s purchase of {Item Description} from {Vendor} on behalf of {Student Organization}, totaling {Total Amount}, for {Purpose}.\n\nBest,',
-	ask: 'Could you approve a purchase for {Student Organization}? Engage needs a written OK from another officer. Please reply with the message below so I can attach it to the request.'
-};
+export type ApprovalEmailField =
+	| 'studentOrganization'
+	| 'purchaser'
+	| 'vendor'
+	| 'itemDescription'
+	| 'totalAmount'
+	| 'eventName'
+	| 'dates';
+
+export type ApprovalEmailRequest = Pick<
+	Doc<'purchaseRequests'>,
+	'studentOrganization' | 'purchaser' | 'vendor' | 'itemDescription' | 'totalAmount' | 'activity'
+> & { purpose?: string };
 
 export type Approver = { name: string; email: string };
 export type ApprovalEmailPart =
 	| { kind: 'text'; text: string }
-	| { kind: 'missing'; variable: BusinessPurposeVariable };
+	| { kind: 'missing'; variable: ApprovalEmailField };
 export type ApprovalEmailText = { parts: ApprovalEmailPart[]; text: string | null };
 export type ApprovalEmail = {
 	subject: ApprovalEmailText;
 	body: ApprovalEmailText;
-	missing: BusinessPurposeVariable[];
+	missing: ApprovalEmailField[];
 };
 
+type Piece = string | ApprovalEmailField;
+
 export function resolveApprovalEmail(
-	request: BusinessPurposeRequest,
+	request: ApprovalEmailRequest,
 	approver: Approver
 ): ApprovalEmail {
+	const values = approvalValues(request);
 	const signature = [approver.name, approver.email]
 		.map((line) => line.trim())
 		.filter((line) => line !== '');
-	const subject = resolveTemplate(approvalEmailTemplate.subject, request, true);
-	const body = resolveTemplate(
-		[approvalEmailTemplate.body, ...signature].join('\n'),
-		request,
+	const purpose = midSentence((request.purpose ?? '').trim().replace(/^for\s+/i, ''));
+	const subject = resolve(['itemDescription', ' purchase approval'], values, true);
+	const body = resolve(
+		[
+			'Hello,\n\nI approve ',
+			'purchaser',
+			'’s purchase of ',
+			'itemDescription',
+			' from ',
+			'vendor',
+			' on behalf of ',
+			'studentOrganization',
+			', totaling ',
+			'totalAmount',
+			purpose === '' ? ', for ' : `, for ${purpose} at `,
+			'eventName',
+			' ',
+			'dates',
+			'.\n\nBest,',
+			...signature.map((line) => `\n${line}`)
+		],
+		values,
 		false
 	);
-	const missing = new Set<BusinessPurposeVariable>();
+	const missing = new Set<ApprovalEmailField>();
 	for (const part of [...subject.parts, ...body.parts]) {
 		if (part.kind === 'missing') missing.add(part.variable);
 	}
@@ -48,16 +74,25 @@ export function approvalRequestBody({
 	approverName,
 	requesterName
 }: {
-	request: BusinessPurposeRequest;
+	request: ApprovalEmailRequest;
 	approval: string;
 	approverName: string;
 	requesterName: string;
 }) {
 	const firstName = approverName.trim().split(/\s+/)[0] ?? '';
+	const ask = resolve(
+		[
+			'Could you approve a purchase for ',
+			'studentOrganization',
+			'? Engage needs a written OK from another officer. Please reply with the message below so I can attach it to the request.'
+		],
+		approvalValues(request),
+		false
+	);
 	return [
 		firstName === '' ? 'Hi,' : `Hi ${firstName},`,
 		'',
-		joinParts(resolveTemplate(approvalEmailTemplate.ask, request, false).parts),
+		joinParts(ask.parts),
 		'',
 		'Thanks,',
 		requesterName.trim(),
@@ -74,9 +109,32 @@ export function mailtoUrl({ to, subject, body }: { to: string; subject: string; 
 	return `mailto:${address}?subject=${encode(subject)}&body=${encode(body)}`;
 }
 
-function resolveTemplate(
-	template: string,
-	request: BusinessPurposeRequest,
+const fields = new Set<string>([
+	'studentOrganization',
+	'purchaser',
+	'vendor',
+	'itemDescription',
+	'totalAmount',
+	'eventName',
+	'dates'
+]);
+
+function approvalValues(request: ApprovalEmailRequest): Record<ApprovalEmailField, string> {
+	const eventName = request.activity.name.trim();
+	return {
+		studentOrganization: request.studentOrganization.name.trim(),
+		purchaser: request.purchaser.name.trim(),
+		vendor: request.vendor.trim(),
+		itemDescription: request.itemDescription.trim(),
+		totalAmount: request.totalAmount > 0 ? formatMoney(request.totalAmount) : '',
+		eventName: eventName === '' ? '' : eventReference(eventName, request.activity.dates.length > 1),
+		dates: eventDatesPhrase(request.activity.dates)
+	};
+}
+
+function resolve(
+	pieces: Piece[],
+	values: Record<ApprovalEmailField, string>,
 	capitalize: boolean
 ): ApprovalEmailText {
 	const parts: ApprovalEmailPart[] = [];
@@ -85,14 +143,14 @@ function resolveTemplate(
 		if (last?.kind === 'text') last.text += text;
 		else parts.push({ kind: 'text', text });
 	};
-	for (const part of parseBusinessPurposeText(template).parts) {
-		if (part.kind === 'text') {
-			pushText(part.text);
+	for (const piece of pieces) {
+		if (!fields.has(piece)) {
+			pushText(piece);
 			continue;
 		}
-		const value = valueForVariable(part.variable, request);
-		if (value === null) parts.push({ kind: 'missing', variable: part.variable });
-		else pushText(value);
+		const variable = piece as ApprovalEmailField;
+		if (values[variable] === '') parts.push({ kind: 'missing', variable });
+		else pushText(values[variable]);
 	}
 	const first = parts[0];
 	if (capitalize && first?.kind === 'text') {

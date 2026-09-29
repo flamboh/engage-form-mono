@@ -3,13 +3,12 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import AppShell from '$lib/app/AppShell.svelte';
 	import PurchaserForm from '$lib/app/PurchaserForm.svelte';
-	import TemplateForm from '$lib/app/TemplateForm.svelte';
 	import { errorMessage, secondaryButtonClass } from '$lib/app/styles';
 	import OrganizationForm from '$lib/welcome/OrganizationForm.svelte';
 	import ProfileForm from '$lib/welcome/ProfileForm.svelte';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 
-	type Table = 'organizations' | 'purchasers' | 'businessPurposeTemplates';
+	type Table = 'organizations' | 'purchasers';
 
 	const client = useConvexClient();
 	let showArchived = $state(false);
@@ -39,7 +38,7 @@
 
 	async function setArchived(
 		table: Table,
-		id: Id<'organizations'> | Id<'purchasers'> | Id<'businessPurposeTemplates'>,
+		id: Id<'organizations'> | Id<'purchasers'>,
 		archived: boolean
 	) {
 		error = '';
@@ -53,10 +52,6 @@
 
 	function fundDescription(fundLetter: string) {
 		return fundLetter === 'I' ? 'ASUO funded' : `Fund ${fundLetter}`;
-	}
-
-	function preview(text: string) {
-		return text.replace(/\{([^}]+)\}/g, '$1').slice(0, 140);
 	}
 </script>
 
@@ -135,7 +130,6 @@
 						<OrganizationForm
 							organization={null}
 							submitLabel="Add organization"
-							showTemplate
 							onSaved={closeEditor}
 							onCancel={closeEditor}
 						/>
@@ -159,7 +153,6 @@
 								<OrganizationForm
 									organization={org}
 									submitLabel="Save"
-									showTemplate
 									onSaved={closeEditor}
 									onCancel={closeEditor}
 								/>
@@ -221,59 +214,6 @@
 					{#if editing !== 'purchaser:new'}
 						<li class="py-4 text-sm text-stone-500">
 							When someone else pays, add them here so their details fill in.
-						</li>
-					{/if}
-				{/each}
-			</ul>
-		</section>
-
-		<section class="flex flex-col gap-3">
-			<div class="flex items-center justify-between gap-4">
-				<div>
-					<h2 class="text-lg font-semibold">Business purpose templates</h2>
-					<p class="text-sm text-stone-500">Reasons you use again and again.</p>
-				</div>
-				<button
-					class={secondaryButtonClass}
-					type="button"
-					disabled={activeOrganizations.length === 0}
-					onclick={() => toggle('template:new')}
-				>
-					Add template
-				</button>
-			</div>
-			<ul class="divide-y divide-stone-200 border-y border-stone-200">
-				{#if editing === 'template:new'}
-					<li class="py-5">
-						<TemplateForm
-							template={null}
-							organizations={activeOrganizations}
-							onDone={closeEditor}
-						/>
-					</li>
-				{/if}
-				{#each saved?.businessPurposeTemplates ?? [] as template (template._id)}
-					{@const key = `template:${template._id}`}
-					<li class="py-4" class:opacity-60={template.archived}>
-						<div class="flex items-center justify-between gap-4">
-							<div class="min-w-0">
-								<p class="truncate font-medium">{template.title}</p>
-								<p class="line-clamp-2 text-sm text-stone-500">
-									{preview(template.businessPurposeTemplate)}
-								</p>
-							</div>
-							{@render rowActions(key, 'businessPurposeTemplates', template._id, template.archived)}
-						</div>
-						{#if editing === key}
-							<div class="pt-5">
-								<TemplateForm {template} organizations={activeOrganizations} onDone={closeEditor} />
-							</div>
-						{/if}
-					</li>
-				{:else}
-					{#if editing !== 'template:new'}
-						<li class="py-4 text-sm text-stone-500">
-							Save a reason once, like weekly meeting snacks, and pick it on any request.
 						</li>
 					{/if}
 				{/each}

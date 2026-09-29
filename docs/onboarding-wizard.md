@@ -39,7 +39,7 @@ All fields required at creation. Index on `clerkUserId`.
 
 - Drop `defaultBudgetLineItem`.
 - Add `budgetLines: string[]` (ordered list of label strings).
-- Keep `name`, `indexNumber`, `fundLetter`, `businessPurposeTemplate`, `archived`, `owner`, `updatedAt`.
+- Keep `name`, `indexNumber`, `fundLetter`, `archived`, `owner`, `updatedAt`.
 
 ### Purchasers
 
@@ -72,7 +72,7 @@ Renamed and narrowed. Purchasers are _other people_ who paid for something. The 
 Route: `/app/welcome/[step]`. Steps in order:
 
 1. `profile` — Create `users` row. Fields above. ID card documents uploaded inline. No skip.
-2. `org` — Create first student organization with `budgetLines` as a repeatable list of strings. Business purpose template prefilled with a sensible default. No skip.
+2. `org` — Create first student organization with `budgetLines` as a repeatable list of strings. No skip.
 3. `done` — Success screen with the primary CTA: **Build your first request** → a new draft on the Student Organization board.
 
 ### Gating
@@ -115,7 +115,7 @@ Triggered by the layout guard above, not by a sign-in event. This means the wiza
 - Remove the requester-person picker entirely.
 - Purchaser section shows a toggle: **I'm the purchaser** (default, `kind: "self"`) / **Someone else** (reveals purchaser picker, `kind: "purchaser"`).
 - When `kind: "self"`, the builder reads requester ID card documents, name, address, etc. from the current `users` row instead of a purchaser record.
-- Business purpose token resolution: `{requester}` now resolves from `users`, not a person row.
+- The generated Business Purpose names the purchaser from `users` when `kind: "self"`.
 
 ### Engage fill mapping
 

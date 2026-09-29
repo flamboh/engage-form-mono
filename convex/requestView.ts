@@ -33,6 +33,29 @@ export const requestReview = z.object({
 	receiptRemoved: z.boolean().optional()
 });
 
+export const missingFact = z.enum([
+	'vendor',
+	'items',
+	'total',
+	'purchaser',
+	'eventName',
+	'dates',
+	'time',
+	'location',
+	'attendance',
+	'recipients'
+]);
+
+export const requestCheck = z.object({
+	id: z.string(),
+	severity: z.enum(['blocking', 'warning']),
+	title: z.string(),
+	detail: z.string(),
+	fileId: zid('files').nullable(),
+	slot: documentSlot.nullable(),
+	action: z.enum(['upload', 'answer', 'confirm']).nullable()
+});
+
 export const requestView = z.object({
 	purchase: purchaseRequestDoc,
 	documents: z.array(requestDocument),
@@ -42,10 +65,13 @@ export const requestView = z.object({
 		ready: z.boolean(),
 		sections: z.array(z.object({ section: z.string(), reasons: z.array(z.string()) }))
 	}),
-	businessPurposeText: z.string()
+	businessPurposeText: z.string(),
+	businessPurposeMissing: z.array(z.object({ fact: missingFact, label: z.string() })),
+	checks: z.array(requestCheck)
 });
 
 export type RequestView = z.infer<typeof requestView>;
 export type RequestDocument = z.infer<typeof requestDocument>;
 export type RequestReview = z.infer<typeof requestReview>;
 export type DocumentSlot = z.infer<typeof documentSlot>;
+export type RequestCheck = z.infer<typeof requestCheck>;

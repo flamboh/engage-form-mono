@@ -49,18 +49,6 @@
 				changedFields
 			});
 		},
-		applyTemplate: async (templateId) => {
-			await client.mutation(api.authed.purchaseBuilder.applyBusinessPurposeTemplate, {
-				draftId: purchaseRequestId,
-				templateId
-			});
-		},
-		saveOrganizationTemplate: async (businessPurposeTemplate) => {
-			await client.mutation(api.authed.purchaseBuilder.setOrganizationBusinessPurposeTemplate, {
-				organizationId,
-				businessPurposeTemplate
-			});
-		},
 		resolveReview: async (field, value) => {
 			await client.mutation(api.authed.documents.resolveReview, {
 				purchaseRequestId,

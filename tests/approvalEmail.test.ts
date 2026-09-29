@@ -10,7 +10,16 @@ function request(overrides: Partial<Record<string, unknown>> = {}) {
 		vendor: 'Market of Choice',
 		itemDescription: 'chips, salsa, and cookies',
 		totalAmount: 36.18,
-		purpose: 'the general meeting',
+		purpose: 'snacks',
+		activity: {
+			eventId: null,
+			name: 'General meeting',
+			dates: ['2026-09-22'],
+			time: '18:00',
+			location: 'EMU 101',
+			attendance: 30,
+			openToAllStudents: true
+		},
 		...overrides
 	} as unknown as Request;
 }
@@ -22,7 +31,7 @@ test('resolves the subject and body from the request and approver', () => {
 	expect(email.missing).toEqual([]);
 	expect(email.subject.text).toBe('Chips, salsa, and cookies purchase approval');
 	expect(email.body.text).toBe(
-		'Hello,\n\nI approve Jordan Lee’s purchase of chips, salsa, and cookies from Market of Choice on behalf of Climbing Club, totaling $36.18, for the general meeting.\n\nBest,\nSam Rivera\nsrivera@uoregon.edu'
+		'Hello,\n\nI approve Jordan Lee’s purchase of chips, salsa, and cookies from Market of Choice on behalf of Climbing Club, totaling $36.18, for snacks at the general meeting on Tuesday 09/22.\n\nBest,\nSam Rivera\nsrivera@uoregon.edu'
 	);
 });
 
@@ -36,19 +45,54 @@ test('leaves out signature lines the user has not filled in', () => {
 
 test('reports missing values instead of writing template tokens', () => {
 	const email = resolveApprovalEmail(
-		request({ vendor: ' ', itemDescription: '', totalAmount: 0, purpose: undefined }),
+		request({
+			vendor: ' ',
+			itemDescription: '',
+			totalAmount: 0,
+			purpose: undefined,
+			activity: {
+				eventId: null,
+				name: '',
+				dates: [],
+				time: '',
+				location: '',
+				attendance: null,
+				openToAllStudents: true
+			}
+		}),
 		approver
 	);
 	expect(email.subject.text).toBeNull();
 	expect(email.body.text).toBeNull();
-	expect(email.missing).toEqual(['itemDescription', 'vendor', 'totalAmount', 'purpose']);
+	expect(email.missing).toEqual(['itemDescription', 'vendor', 'totalAmount', 'eventName', 'dates']);
 	expect(email.subject.parts).toEqual([
 		{ kind: 'missing', variable: 'itemDescription' },
 		{ kind: 'text', text: ' purchase approval' }
 	]);
 	const written = email.body.parts.map((part) => (part.kind === 'text' ? part.text : '')).join('');
 	expect(written).not.toMatch(/[{}]/);
-	expect(email.body.parts.filter((part) => part.kind === 'missing')).toHaveLength(4);
+	expect(email.body.parts.filter((part) => part.kind === 'missing')).toHaveLength(5);
+});
+
+test('recurring purchases list every event date in the approval', () => {
+	const email = resolveApprovalEmail(
+		request({
+			purpose: '',
+			activity: {
+				eventId: null,
+				name: 'Weekly listening event',
+				dates: ['2026-05-19', '2026-05-12', '2026-05-26'],
+				time: '18:30',
+				location: 'McKenzie 240A',
+				attendance: 50,
+				openToAllStudents: true
+			}
+		}),
+		approver
+	);
+	expect(email.body.text).toContain(
+		'totaling $36.18, for the weekly listening events on Tuesdays (05/12, 05/19, 05/26).'
+	);
 });
 
 test('builds the ask with the approval below it', () => {

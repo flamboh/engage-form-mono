@@ -2,109 +2,67 @@
 	import type { RequestEditor } from './editor.svelte';
 	import SourceCue from './SourceCue.svelte';
 
-	let { editor, resolvedText }: { editor: RequestEditor; resolvedText: string } = $props();
+	let {
+		editor,
+		resolvedText,
+		missing
+	}: {
+		editor: RequestEditor;
+		resolvedText: string;
+		missing: { fact: string; label: string }[];
+	} = $props();
 
 	let customizing = $state(false);
-	let textarea = $state<HTMLTextAreaElement | null>(null);
 
-	const variables = [
-		'Purpose',
-		'Student Organization',
-		'Purchaser',
-		'Vendor',
-		'Item Description',
-		'Total Amount',
-		'Activity Date',
-		'Time',
-		'Location',
-		'Recipients',
-		'Office Location'
-	];
-	const parts = $derived(
-		resolvedText.split(/(\{[^{}]+\})/).map((text) => ({
-			text: text.startsWith('{') ? text.slice(1, -1) : text,
-			blank: text.startsWith('{')
-		}))
-	);
-
-	function insert(variable: string) {
-		const current = editor.form?.businessPurposeText ?? '';
-		const token = `{${variable}}`;
-		const start = textarea?.selectionStart ?? current.length;
-		const end = textarea?.selectionEnd ?? current.length;
-		editor.update(
-			{
-				businessPurposeText: current.slice(0, start) + token + current.slice(end),
-				businessPurposeTouched: true
-			},
-			{ debounce: true }
-		);
-		requestAnimationFrame(() => {
-			textarea?.focus();
-			textarea?.setSelectionRange(start + token.length, start + token.length);
-		});
-	}
+	const override = $derived(editor.form?.businessPurposeOverride ?? null);
 </script>
 
 <section id="field-businessPurpose" class="flex flex-col gap-3" aria-labelledby="purpose-heading">
 	<div class="flex items-baseline justify-between gap-3">
 		<h2 id="purpose-heading" class="flex items-baseline gap-2 text-lg font-semibold text-(--ink)">
 			Business Purpose
-			<SourceCue source={editor.sourceOf('businessPurposeSource', 'businessPurposeText')} />
+			<SourceCue source={editor.sourceOf('businessPurposeOverride')} />
 		</h2>
-		<button
-			class="text-sm text-(--pine) underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--pine)"
-			type="button"
-			aria-expanded={customizing}
-			onclick={() => (customizing = !customizing)}
-		>
-			{customizing ? 'Done' : 'Customize'}
-		</button>
+		<div class="flex gap-3">
+			{#if override !== null}
+				<button
+					class="text-sm text-(--pine) underline"
+					type="button"
+					onclick={() => {
+						customizing = false;
+						editor.update({ businessPurposeOverride: null });
+					}}
+				>
+					Reset to generated
+				</button>
+			{/if}
+			<button
+				class="text-sm text-(--pine) underline"
+				type="button"
+				aria-expanded={customizing}
+				onclick={() => (customizing = !customizing)}
+			>
+				{customizing ? 'Done' : 'Customize'}
+			</button>
+		</div>
 	</div>
 
 	{#if customizing}
 		<textarea
-			bind:this={textarea}
 			class="input min-h-36 leading-relaxed"
-			aria-label="Business Purpose template"
-			value={editor.form?.businessPurposeText ?? ''}
+			aria-label="Business Purpose"
+			value={override ?? resolvedText}
 			oninput={(event) =>
-				editor.update(
-					{ businessPurposeText: event.currentTarget.value, businessPurposeTouched: true },
-					{ debounce: true }
-				)}
+				editor.update({ businessPurposeOverride: event.currentTarget.value }, { debounce: true })}
 		></textarea>
-		<div class="flex flex-wrap items-center gap-1.5">
-			<span class="mr-1 text-xs text-(--quiet)">Insert</span>
-			{#each variables as variable (variable)}
-				<button
-					class="border border-(--line) bg-white px-2 py-1 text-xs text-(--ink) hover:border-(--pine) focus-visible:outline-2 focus-visible:outline-(--pine)"
-					type="button"
-					onclick={() => insert(variable)}
-				>
-					{variable}
-				</button>
-			{/each}
-		</div>
-		<p class="text-xs text-(--quiet)">Words in braces fill in from this request.</p>
-	{:else if resolvedText.trim() === ''}
-		<p class="text-sm text-(--quiet)">Say what it was for above, or customize the sentence.</p>
 	{:else}
-		<p class="max-w-prose text-base leading-relaxed text-(--ink)">
-			{#each parts as part, index (index)}
-				{#if part.blank}
-					<span class="blank px-0.5 text-(--quiet)">{part.text.toLowerCase()}</span>
-				{:else}
-					{part.text}
-				{/if}
+		<p class="max-w-prose text-base leading-relaxed text-(--ink)">{resolvedText}</p>
+	{/if}
+	{#if missing.length > 0}
+		<ul class="flex flex-col gap-1 text-sm text-(--quiet)">
+			{#each missing as item (item.fact)}
+				<li>{item.label}</li>
 			{/each}
-		</p>
+		</ul>
 	{/if}
 </section>
-
-<style>
-	.blank {
-		border-bottom: 1.5px dashed var(--quiet);
-		background: color-mix(in oklab, var(--marker) 35%, transparent);
-	}
-</style>
