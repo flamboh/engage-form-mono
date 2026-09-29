@@ -123,6 +123,11 @@ export const userDoc = z.object({
 	updatedAt: z.number()
 });
 
+export const budgetLine = z.object({
+	name: z.string(),
+	allocations: z.array(z.object({ fiscalYear: z.number(), amount: z.number() }))
+});
+
 export const organizationDoc = z.object({
 	_id: zid('organizations'),
 	_creationTime: z.number(),
@@ -130,7 +135,7 @@ export const organizationDoc = z.object({
 	name: z.string(),
 	indexNumber: z.string(),
 	fundLetter,
-	budgetLines: z.array(z.string()),
+	budgetLines: z.array(budgetLine),
 	archived: z.boolean(),
 	updatedAt: z.number()
 });
@@ -196,6 +201,7 @@ export const purchaseRequestDoc = z.object({
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	lastFilledAt: z.number().nullable(),
+	reviewerNote: z.string().nullable(),
 	fieldSources: z
 		.record(z.string(), z.enum(['user', 'receipt', 'previous', 'suggested']))
 		.optional(),

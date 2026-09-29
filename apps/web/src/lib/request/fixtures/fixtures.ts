@@ -36,7 +36,7 @@ const organization: Doc<'organizations'> = {
 	name: 'Climbing Club',
 	indexNumber: '123456',
 	fundLetter: 'I',
-	budgetLines: ['Event Expenses', 'Equipment', 'Travel'],
+	budgetLines: ['Event Expenses', 'Equipment', 'Travel'].map((name) => ({ name, allocations: [] })),
 	archived: false,
 	updatedAt: now
 };
@@ -180,7 +180,7 @@ function basePurchase(): Purchase {
 			name: organization.name,
 			indexNumber: organization.indexNumber,
 			fundLetter: organization.fundLetter,
-			budgetLines: organization.budgetLines
+			budgetLines: organization.budgetLines.map((line) => line.name)
 		},
 		requester: {
 			id: mockUser._id,
@@ -221,6 +221,7 @@ function basePurchase(): Purchase {
 		createdAt: now,
 		updatedAt: now,
 		lastFilledAt: null,
+		reviewerNote: null,
 		fieldSources: {
 			purchaserSource: 'previous',
 			budgetLineItem: 'previous',

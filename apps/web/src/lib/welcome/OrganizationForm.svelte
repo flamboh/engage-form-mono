@@ -35,7 +35,7 @@
 	let name = $state(start?.name ?? '');
 	let indexNumber = $state(start?.indexNumber ?? '');
 	let fundLetter = $state<FundLetter>(start?.fundLetter ?? 'I');
-	let budgetLines = $state<string[]>(start ? [...start.budgetLines] : []);
+	let budgetLines = $state<string[]>(start ? start.budgetLines.map((line) => line.name) : []);
 	let newLine = $state('');
 	let saving = $state(false);
 	let error = $state('');

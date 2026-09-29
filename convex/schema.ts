@@ -73,6 +73,11 @@ const studentOrganizationDetails = v.object({
 	budgetLines: v.array(v.string())
 });
 
+const budgetLine = v.object({
+	name: v.string(),
+	allocations: v.array(v.object({ fiscalYear: v.number(), amount: v.number() }))
+});
+
 const requesterDetails = v.object({
 	id: v.id('users'),
 	name: v.string(),
@@ -129,7 +134,7 @@ export default defineSchema({
 		name: v.string(),
 		indexNumber: v.string(),
 		fundLetter,
-		budgetLines: v.array(v.string()),
+		budgetLines: v.array(budgetLine),
 		archived: v.boolean(),
 		updatedAt: v.number()
 	})
@@ -216,6 +221,7 @@ export default defineSchema({
 		createdAt: v.number(),
 		updatedAt: v.number(),
 		lastFilledAt: v.union(v.number(), v.null()),
+		reviewerNote: v.union(v.string(), v.null()),
 		fieldSources: v.optional(v.record(v.string(), fieldSource)),
 		receiptDate: v.optional(v.string()),
 		purpose: v.optional(v.string()),

@@ -179,7 +179,7 @@ export function previousRequestDefaults(
 		};
 		sources.activity = 'previous';
 	}
-	if (organization.budgetLines.includes(previous.budgetLineItem)) {
+	if (organization.budgetLines.some((line) => line.name === previous.budgetLineItem)) {
 		defaults.budgetLineItem = previous.budgetLineItem;
 		sources.budgetLineItem = 'previous';
 	}
@@ -366,7 +366,7 @@ export function studentOrganizationDetails(org: Doc<'organizations'>): StudentOr
 		name: org.name,
 		indexNumber: org.indexNumber,
 		fundLetter: org.fundLetter,
-		budgetLines: org.budgetLines
+		budgetLines: org.budgetLines.map((line) => line.name)
 	};
 }
 

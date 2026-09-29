@@ -181,7 +181,7 @@ export const upsertOrganization = authedMutation({
 			name: args.name,
 			indexNumber: args.indexNumber,
 			fundLetter: args.fundLetter,
-			budgetLines,
+			budgetLines: budgetLines.map((line) => ({ name: line, allocations: [] })),
 			archived: false,
 			updatedAt: Date.now()
 		};
@@ -269,7 +269,7 @@ export const createDraftForOrganization = authedMutation({
 			...draft,
 			organizationSourceId: organization._id,
 			studentOrganization: studentOrganizationDetails(organization),
-			budgetLineItem: organization.budgetLines[0] ?? '',
+			budgetLineItem: organization.budgetLines[0]?.name ?? '',
 			...withSuggestedEvent(
 				previousRequestDefaults(
 					previous,
@@ -445,7 +445,8 @@ function emptyDraft(
 		recipients: [],
 		createdAt: now,
 		updatedAt: now,
-		lastFilledAt: null
+		lastFilledAt: null,
+		reviewerNote: null
 	};
 }
 
