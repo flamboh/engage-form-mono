@@ -5,7 +5,8 @@ import {
 	formatReadinessBlockers,
 	withBlockingChecks
 } from './purchaseReadiness';
-import { loadRequestChecks } from './checks/load';
+import { checkInputFrom, requestExtractions, type Extraction } from './checks/load';
+import { requestChecks } from './checks/requestChecks';
 import { effectiveDocumentationCategories } from './purchaseCategories';
 import { fileDownloadUrl } from './files';
 import { businessPurposeFor } from './businessPurpose';
@@ -285,7 +286,11 @@ export async function purchaseReadiness(ctx: Ctx, request: Doc<'purchaseRequests
 	return (await readinessWithChecks(ctx, request)).readiness;
 }
 
-export async function readinessWithChecks(ctx: Ctx, request: Doc<'purchaseRequests'>) {
+export async function readinessWithChecks(
+	ctx: Ctx,
+	request: Doc<'purchaseRequests'>,
+	extractions?: Extraction[]
+) {
 	const readiness = await evaluatePurchaseReadiness(request, {
 		documentExists: async (id) => {
 			const doc = await ctx.db.get(id);
@@ -296,7 +301,9 @@ export async function readinessWithChecks(ctx: Ctx, request: Doc<'purchaseReques
 			return doc !== null && doc.owner === request.owner && doc.organizationId === organizationId;
 		}
 	});
-	const checks = await loadRequestChecks(ctx, request);
+	const checks = requestChecks(
+		checkInputFrom(request, extractions ?? (await requestExtractions(ctx, request)))
+	);
 	return { readiness: withBlockingChecks(readiness, checks), checks };
 }
 

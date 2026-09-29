@@ -170,10 +170,10 @@ test('gift purposes read as giving', () => {
 });
 
 test('prizes keep the preposition the user wrote', () => {
-	const { text } = generateBusinessPurpose(
-		facts({ items: 'vinyl', purpose: 'prizes for trivia night' })
-	);
-	expect(text).toContain('given as prizes for trivia night');
+	const text = (purpose: string) =>
+		generateBusinessPurpose(facts({ items: 'vinyl', purpose })).text;
+	expect(text('prizes for trivia night')).toContain('given as a prize for trivia night');
+	expect(text('prizes to trivia winners')).toContain('given as a prize to trivia winners');
 });
 
 test('customized text must mention one of the event dates', () => {
@@ -185,4 +185,44 @@ test('customized text must mention one of the event dates', () => {
 	expect(custom('Apr 7')).not.toContain('dates');
 	expect(custom('4/14')).toContain('dates');
 	expect(custom('14/7')).toContain('dates');
+});
+
+test('the gift noun agrees with the number of items', () => {
+	const use = (items: string, purpose: string) =>
+		generateBusinessPurpose(facts({ items, purpose })).text.split('. ')[1].split(' at Chess')[0];
+	expect(use('New LP', 'prizes for trivia night')).toBe(
+		'The New LP was given as a prize for trivia night'
+	);
+	expect(use('vinyl and CD', 'prizes for trivia night')).toBe(
+		'The vinyl and CD were given as prizes for trivia night'
+	);
+	expect(use('two mugs', 'a gift to volunteers')).toBe(
+		'The mugs were given as gifts to volunteers'
+	);
+	expect(use('1 trophy', 'as awards for the winners')).toBe(
+		'The trophy was given as an award for the winners'
+	);
+	expect(use('rope, tape, chalk, and a first aid kit', 'giveaways to attendees')).toBe(
+		'These items were given as giveaways to attendees'
+	);
+});
+
+test('mass nouns keep a plural gift noun and a singular verb', () => {
+	const use = (items: string) =>
+		generateBusinessPurpose(facts({ items, purpose: 'prizes for trivia night' })).text.split(
+			'. '
+		)[1];
+	expect(use('candy')).toMatch(/^The candy was given as prizes for trivia night/);
+	expect(use('coffee')).toMatch(/^The coffee was given as prizes for trivia night/);
+});
+
+test('singular, mass, and plural subjects take the matching verb', () => {
+	const second = (items: string, today: string) =>
+		generateBusinessPurpose(
+			facts({ items, dates: ['2026-04-07', '2026-04-14'], today })
+		).text.split('. ')[1];
+	expect(second('coffee', '2026-04-20')).toMatch(/^The coffee was served/);
+	expect(second('coffee', '2026-04-10')).toMatch(/^The coffee is served/);
+	expect(second('a chess set', '2026-04-10')).toMatch(/^The chess set is used/);
+	expect(second('cones and pinnies', '2026-04-10')).toMatch(/^The cones and pinnies are used/);
 });

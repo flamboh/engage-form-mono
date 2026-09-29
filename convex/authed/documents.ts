@@ -56,7 +56,7 @@ export const getRequestView = authedQuery({
 					(slot === 'receipt' && url === null && extraction?.status !== 'done')
 			});
 		}
-		const { readiness, checks } = await readinessWithChecks(ctx, request);
+		const { readiness, checks } = await readinessWithChecks(ctx, request, extractions);
 		const businessPurpose = businessPurposeFor(request, todayInOregon());
 		return {
 			purchase: request,

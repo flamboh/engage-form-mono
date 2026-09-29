@@ -160,7 +160,7 @@ export function generateBusinessPurpose(facts: BusinessPurposeFacts): GeneratedB
 			? `given to ${joinList(recipients.map(recipientText))}`
 			: purpose === '' && foodWords.has(subject.noun.toLowerCase())
 				? 'served'
-				: purposeUse(purpose);
+				: purposeUse(purpose, subject.plural || massNouns.has(subject.noun.toLowerCase()));
 	const where = [
 		` at ${eventPhrase(organization, eventName, dates.length > 1)}`,
 		dates.length === 0 ? '' : ` ${eventDatesPhrase(dates)}`,
@@ -239,12 +239,15 @@ function reasonPhrase(reason: string) {
 	return /^(for|as)\b/i.test(text) ? text : `for ${text}`;
 }
 
-function purposeUse(purpose: string) {
+function purposeUse(purpose: string, several: boolean) {
 	if (purpose === '') return 'used';
 	const text = midSentence(purpose).replace(/[.!]+$/, '');
-	const giving = /^(gifts?|prizes?|giveaways?|awards?)\s+(for|to)\s+(.+)$/i.exec(text);
+	const giving =
+		/^(?:as\s+)?(?:(?:a|an)\s+)?(gift|prize|giveaway|award)s?\s+(for|to)\s+(.+)$/i.exec(text);
 	if (giving !== null) {
-		return `given as ${giving[1].toLowerCase()} ${giving[2].toLowerCase()} ${giving[3]}`;
+		const noun = giving[1].toLowerCase();
+		const given = several ? `${noun}s` : `${/^[aeiou]/.test(noun) ? 'an' : 'a'} ${noun}`;
+		return `given as ${given} ${giving[2].toLowerCase()} ${giving[3]}`;
 	}
 	if (/^(to|as|in|during)\b/i.test(text)) return `used ${text}`;
 	return `used for ${text.replace(/^for\s+/i, '')}`;
@@ -321,6 +324,11 @@ function isList(text: string) {
 const foodWords = new Set(
 	`pizza pizzas snacks snack food coffee tea drinks cookies chips candy donuts bagels sandwiches fruit
 	juice soda cake cupcakes tacos burritos refreshments popcorn pastries muffins`.split(/\s+/)
+);
+
+const massNouns = new Set(
+	`candy coffee tea food fruit juice soda water popcorn chocolate swag merch merchandise apparel
+	clothing equipment gear furniture jewelry stationery`.split(/\s+/)
 );
 
 const singularEndingInS = new Set(['canvas', 'atlas', 'gas', 'lens', 'series', 'news', 'chess']);

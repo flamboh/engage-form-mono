@@ -2,7 +2,9 @@ import { z } from 'zod/v4';
 import { zid } from 'convex-helpers/server/zod4';
 import type { Doc } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
-import { evaluatePurchaseReadiness, ownerFromIdentity, requireOwnedDoc } from '../purchaseModel';
+import { ownerFromIdentity, readinessWithChecks, requireOwnedDoc } from '../purchaseModel';
+import { requestExtractions } from '../checks/load';
+import type { PurchaseReadiness } from '../purchaseReadiness';
 import { authedQuery } from './helpers';
 
 const boardItem = z.object({
@@ -47,7 +49,16 @@ const reasonPriority = [
 	'Item description missing.'
 ];
 
-export function plainNextStep(reasons: string[]): string | null {
+export function plainNextStep(
+	readiness: Pick<PurchaseReadiness, 'sections'>,
+	checks: { severity: 'blocking' | 'warning'; title: string }[]
+): string | null {
+	const reasons = readiness.sections
+		.flatMap((section) => section.reasons)
+		.filter((reason) => !checks.some((check) => check.title === reason));
+	const blocking = checks.find((check) => check.severity === 'blocking');
+	if (reasons.includes(reasonPriority[0])) return 'Add a receipt';
+	if (blocking !== undefined) return blocking.title;
 	if (reasons.length === 0) return null;
 	const first =
 		reasonPriority.find((reason) => reasons.includes(reason)) ??
@@ -83,14 +94,20 @@ export const organizationBoard = authedQuery({
 			byStatus('ready', 40),
 			byStatus('approved', 11)
 		]);
-		const needsInfo = await Promise.all(drafts.map((request) => draftItem(ctx, request)));
+		const [draftItems, readyItems] = await Promise.all([
+			Promise.all(drafts.map((request) => checkedItem(ctx, request))),
+			Promise.all(ready.map((request) => checkedItem(ctx, request)))
+		]);
+		const stillReady = ready.filter((_, index) => readyItems[index].nextStep === null);
 		return {
 			organization: { id: organization._id, name: organization.name },
-			needsInfo,
-			readyToFill: ready
+			needsInfo: [...draftItems, ...readyItems.filter((item) => item.nextStep !== null)].sort(
+				(left, right) => right.updatedAt - left.updatedAt
+			),
+			readyToFill: stillReady
 				.filter((request) => request.lastFilledAt === null)
 				.map((request) => baseItem(request)),
-			waitingOnEngage: ready
+			waitingOnEngage: stillReady
 				.filter((request) => request.lastFilledAt !== null)
 				.map((request) => baseItem(request)),
 			approved: approved.slice(0, 10).map((request) => baseItem(request)),
@@ -140,18 +157,15 @@ function baseItem(request: Doc<'purchaseRequests'>): BoardItem {
 	};
 }
 
-async function draftItem(ctx: QueryCtx, request: Doc<'purchaseRequests'>): Promise<BoardItem> {
-	const extractions = await ctx.db
-		.query('extractions')
-		.withIndex('by_purchaseRequestId', (q) => q.eq('purchaseRequestId', request._id))
-		.take(10);
+async function checkedItem(ctx: QueryCtx, request: Doc<'purchaseRequests'>): Promise<BoardItem> {
+	const extractions = await requestExtractions(ctx, request);
 	const reading = extractions.some(
 		(extraction) => extraction.status === 'pending' || extraction.status === 'running'
 	);
-	const readiness = await evaluatePurchaseReadiness(request);
+	const { readiness, checks } = await readinessWithChecks(ctx, request, extractions);
 	return {
 		...baseItem(request),
 		reading,
-		nextStep: plainNextStep(readiness.sections.flatMap((section) => section.reasons))
+		nextStep: plainNextStep(readiness, checks)
 	};
 }

@@ -2,10 +2,10 @@ import type { Doc } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
 import { requestDocuments } from '../extraction/apply';
 import { effectiveDocumentationCategories } from '../purchaseCategories';
-import { requestChecks, type ApprovalBasis, type CheckInput } from './requestChecks';
+import type { ApprovalBasis, CheckInput } from './requestChecks';
 
 type Request = Doc<'purchaseRequests'>;
-type Extraction = Pick<
+export type Extraction = Pick<
 	Doc<'extractions'>,
 	'fileId' | 'status' | 'vendor' | 'totalAmount' | 'facts'
 >;
@@ -58,8 +58,4 @@ export async function requestExtractions(ctx: QueryCtx, request: Request) {
 		.query('extractions')
 		.withIndex('by_purchaseRequestId', (q) => q.eq('purchaseRequestId', request._id))
 		.take(50);
-}
-
-export async function loadRequestChecks(ctx: QueryCtx, request: Request) {
-	return requestChecks(checkInputFrom(request, await requestExtractions(ctx, request)));
 }
