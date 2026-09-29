@@ -29,7 +29,7 @@ function facts(overrides: Partial<BusinessPurposeFacts> = {}): BusinessPurposeFa
 
 test('writes two past-tense sentences with every required fact', () => {
 	expect(generateBusinessPurpose(facts())).toEqual({
-		text: 'Chess Club wishes to reimburse Jordan Lee because they purchased snacks from Target for $24.50. The snacks were used at Chess Club’s weekly chess night on Tuesday 04/07 at 7pm in EMU 101, with about 30 students in attendance.',
+		text: 'Chess Club wishes to reimburse Jordan Lee because they purchased snacks from Target for $24.50. The snacks were served at Chess Club’s weekly chess night on Tuesday 04/07 at 7pm in EMU 101, with about 30 students in attendance.',
 		missing: []
 	});
 });
@@ -67,13 +67,13 @@ test('lists several recipients', () => {
 test('recurring supplies list concrete dates', () => {
 	const { text } = generateBusinessPurpose(
 		facts({
-			items: 'candy',
+			items: 'name tags',
 			dates: ['2026-04-07', '2026-04-14', '2026-04-21'],
 			today: '2026-04-22'
 		})
 	);
 	expect(text).toContain(
-		'The candy was used at Chess Club’s weekly chess night on Tuesdays (04/07, 04/14, 04/21) at 7pm in EMU 101, with about 30 students at each event.'
+		'The name tags were used at Chess Club’s weekly chess nights on Tuesdays (04/07, 04/14, 04/21) at 7pm in EMU 101, with about 30 students at each event.'
 	);
 });
 
@@ -122,4 +122,49 @@ test('customized text is checked for the facts it seems to omit', () => {
 		'attendance',
 		'dates'
 	]);
+});
+
+test('a long weekly run reads as a range', () => {
+	const dates = ['2026-03-31', '2026-04-07', '2026-04-14', '2026-04-21', '2026-04-28'];
+	expect(generateBusinessPurpose(facts({ dates, today: '2026-05-01' })).text).toContain(
+		'weekly chess nights every Tuesday from 03/31 through 04/28 at 7pm'
+	);
+});
+
+test('tense follows the event dates', () => {
+	const dates = ['2026-04-07', '2026-04-14'];
+	const verb = (today: string) =>
+		generateBusinessPurpose(facts({ items: 'name tags', dates, today })).text.split('. ')[1];
+	expect(verb('2026-04-20')).toMatch(/^The name tags were used/);
+	expect(verb('2026-04-10')).toMatch(/^The name tags are used/);
+	expect(verb('2026-04-01')).toMatch(/^The name tags will be used/);
+});
+
+test('refers back to long item descriptions briefly', () => {
+	const second = (items: string) =>
+		generateBusinessPurpose(facts({ items, purpose: 'trivia' })).text.split('. ')[1];
+	expect(second('a Quizlet Plus yearly team subscription')).toMatch(
+		/^The subscription was used for trivia/
+	);
+	expect(second('two bulk packs of pretzels')).toMatch(/^The pretzels were used/);
+	expect(second('rope, tape, chalk, and a first aid kit')).toMatch(/^These items were used/);
+	expect(second('cones and pinnies')).toMatch(/^The cones and pinnies were used/);
+});
+
+test('keeps proper nouns and lowercases common words mid-sentence', () => {
+	expect(generateBusinessPurpose(facts({ eventName: 'Game Night' })).text).toContain(
+		'at Chess Club’s Game Night on'
+	);
+	expect(generateBusinessPurpose(facts({ eventName: 'Halloween tournament' })).text).toContain(
+		'at Chess Club’s Halloween tournament on'
+	);
+	expect(generateBusinessPurpose(facts({ eventName: 'Blitz' })).text).toContain(
+		'at Chess Club’s Blitz event on'
+	);
+});
+
+test('gift purposes read as giving', () => {
+	expect(
+		generateBusinessPurpose(facts({ items: 'mugs', purpose: 'gifts for graduating seniors' })).text
+	).toContain('The mugs were given as gifts to graduating seniors at');
 });

@@ -91,7 +91,7 @@ test('recurring purchases list every event date in the approval', () => {
 		approver
 	);
 	expect(email.body.text).toContain(
-		'totaling $36.18, for the weekly listening event on Tuesdays (05/12, 05/19, 05/26).'
+		'totaling $36.18, for the weekly listening events on Tuesdays (05/12, 05/19, 05/26).'
 	);
 });
 

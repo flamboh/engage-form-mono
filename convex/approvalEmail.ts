@@ -1,6 +1,6 @@
 import type { Doc } from './_generated/dataModel';
 import { eventReference, formatMoney, midSentence } from './businessPurpose';
-import { formatEventDates } from './events';
+import { eventDatesPhrase } from './events';
 
 export type ApprovalEmailField =
 	| 'studentOrganization'
@@ -53,7 +53,7 @@ export function resolveApprovalEmail(
 			'totalAmount',
 			purpose === '' ? ', for ' : `, for ${purpose} at `,
 			'eventName',
-			' on ',
+			' ',
 			'dates',
 			'.\n\nBest,',
 			...signature.map((line) => `\n${line}`)
@@ -127,8 +127,8 @@ function approvalValues(request: ApprovalEmailRequest): Record<ApprovalEmailFiel
 		vendor: request.vendor.trim(),
 		itemDescription: request.itemDescription.trim(),
 		totalAmount: request.totalAmount > 0 ? formatMoney(request.totalAmount) : '',
-		eventName: eventName === '' ? '' : eventReference(eventName),
-		dates: formatEventDates(request.activity.dates)
+		eventName: eventName === '' ? '' : eventReference(eventName, request.activity.dates.length > 1),
+		dates: eventDatesPhrase(request.activity.dates)
 	};
 }
 
