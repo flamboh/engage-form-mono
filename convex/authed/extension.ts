@@ -28,8 +28,8 @@ export const requestFill = authedMutation({
 		await assertReady(ctx, request);
 		const user = await requireUserProfile(ctx, owner);
 		const now = Date.now();
-		if (request.status === 'draft') {
-			await ctx.db.patch(request._id, { status: 'ready', updatedAt: now });
+		if (request.status === 'draft' || request.reviewerNote !== null) {
+			await ctx.db.patch(request._id, { status: 'ready', reviewerNote: null, updatedAt: now });
 		}
 		await ctx.db.patch(user._id, {
 			pendingFill: { purchaseRequestId: request._id, requestedAt: now }

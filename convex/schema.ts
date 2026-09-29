@@ -216,6 +216,7 @@ export default defineSchema({
 		createdAt: v.number(),
 		updatedAt: v.number(),
 		lastFilledAt: v.union(v.number(), v.null()),
+		reviewerNote: v.union(v.string(), v.null()),
 		fieldSources: v.optional(v.record(v.string(), fieldSource)),
 		receiptDate: v.optional(v.string()),
 		purpose: v.optional(v.string()),

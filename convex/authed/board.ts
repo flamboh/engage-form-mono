@@ -5,7 +5,7 @@ import type { QueryCtx } from '../_generated/server';
 import { ownerFromIdentity, readinessWithChecks, requireOwnedDoc } from '../purchaseModel';
 import { requestExtractions } from '../checks/load';
 import type { PurchaseReadiness } from '../purchaseReadiness';
-import { authedQuery } from './helpers';
+import { authedMutation, authedQuery } from './helpers';
 
 const boardItem = z.object({
 	id: zid('purchaseRequests'),
@@ -21,7 +21,11 @@ const boardItem = z.object({
 
 export type BoardItem = z.infer<typeof boardItem>;
 
+export const sentBackStep = 'Fix what Engage sent back';
+
 const nextStepRules: [RegExp, string][] = [
+	[/^Your UO ID/, 'Add your UO ID (front and back)'],
+	[/^Purchaser UO ID/, 'Add their UO ID (front and back)'],
 	[/^Receipt document missing/, 'Add a receipt'],
 	[/^Receipt documents are limited/, 'Keep it to three receipts'],
 	[/^Vendor missing/, 'Add where it was bought'],
@@ -113,6 +117,25 @@ export const organizationBoard = authedQuery({
 			approved: approved.slice(0, 10).map((request) => baseItem(request)),
 			hasMoreApproved: approved.length > 10
 		};
+	}
+});
+
+export const markSentBack = authedMutation({
+	args: { purchaseRequestId: zid('purchaseRequests'), note: z.string() },
+	returns: z.null(),
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
+		if (request.status !== 'ready' || request.lastFilledAt === null) {
+			throw new Error('Only requests filled on Engage can be sent back.');
+		}
+		await ctx.db.patch(request._id, {
+			status: 'draft',
+			lastFilledAt: null,
+			reviewerNote: args.note.trim(),
+			updatedAt: Date.now()
+		});
+		return null;
 	}
 });
 

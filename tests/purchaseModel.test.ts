@@ -196,7 +196,7 @@ test('reports a complete Personal Reimbursement purchase request as Ready', asyn
 	});
 });
 
-test('requires both sides of the ID card for Personal Reimbursement', async () => {
+test('a self-paid request needs both sides of the requester UO ID', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
@@ -208,7 +208,34 @@ test('requires both sides of the ID card for Personal Reimbursement', async () =
 		})
 	).resolves.toEqual({
 		ready: false,
-		sections: [{ section: 'Purchaser', reasons: ['Back of ID card missing.'] }]
+		sections: [{ section: 'Purchaser', reasons: ['Your UO ID (front and back) missing.'] }]
+	});
+	await expect(
+		evaluatePurchaseReadiness(
+			{ ...request, purchaser: { ...request.purchaser, idCardFrontFileId: null as never } },
+			{ documentExists: async () => true }
+		)
+	).resolves.toMatchObject({ ready: false });
+	await expect(
+		evaluatePurchaseReadiness(request, {
+			documentExists: async (id) => id !== 'file_back'
+		})
+	).resolves.toMatchObject({
+		sections: [{ section: 'Purchaser', reasons: ['Your UO ID (front and back) missing.'] }]
+	});
+});
+
+test('another purchaser needs both sides of their own UO ID', async () => {
+	await expect(
+		evaluatePurchaseReadiness({
+			...request,
+			purchaserSource: { kind: 'purchaser', purchaserId: 'purchaser_1' as never },
+			secondApprovalFileId: null,
+			purchaser: { ...request.purchaser, idCardBackFileId: null as never }
+		})
+	).resolves.toEqual({
+		ready: false,
+		sections: [{ section: 'Purchaser', reasons: ['Purchaser UO ID (front and back) missing.'] }]
 	});
 });
 
@@ -538,7 +565,7 @@ test('reports blocked Draft reasons grouped by section', async () => {
 					'Purchaser name missing.',
 					'Purchaser UO 95 missing.',
 					'Purchaser address missing.',
-					'ID card document missing.'
+					'Your UO ID (front and back) missing.'
 				]
 			},
 			{

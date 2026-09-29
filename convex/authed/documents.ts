@@ -15,6 +15,7 @@ import { businessPurposeFor, missingFactLabel } from '../businessPurpose';
 import { todayInOregon } from '../events';
 import { nullReturn } from '../purchaseZod';
 import { documentSlot, requestView, reviewField } from '../requestView';
+import { requestLifecycle, todayInEugene } from '../lifecycle';
 import {
 	detachDocument,
 	documentReadFailed,
@@ -58,10 +59,11 @@ export const getRequestView = authedQuery({
 		}
 		const { readiness, checks } = await readinessWithChecks(ctx, request, extractions);
 		const businessPurpose = businessPurposeFor(request, todayInOregon());
+		const reading = documents.some((document) => document.reading);
 		return {
 			purchase: request,
 			documents,
-			reading: documents.some((document) => document.reading),
+			reading,
 			reviews: requestReviews(request, extractions),
 			readiness,
 			businessPurposeText: businessPurpose.text,
@@ -69,8 +71,29 @@ export const getRequestView = authedQuery({
 				fact,
 				label: missingFactLabel(fact)
 			})),
-			checks
+			checks,
+			...requestLifecycle(request, {
+				reading,
+				readinessReady: readiness.ready,
+				today: todayInEugene(Date.now())
+			})
 		};
+	}
+});
+
+export const confirmFields = authedMutation({
+	args: {
+		purchaseRequestId: zid('purchaseRequests'),
+		fields: z.array(z.enum(['activity', 'purchaserSource', 'budgetLineItem']))
+	},
+	returns: nullReturn,
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
+		const fieldSources = { ...(request.fieldSources ?? {}) };
+		for (const field of args.fields) fieldSources[field] = 'user';
+		await ctx.db.patch(request._id, { fieldSources, updatedAt: Date.now() });
+		return null;
 	}
 });
 

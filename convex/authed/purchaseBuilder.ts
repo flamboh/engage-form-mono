@@ -445,7 +445,8 @@ function emptyDraft(
 		recipients: [],
 		createdAt: now,
 		updatedAt: now,
-		lastFilledAt: null
+		lastFilledAt: null,
+		reviewerNote: null
 	};
 }
 
