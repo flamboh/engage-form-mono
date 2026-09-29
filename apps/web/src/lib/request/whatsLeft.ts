@@ -1,7 +1,9 @@
+import type { RequestCheck } from '$convex/requestView';
 import { reviewDisplay } from './labels';
 
 export type LeftTarget =
 	| { kind: 'slot'; slot: MissingSlot }
+	| { kind: 'check'; check: RequestCheck }
 	| { kind: 'field'; field: LeftField }
 	| { kind: 'review'; field: ReviewField }
 	| { kind: 'link'; href: string };
@@ -64,13 +66,6 @@ const reasonCopy: Record<string, Copy> = {
 		label: 'Add a Second Approval',
 		detail: 'You paid, so another officer OKs it by email. We’ll write it for you.',
 		target: { kind: 'slot', slot: 'second_approval' },
-		waitsForReceipt: false
-	},
-	'Catering waiver missing.': {
-		key: 'catering_waiver',
-		label: 'Add the catering waiver',
-		detail: 'Needed because this purchase includes food.',
-		target: { kind: 'slot', slot: 'catering_waiver' },
 		waitsForReceipt: false
 	},
 	'Printing invoice missing.': {
@@ -213,6 +208,7 @@ export function reviewProposal(review: { value: string; alternatives: string[] }
 export function whatsLeft({
 	readiness,
 	reviews,
+	checks = [],
 	reading,
 	purposeMissing = false,
 	onlyPurposeUnresolved = false
@@ -224,6 +220,7 @@ export function whatsLeft({
 		alternatives: string[];
 		receiptRemoved?: boolean;
 	}[];
+	checks?: RequestCheck[];
 	reading: boolean;
 	purposeMissing?: boolean;
 	onlyPurposeUnresolved?: boolean;
@@ -232,6 +229,7 @@ export function whatsLeft({
 	if (purposeMissing) items.set(purposeCopy.key, { ...purposeCopy, blocking: true });
 	for (const section of readiness.sections) {
 		for (const reason of section.reasons) {
+			if (checks.some((check) => check.title === reason)) continue;
 			const copy = reasonCopy[reason] ?? sectionCopy[section.section] ?? fallbackCopy(reason);
 			if (copy.key === 'businessPurpose' && purposeMissing && onlyPurposeUnresolved) continue;
 			if (!items.has(copy.key)) items.set(copy.key, { ...copy, blocking: true });
@@ -259,6 +257,16 @@ export function whatsLeft({
 			waitsForReceipt: false
 		});
 	}
+	for (const check of checks) {
+		items.set(`check-${check.id}`, {
+			key: `check-${check.id}`,
+			label: check.title,
+			detail: check.detail,
+			target: { kind: 'check', check },
+			blocking: check.severity === 'blocking',
+			waitsForReceipt: false
+		});
+	}
 	return [...items.values()]
 		.map((item, index) => ({ item, index }))
 		.sort((a, b) => rank(a.item, reading) - rank(b.item, reading) || a.index - b.index)
@@ -267,6 +275,10 @@ export function whatsLeft({
 
 function rank(item: LeftItem, reading: boolean) {
 	if (item.target.kind === 'review') return 0;
+	if (item.target.kind === 'check') {
+		if (!item.blocking) return 6;
+		return item.target.check.action === 'answer' ? 1 : reading ? 3 : 2;
+	}
 	if (item.target.kind === 'field' && item.target.field === 'why') return 1;
 	if (reading) {
 		if (item.waitsForReceipt) return 5;

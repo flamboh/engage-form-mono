@@ -215,7 +215,9 @@ export const purchaseRequestDoc = z.object({
 	receiptDate: z.string().optional(),
 	purpose: z.string().optional(),
 	activityTime: z.string().optional(),
-	activityLocation: z.string().optional()
+	activityLocation: z.string().optional(),
+	foodIndividuallyPackaged: z.boolean().nullable().optional(),
+	checkConfirmations: z.array(z.object({ id: z.string(), key: z.string() })).optional()
 });
 
 export const savedData = z.object({

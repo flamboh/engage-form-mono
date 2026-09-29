@@ -1,6 +1,11 @@
 import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
-import { evaluatePurchaseReadiness, formatReadinessBlockers } from './purchaseReadiness';
+import {
+	evaluatePurchaseReadiness,
+	formatReadinessBlockers,
+	withBlockingChecks
+} from './purchaseReadiness';
+import { loadRequestChecks } from './checks/load';
 import { effectiveDocumentationCategories } from './purchaseCategories';
 import { fileDownloadUrl } from './files';
 import {
@@ -322,7 +327,11 @@ export async function assertReady(ctx: Ctx, request: Doc<'purchaseRequests'>) {
 }
 
 export async function purchaseReadiness(ctx: Ctx, request: Doc<'purchaseRequests'>) {
-	return await evaluatePurchaseReadiness(request, {
+	return (await readinessWithChecks(ctx, request)).readiness;
+}
+
+export async function readinessWithChecks(ctx: Ctx, request: Doc<'purchaseRequests'>) {
+	const readiness = await evaluatePurchaseReadiness(request, {
 		documentExists: async (id) => {
 			const doc = await ctx.db.get(id);
 			return doc !== null && doc.owner === request.owner;
@@ -332,6 +341,8 @@ export async function purchaseReadiness(ctx: Ctx, request: Doc<'purchaseRequests
 			return doc !== null && doc.owner === request.owner && doc.organizationId === organizationId;
 		}
 	});
+	const checks = await loadRequestChecks(ctx, request);
+	return { readiness: withBlockingChecks(readiness, checks), checks };
 }
 
 export async function demoteIfNotReady(ctx: MutationCtx, id: Id<'purchaseRequests'>) {

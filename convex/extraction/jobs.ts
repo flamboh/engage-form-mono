@@ -12,6 +12,9 @@ import { readFileBytes } from '../files';
 import { demoteIfNotReady, renderBusinessPurpose } from '../purchaseModel';
 import { isCurrentAttempt, placeDocument, receiptFieldsPatch, slotForKind, slotOf } from './apply';
 import { documentKinds, type DocumentExtraction, type ParsedField } from './jev';
+import { documentFacts } from './facts';
+import { approvalBasisOf } from '../checks/load';
+import { approvalBasisKey, withConfirmation } from '../checks/requestChecks';
 import { decideDefaults, extractDocument, readDocumentText, type ExtractionEnv } from './pipeline';
 
 const extractedField = v.object({
@@ -73,7 +76,7 @@ export const extractFile = internalAction({
 				result: storedResult(result)
 			});
 			timing.applied = elapsed();
-			if (purchaseRequestId !== null && isReceipt(result, args.classify)) {
+			if (purchaseRequestId !== null) {
 				await refreshDecisions(ctx, env, purchaseRequestId, text.lines.join('\n')).catch((error) =>
 					console.error('Default decisions failed', error)
 				);
@@ -161,22 +164,23 @@ export const finishExtraction = internalMutation({
 			vendor: v.union(extractedField, v.null()),
 			totalAmount: v.union(extractedField, v.null()),
 			receiptDate: v.union(extractedField, v.null()),
-			items: v.array(v.string())
+			items: v.array(v.string()),
+			facts: documentFacts
 		})
 	},
 	handler: async (ctx, args) => {
 		const extraction = await ctx.db.get(args.extractionId);
 		if (extraction === null || !isCurrentAttempt(extraction, args.attempt)) return null;
 		const slot = slotForKind(args.result.documentKind, args.result.looksLikePurchase);
-		const receiptLike = isReceipt(args.result, args.classify);
 		await ctx.db.patch(args.extractionId, {
 			status: 'done',
 			textSource: args.textSource,
 			documentKind: args.result.documentKind,
-			vendor: receiptLike ? args.result.vendor : null,
-			totalAmount: receiptLike ? args.result.totalAmount : null,
-			receiptDate: receiptLike ? args.result.receiptDate : null,
-			items: receiptLike ? args.result.items : [],
+			vendor: args.result.vendor,
+			totalAmount: args.result.totalAmount,
+			receiptDate: args.result.receiptDate,
+			items: args.result.items,
+			facts: args.result.facts,
 			error: null,
 			updatedAt: Date.now()
 		});
@@ -186,6 +190,9 @@ export const finishExtraction = internalMutation({
 		if (args.classify && request.status !== 'approved')
 			await classifyDocument(ctx, request, extraction.fileId, slot);
 		await applyReceiptFields(ctx, request._id);
+		await demoteIfNotReady(ctx, request._id);
+		const current = await ctx.db.get(request._id);
+		if (current === null || slotOf(current, extraction.fileId) !== 'receipt') return null;
 		return request._id;
 	}
 });
@@ -260,10 +267,20 @@ async function classifyDocument(
 	if (current === null || slot === null || current === slot) return;
 	await ctx.db.patch(request._id, {
 		...placeDocument(request, fileId, slot),
+		...(slot === 'second_approval' ? approvalBasisPatch(request) : {}),
 		updatedAt: Date.now()
 	});
 	const file = await ctx.db.get(fileId);
 	if (file !== null) await ctx.db.patch(fileId, { kind: slot });
+}
+
+export function approvalBasisPatch(request: Doc<'purchaseRequests'>) {
+	return {
+		checkConfirmations: withConfirmation(request.checkConfirmations ?? [], {
+			id: 'approval-recheck',
+			key: approvalBasisKey(approvalBasisOf(request))
+		})
+	};
 }
 
 export async function applyReceiptFields(
@@ -300,13 +317,6 @@ async function refreshDecisions(
 	});
 }
 
-function isReceipt(
-	result: Pick<DocumentExtraction, 'documentKind' | 'looksLikePurchase'>,
-	classify: boolean
-) {
-	return !classify || slotForKind(result.documentKind, result.looksLikePurchase) === 'receipt';
-}
-
 function storedResult(result: DocumentExtraction) {
 	const strip = (field: ParsedField | null) =>
 		field === null
@@ -318,7 +328,8 @@ function storedResult(result: DocumentExtraction) {
 		vendor: strip(result.vendor),
 		totalAmount: strip(result.totalAmount),
 		receiptDate: strip(result.receiptDate),
-		items: result.items
+		items: result.items,
+		facts: result.facts
 	};
 }
 

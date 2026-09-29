@@ -7,7 +7,7 @@ import { fileDownloadUrl, requireOwnedKey } from '../files';
 import {
 	demoteIfNotReady,
 	ownerFromIdentity,
-	purchaseReadiness,
+	readinessWithChecks,
 	renderBusinessPurpose,
 	requireOwnedDoc,
 	requireText
@@ -25,7 +25,8 @@ import {
 	slotOf,
 	type Slot
 } from '../extraction/apply';
-import { applyReceiptFields, extractionTimeoutMs } from '../extraction/jobs';
+import { applyReceiptFields, approvalBasisPatch, extractionTimeoutMs } from '../extraction/jobs';
+import { requestExtractions } from '../checks/load';
 import { authedMutation, authedQuery } from './helpers';
 
 export const getRequestView = authedQuery({
@@ -34,10 +35,7 @@ export const getRequestView = authedQuery({
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
-		const extractions = await ctx.db
-			.query('extractions')
-			.withIndex('by_purchaseRequestId', (q) => q.eq('purchaseRequestId', request._id))
-			.take(50);
+		const extractions = await requestExtractions(ctx, request);
 		const extractionsByFile = new Map(extractions.map((row) => [row.fileId, row]));
 		const documents = [];
 		for (const { fileId, slot } of requestDocuments(request)) {
@@ -57,13 +55,15 @@ export const getRequestView = authedQuery({
 					(slot === 'receipt' && url === null && extraction?.status !== 'done')
 			});
 		}
+		const { readiness, checks } = await readinessWithChecks(ctx, request);
 		return {
 			purchase: request,
 			documents,
 			reading: documents.some((document) => document.reading),
 			reviews: requestReviews(request, extractions),
-			readiness: await purchaseReadiness(ctx, request),
-			businessPurposeText: renderBusinessPurpose(request)
+			readiness,
+			businessPurposeText: renderBusinessPurpose(request),
+			checks
 		};
 	}
 });
@@ -129,7 +129,8 @@ export const retryExtraction = authedMutation({
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
 		requireEditableDocuments(request);
-		if (slotOf(request, args.fileId) !== 'receipt') throw new Error('Only receipts can be read.');
+		const slot = slotOf(request, args.fileId);
+		if (slot === null || !readSlots.has(slot)) throw new Error('This document can’t be read.');
 		await requireOwnedDoc(ctx, 'files', args.fileId, owner);
 		const existing = await extractionForFile(ctx, args.fileId);
 		if (existing?.status === 'pending' || existing?.status === 'running') return null;
@@ -169,10 +170,11 @@ async function attachFiles(
 		const slot: Slot = explicit ? (target as Slot) : 'receipt';
 		await ctx.db.patch(request._id, {
 			...placeDocument(request, fileId, slot),
+			...(slot === 'second_approval' ? approvalBasisPatch(request) : {}),
 			updatedAt: Date.now()
 		});
 		if (explicit) await ctx.db.patch(fileId, { kind: slot });
-		if (slot === 'receipt') await startExtraction(ctx, request, fileId, !explicit);
+		if (readSlots.has(slot)) await startExtraction(ctx, request, fileId, !explicit);
 		const next = await ctx.db.get(request._id);
 		if (next === null) throw new Error('Purchase request not found.');
 		request = next;
@@ -205,6 +207,7 @@ async function startExtraction(
 		totalAmount: null,
 		receiptDate: null,
 		items: [],
+		facts: null,
 		error: null,
 		attempt: (existing?.attempt ?? 0) + 1,
 		updatedAt: now
@@ -227,6 +230,8 @@ async function startExtraction(
 		attempt: fields.attempt
 	});
 }
+
+const readSlots = new Set<Slot>(['receipt', 'publicity', 'second_approval']);
 
 function requireEditableDocuments(request: Doc<'purchaseRequests'>) {
 	if (request.status === 'approved') {

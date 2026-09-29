@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { documentFacts } from './extraction/facts';
 
 const fundLetter = v.union(
 	v.literal('I'),
@@ -240,7 +241,9 @@ export default defineSchema({
 		receiptDate: v.optional(v.string()),
 		purpose: v.optional(v.string()),
 		activityTime: v.optional(v.string()),
-		activityLocation: v.optional(v.string())
+		activityLocation: v.optional(v.string()),
+		foodIndividuallyPackaged: v.optional(v.union(v.boolean(), v.null())),
+		checkConfirmations: v.optional(v.array(v.object({ id: v.string(), key: v.string() })))
 	})
 		.index('by_owner_and_organizationSourceId_and_status_and_updatedAt', [
 			'owner',
@@ -272,6 +275,7 @@ export default defineSchema({
 		totalAmount: v.union(extractedField, v.null()),
 		receiptDate: v.union(extractedField, v.null()),
 		items: v.array(v.string()),
+		facts: v.optional(v.union(documentFacts, v.null())),
 		error: v.union(v.string(), v.null()),
 		attempt: v.optional(v.number()),
 		createdAt: v.number(),

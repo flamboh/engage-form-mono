@@ -1,6 +1,8 @@
 import type { Doc, Id } from '$convex/_generated/dataModel';
 import { parseBusinessPurposeText, resolveBusinessPurpose } from '$convex/businessPurpose';
-import { evaluatePurchaseReadiness } from '$convex/purchaseReadiness';
+import { evaluatePurchaseReadiness, withBlockingChecks } from '$convex/purchaseReadiness';
+import { approvalBasisKey } from '$convex/checks/requestChecks';
+import { mockChecks } from './checks';
 import type { RequestDocument, RequestReview, RequestView } from '$convex/requestView';
 import type { SavedData } from '$lib/purchase/draftDetails';
 
@@ -324,8 +326,88 @@ const scenarios: Record<string, () => Scenario> = {
 	approved: () => ({
 		purchase: { ...complete, status: 'approved', lastFilledAt: now },
 		documents: completeDocs()
-	})
+	}),
+	checks: () => ({
+		purchase: {
+			...complete,
+			fieldSources: readSources,
+			receiptFileIds: [file('mock_receipt_nocard')],
+			publicityFileId: file('mock_flyer_wrong'),
+			cateringWaiverFileId: null
+		},
+		documents: [
+			{ ...receiptDoc(), fileId: file('mock_receipt_nocard') },
+			{ ...publicityDoc(), fileId: file('mock_flyer_wrong') },
+			approvalDoc()
+		]
+	}),
+	'checks-online': () => ({
+		purchase: {
+			...complete,
+			vendor: 'Amazon',
+			itemDescription: 'Live Vol. 1 (180gm 2LP)',
+			totalAmount: 32.98,
+			documentationCategories: ['gifts_prizes'],
+			fieldSources: readSources,
+			receiptFileIds: [file('mock_amazon')],
+			secondApprovalFileId: file('mock_approval_old'),
+			cateringWaiverFileId: null,
+			recipients: [
+				{ name: 'Avery Chen', uo95: '951000002', reason: 'Trivia winner', value: 32.98 },
+				{ name: 'Riley Park', uo95: '95100', reason: 'Trivia runner-up', value: 0 }
+			]
+		},
+		documents: [
+			document('mock_amazon', 'receipt', 'amazon-order.png', 'image/svg+xml', amazonImage()),
+			publicityDoc(),
+			document('mock_approval_old', 'second_approval', 'approval.pdf', 'application/pdf', null)
+		]
+	}),
+	'checks-recheck': () => {
+		const purchase = {
+			...complete,
+			vendor: 'Epic Seconds',
+			itemDescription: 'Yusef Lateef CD',
+			totalAmount: 19,
+			documentationCategories: [],
+			fieldSources: readSources,
+			receiptFileIds: [file('mock_slip')],
+			secondApprovalFileId: file('mock_approval_cd'),
+			cateringWaiverFileId: null
+		} satisfies Partial<Purchase>;
+		return {
+			purchase: {
+				...purchase,
+				checkConfirmations: [
+					{
+						id: 'approval-recheck',
+						key: approvalBasisKey({
+							...purchase,
+							itemDescription: 'Yusef Lateef CD and sleeve',
+							activity: { name: '', dates: ['2026-09-24'] }
+						})
+					}
+				]
+			},
+			documents: [
+				document(
+					'mock_slip',
+					'receipt',
+					'card-slip.jpg',
+					'image/svg+xml',
+					receiptImage('EPIC SECONDS', [['CREDIT CARD SALE', '19.00']], '$19.00')
+				),
+				publicityDoc(),
+				document('mock_approval_cd', 'second_approval', 'approval.pdf', 'application/pdf', null)
+			]
+		};
+	}
 };
+
+function amazonImage() {
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400"><rect width="300" height="400" fill="#fff"/><g font-family="Arial, sans-serif" fill="#111"><text x="20" y="40" font-size="16" font-weight="bold">Order Summary</text><text x="20" y="70" font-size="12">Order placed October 31, 2025</text><text x="20" y="120" font-size="18" fill="#067d62" font-weight="bold">Arriving Monday</text><text x="20" y="160" font-size="13">Live Vol. 1 (180gm 2LP)</text><text x="20" y="200" font-size="12">Grand Total: $32.98</text></g></svg>`;
+	return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 
 export const scenarioNames = Object.keys(scenarios);
 
@@ -338,13 +420,20 @@ export function scenarioView(name: string): RequestView {
 		reading: scenario.reading ?? false,
 		reviews: scenario.reviews ?? [],
 		readiness: { ready: false, sections: [] },
-		businessPurposeText: businessPurposeTextFor(purchase)
+		businessPurposeText: businessPurposeTextFor(purchase),
+		checks: []
 	};
 }
 
 export async function withReadiness(view: RequestView): Promise<RequestView> {
 	const readiness = await evaluatePurchaseReadiness(view.purchase as Doc<'purchaseRequests'>);
-	return { ...view, readiness, businessPurposeText: businessPurposeTextFor(view.purchase) };
+	const checks = mockChecks(view.purchase);
+	return {
+		...view,
+		readiness: withBlockingChecks(readiness, checks),
+		businessPurposeText: businessPurposeTextFor(view.purchase),
+		checks
+	};
 }
 
 export function businessPurposeTextFor(purchase: Purchase) {
