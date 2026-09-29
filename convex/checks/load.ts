@@ -21,9 +21,9 @@ export function approvalBasisOf(request: Request): ApprovalBasis {
 
 function activityOf(request: Request) {
 	return {
-		name: '',
-		dates: request.activityDate === '' ? [] : [request.activityDate],
-		location: request.activityLocation ?? ''
+		name: request.activity.name,
+		dates: request.activity.dates,
+		location: request.activity.location
 	};
 }
 

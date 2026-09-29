@@ -1,17 +1,12 @@
 import { z } from 'zod/v4';
 import { zid } from 'convex-helpers/server/zod4';
 import type { Doc, Id } from '../_generated/dataModel';
-import { internal } from '../_generated/api';
 import { authedMutation, authedQuery } from './helpers';
 import { deleteStoredFile, issueUploadTicket, requireOwnedKey } from '../files';
 import {
 	changedSnapshotPatch,
-	businessPurposeTemplateDraftPatch,
-	businessPurposeTemplateFields,
-	businessPurposeTemplateUpdateFields,
 	getUserProfile,
 	ownerFromIdentity,
-	parseBusinessPurposeText,
 	previousRequestDefaults,
 	purchaserDetails,
 	requireOwnedDoc,
@@ -20,14 +15,13 @@ import {
 	studentOrganizationDetails,
 	userAsPurchaserDetails,
 	userAsRequesterDetails,
-	userFieldSources,
-	validateBusinessPurposeText
+	userFieldSources
 } from '../purchaseModel';
+import { normalizeActivity } from './events';
 import {
 	fileKind,
 	fundLetter,
 	nullReturn,
-	purchaseRequestDoc,
 	savedData,
 	userDoc,
 	wizardSnapshot
@@ -38,8 +32,7 @@ const createOrganizationArgs = {
 	name: z.string(),
 	indexNumber: z.string(),
 	fundLetter,
-	budgetLines: z.array(z.string()),
-	businessPurposeTemplate: z.string()
+	budgetLines: z.array(z.string())
 };
 
 const purchaserArgs = {
@@ -143,17 +136,7 @@ export const listSaved = authedQuery({
 					.query('purchasers')
 					.withIndex('by_owner_and_archived', (q) => q.eq('owner', owner).eq('archived', false))
 					.take(200);
-		const businessPurposeTemplates = args.includeArchived
-			? await ctx.db
-					.query('businessPurposeTemplates')
-					.withIndex('by_owner', (q) => q.eq('owner', owner))
-					.take(200)
-			: await ctx.db
-					.query('businessPurposeTemplates')
-					.withIndex('by_owner_and_archived', (q) => q.eq('owner', owner).eq('archived', false))
-					.take(200);
-
-		return { organizations, purchasers, businessPurposeTemplates };
+		return { organizations, purchasers };
 	}
 });
 
@@ -190,8 +173,6 @@ export const upsertOrganization = authedMutation({
 		const owner = ownerFromIdentity(ctx.identity);
 		requireText(args.name, 'Organization name missing.');
 		requireText(args.indexNumber, 'Index number missing.');
-		requireText(args.businessPurposeTemplate, 'Business Purpose Template missing.');
-		validateBusinessPurposeText(args.businessPurposeTemplate);
 		const budgetLines = args.budgetLines.map((line) => line.trim()).filter((line) => line !== '');
 		if (budgetLines.length === 0) throw new Error('Add at least one budget line.');
 		const fields = {
@@ -200,7 +181,6 @@ export const upsertOrganization = authedMutation({
 			indexNumber: args.indexNumber,
 			fundLetter: args.fundLetter,
 			budgetLines,
-			businessPurposeTemplate: args.businessPurposeTemplate,
 			archived: false,
 			updatedAt: Date.now()
 		};
@@ -208,22 +188,6 @@ export const upsertOrganization = authedMutation({
 		await requireOwnedDoc(ctx, 'organizations', args.id, owner);
 		await ctx.db.patch(args.id, fields);
 		return args.id;
-	}
-});
-
-export const setOrganizationBusinessPurposeTemplate = authedMutation({
-	args: { organizationId: zid('organizations'), businessPurposeTemplate: z.string() },
-	returns: nullReturn,
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
-		requireText(args.businessPurposeTemplate, 'Business Purpose Template missing.');
-		validateBusinessPurposeText(args.businessPurposeTemplate);
-		await ctx.db.patch(args.organizationId, {
-			businessPurposeTemplate: args.businessPurposeTemplate,
-			updatedAt: Date.now()
-		});
-		return null;
 	}
 });
 
@@ -257,68 +221,10 @@ export const upsertPurchaser = authedMutation({
 	}
 });
 
-export const upsertBusinessPurposeTemplate = authedMutation({
-	args: {
-		id: zid('businessPurposeTemplates').nullable(),
-		organizationId: zid('organizations'),
-		title: z.string(),
-		businessPurposeTemplate: z.string()
-	},
-	returns: zid('businessPurposeTemplates'),
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
-		if (args.id === null) {
-			return await ctx.db.insert(
-				'businessPurposeTemplates',
-				businessPurposeTemplateFields(owner, args)
-			);
-		}
-		await requireOwnedDoc(ctx, 'businessPurposeTemplates', args.id, owner);
-		await ctx.db.patch(args.id, businessPurposeTemplateUpdateFields(args));
-		return args.id;
-	}
-});
-
-export const applyBusinessPurposeTemplate = authedMutation({
-	args: {
-		draftId: zid('purchaseRequests'),
-		templateId: zid('businessPurposeTemplates')
-	},
-	returns: purchaseRequestDoc,
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const draft = await requireOwnedDoc(ctx, 'purchaseRequests', args.draftId, owner);
-		if (draft.status === 'approved') throw new Error('Approved requests cannot use templates.');
-		const template = await requireOwnedDoc(ctx, 'businessPurposeTemplates', args.templateId, owner);
-		if (template.archived) throw new Error('Business Purpose Template archived.');
-		if (
-			draft.organizationSourceId !== null &&
-			template.organizationId !== draft.organizationSourceId
-		) {
-			throw new Error('Business Purpose Template belongs to another Student Organization.');
-		}
-		await ctx.db.patch(args.draftId, {
-			...businessPurposeTemplateDraftPatch(template),
-			fieldSources: { ...(draft.fieldSources ?? {}), businessPurposeSource: 'user' }
-		});
-		if (draft.status === 'draft' && draft.receiptFileIds.length > 0) {
-			await ctx.scheduler.runAfter(0, internal.extraction.jobs.refreshDefaults, {
-				purchaseRequestId: args.draftId
-			});
-		}
-		return await requireOwnedDoc(ctx, 'purchaseRequests', args.draftId, owner);
-	}
-});
-
 export const setArchived = authedMutation({
 	args: {
-		table: z.union([
-			z.literal('organizations'),
-			z.literal('purchasers'),
-			z.literal('businessPurposeTemplates')
-		]),
-		id: z.union([zid('organizations'), zid('purchasers'), zid('businessPurposeTemplates')]),
+		table: z.union([z.literal('organizations'), z.literal('purchasers')]),
+		id: z.union([zid('organizations'), zid('purchasers')]),
 		archived: z.boolean()
 	},
 	returns: nullReturn,
@@ -350,16 +256,18 @@ export const createDraftForOrganization = authedMutation({
 			previous?.purchaserSource.kind === 'purchaser'
 				? await ctx.db.get(previous.purchaserSource.purchaserId)
 				: null;
+		const previousEvent =
+			previous?.activity.eventId != null ? await ctx.db.get(previous.activity.eventId) : null;
 		return await ctx.db.insert('purchaseRequests', {
 			...draft,
 			organizationSourceId: organization._id,
 			studentOrganization: studentOrganizationDetails(organization),
 			budgetLineItem: organization.budgetLines[0] ?? '',
-			businessPurposeSource: parseBusinessPurposeText(organization.businessPurposeTemplate),
 			...previousRequestDefaults(
 				previous,
 				organization,
-				previousPurchaser !== null && previousPurchaser.owner === owner ? previousPurchaser : null
+				previousPurchaser !== null && previousPurchaser.owner === owner ? previousPurchaser : null,
+				previousEvent !== null && previousEvent.owner === owner ? previousEvent : null
 			)
 		});
 	}
@@ -379,6 +287,16 @@ export const saveDraftSnapshot = authedMutation({
 			changedSnapshotPatch(snapshotPatch(args.snapshot), args.changedFields)
 		);
 		if (Object.keys(patch).every((key) => key === 'updatedAt')) return null;
+		const eventId = patch.activity?.eventId ?? null;
+		if (eventId !== null) {
+			const event = await requireOwnedDoc(ctx, 'events', eventId, owner);
+			if (event.organizationId !== request.organizationSourceId) {
+				throw new Error('Event belongs to another Student Organization.');
+			}
+			if (eventId !== request.activity.eventId) {
+				await ctx.db.patch(eventId, { lastUsedAt: Date.now() });
+			}
+		}
 		const fieldSources = userFieldSources(request, patch);
 		await ctx.db.patch(args.id, {
 			...patch,
@@ -484,19 +402,25 @@ function emptyDraft(
 			name: '',
 			indexNumber: '',
 			fundLetter: 'I' as const,
-			budgetLines: [],
-			businessPurposeTemplate: ''
+			budgetLines: []
 		},
 		requester: userAsRequesterDetails(requester),
 		purchaser: userAsPurchaserDetails(requester),
-		activityDate: '',
+		activity: {
+			eventId: null,
+			name: '',
+			dates: [],
+			time: '',
+			location: '',
+			attendance: null,
+			openToAllStudents: true
+		},
 		vendor: '',
 		itemDescription: '',
 		totalAmount: 0,
 		budgetLineItem: '',
 		reimbursementReason: 'Other processes are too slow.',
-		businessPurposeSource: { parts: [] },
-		businessPurposeTouched: false,
+		businessPurposeOverride: null,
 		receiptFileIds: [],
 		secondApprovalFileId: null,
 		publicityFileId: null,
@@ -519,7 +443,7 @@ function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {
 		documentationCategories: snapshot.documentationCategories,
 		purchaserSource: snapshot.purchaserSource,
 		purchaser: snapshot.purchaser,
-		activityDate: snapshot.activityDate,
+		activity: normalizeActivity(snapshot.activity),
 		vendor: snapshot.vendor,
 		itemDescription: snapshot.itemDescription,
 		totalAmount:
@@ -529,11 +453,8 @@ function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {
 		budgetLineItem: snapshot.budgetLineItem,
 		reimbursementReason:
 			snapshot.typeOfPurchase === 'personal_reimbursement' ? 'Other processes are too slow.' : '',
-		businessPurposeSource: parseBusinessPurposeText(snapshot.businessPurposeText),
-		businessPurposeTouched: snapshot.businessPurposeTouched,
+		businessPurposeOverride: normalizeOverride(snapshot.businessPurposeOverride),
 		purpose: snapshot.purpose.trim().slice(0, 200),
-		activityTime: snapshot.activityTime.trim().slice(0, 40),
-		activityLocation: snapshot.activityLocation.trim().slice(0, 200),
 		receiptFileIds: snapshot.receiptFileIds,
 		secondApprovalFileId: snapshot.secondApprovalFileId,
 		publicityFileId: snapshot.publicityFileId,
@@ -546,4 +467,10 @@ function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {
 		recipients: snapshot.recipients,
 		updatedAt: Date.now()
 	};
+}
+
+function normalizeOverride(value: string | null) {
+	if (value === null) return null;
+	const text = value.trim().slice(0, 2000);
+	return text === '' ? null : text;
 }

@@ -33,6 +33,19 @@ export const requestReview = z.object({
 	receiptRemoved: z.boolean().optional()
 });
 
+export const missingFact = z.enum([
+	'vendor',
+	'items',
+	'total',
+	'purchaser',
+	'eventName',
+	'dates',
+	'time',
+	'location',
+	'attendance',
+	'recipients'
+]);
+
 export const requestCheck = z.object({
 	id: z.string(),
 	severity: z.enum(['blocking', 'warning']),
@@ -53,6 +66,7 @@ export const requestView = z.object({
 		sections: z.array(z.object({ section: z.string(), reasons: z.array(z.string()) }))
 	}),
 	businessPurposeText: z.string(),
+	businessPurposeMissing: z.array(z.object({ fact: missingFact, label: z.string() })),
 	checks: z.array(requestCheck)
 });
 

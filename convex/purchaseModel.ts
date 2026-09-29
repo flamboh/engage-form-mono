@@ -8,18 +8,8 @@ import {
 import { loadRequestChecks } from './checks/load';
 import { effectiveDocumentationCategories } from './purchaseCategories';
 import { fileDownloadUrl } from './files';
-import {
-	parseBusinessPurposeText,
-	resolveBusinessPurpose,
-	validateBusinessPurposeText
-} from './businessPurpose';
-export {
-	formatBusinessPurposeSource,
-	parseBusinessPurposeText,
-	resolveBusinessPurpose,
-	validateBusinessPurposeSource,
-	validateBusinessPurposeText
-} from './businessPurpose';
+import { businessPurposeFor } from './businessPurpose';
+import { todayInOregon } from './events';
 
 export { evaluatePurchaseReadiness } from './purchaseReadiness';
 export { effectiveDocumentationCategories } from './purchaseCategories';
@@ -36,12 +26,6 @@ export type StudentOrganizationDetails = {
 	indexNumber: string;
 	fundLetter: Doc<'organizations'>['fundLetter'];
 	budgetLines: string[];
-	businessPurposeTemplate: string;
-};
-export type BusinessPurposeTemplateInput = {
-	organizationId: Id<'organizations'>;
-	title: string;
-	businessPurposeTemplate: string;
 };
 export type RequesterDetails = {
 	id: Id<'users'>;
@@ -75,13 +59,7 @@ export function requireText(value: string, message: string) {
 }
 
 export async function requireOwnedDoc<
-	Table extends
-		| 'users'
-		| 'organizations'
-		| 'businessPurposeTemplates'
-		| 'files'
-		| 'purchasers'
-		| 'purchaseRequests'
+	Table extends 'users' | 'organizations' | 'events' | 'files' | 'purchasers' | 'purchaseRequests'
 >(ctx: Ctx, table: Table, id: Id<Table & string>, owner: string) {
 	void table;
 	const doc = await ctx.db.get(id);
@@ -108,12 +86,12 @@ const userTrackedFields = [
 	'typeOfPurchase',
 	'documentationCategories',
 	'purchaserSource',
-	'activityDate',
+	'activity',
 	'vendor',
 	'itemDescription',
 	'totalAmount',
 	'budgetLineItem',
-	'businessPurposeSource',
+	'businessPurposeOverride',
 	'officeLocation',
 	'recipients'
 ] as const;
@@ -139,8 +117,7 @@ export function userFieldSources(
 
 const snapshotFieldTargets: Record<string, readonly string[]> = {
 	typeOfPurchase: ['typeOfPurchase', 'reimbursementReason'],
-	purchaserSource: ['purchaserSource', 'purchaser'],
-	businessPurposeText: ['businessPurposeSource']
+	purchaserSource: ['purchaserSource', 'purchaser']
 };
 
 export function changedSnapshotPatch<Patch extends object>(
@@ -162,14 +139,14 @@ export type PreviousRequestDefaults = Pick<
 	| 'budgetLineItem'
 	| 'documentationCategories'
 	| 'reimbursementReason'
-	| 'businessPurposeTouched'
-	| 'businessPurposeSource'
+	| 'activity'
 >;
 
 export function previousRequestDefaults(
 	previous: PreviousRequestDefaults | null,
 	organization: Pick<Doc<'organizations'>, '_id' | 'budgetLines'>,
-	purchaser: Doc<'purchasers'> | null
+	purchaser: Doc<'purchasers'> | null,
+	event: Doc<'events'> | null = null
 ): Partial<Doc<'purchaseRequests'>> {
 	if (previous === null) return {};
 	const sources: FieldSources = {};
@@ -186,10 +163,20 @@ export function previousRequestDefaults(
 		defaults.purchaser = purchaserDetails(purchaser);
 		sources.purchaserSource = 'previous';
 	}
-	if (previous.businessPurposeSource.parts.length > 0) {
-		defaults.businessPurposeSource = previous.businessPurposeSource;
-		defaults.businessPurposeTouched = previous.businessPurposeTouched;
-		sources.businessPurposeSource = 'previous';
+	if (previous.activity.name.trim() !== '') {
+		const eventId = previous.activity.eventId;
+		const eventUsable =
+			eventId !== null &&
+			event !== null &&
+			event._id === eventId &&
+			!event.archived &&
+			event.organizationId === organization._id;
+		defaults.activity = {
+			...previous.activity,
+			eventId: eventUsable ? eventId : null,
+			dates: []
+		};
+		sources.activity = 'previous';
 	}
 	if (organization.budgetLines.includes(previous.budgetLineItem)) {
 		defaults.budgetLineItem = previous.budgetLineItem;
@@ -206,63 +193,8 @@ export function previousRequestDefaults(
 	return { ...defaults, fieldSources: sources };
 }
 
-export function businessPurposeTemplateFields(
-	owner: string,
-	input: BusinessPurposeTemplateInput,
-	updatedAt = Date.now()
-) {
-	return {
-		...businessPurposeTemplateUpdateFields(input, updatedAt),
-		owner,
-		organizationId: input.organizationId,
-		archived: false
-	};
-}
-
-export function businessPurposeTemplateUpdateFields(
-	input: Pick<BusinessPurposeTemplateInput, 'title' | 'businessPurposeTemplate'>,
-	updatedAt = Date.now()
-) {
-	const title = input.title.trim();
-	requireText(title, 'Business Purpose Template title missing.');
-	requireText(input.businessPurposeTemplate, 'Business Purpose Template missing.');
-	validateBusinessPurposeText(input.businessPurposeTemplate);
-	return {
-		title,
-		businessPurposeTemplate: input.businessPurposeTemplate,
-		searchText: businessPurposeTemplateSearchText(title, input.businessPurposeTemplate),
-		updatedAt
-	};
-}
-
-export function businessPurposeTemplateDraftPatch(
-	template: Pick<Doc<'businessPurposeTemplates'>, 'businessPurposeTemplate'>
-): Partial<Doc<'purchaseRequests'>> {
-	return {
-		businessPurposeSource: parseBusinessPurposeText(template.businessPurposeTemplate),
-		businessPurposeTouched: true,
-		updatedAt: Date.now()
-	};
-}
-
-export function filterBusinessPurposeTemplates<
-	Template extends Pick<
-		Doc<'businessPurposeTemplates'>,
-		'title' | 'businessPurposeTemplate' | 'archived'
-	>
->(templates: Template[], query: string, options: { includeArchived?: boolean } = {}) {
-	const normalizedQuery = normalizeSearch(query);
-	return templates.filter((template) => {
-		if (!options.includeArchived && template.archived) return false;
-		if (normalizedQuery === '') return true;
-		return normalizeSearch(
-			businessPurposeTemplateSearchText(template.title, template.businessPurposeTemplate)
-		).includes(normalizedQuery);
-	});
-}
-
-export function renderBusinessPurpose(request: Doc<'purchaseRequests'>) {
-	return resolveBusinessPurpose(request.businessPurposeSource, request).text;
+export function renderBusinessPurpose(request: Doc<'purchaseRequests'>, now = Date.now()) {
+	return businessPurposeFor(request, todayInOregon(now)).text;
 }
 
 export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'>) {
@@ -299,7 +231,6 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		organization: orgPayload(request),
 		requester: request.requester,
 		purchaser: request.purchaser,
-		activityDate: request.activityDate,
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
@@ -404,8 +335,7 @@ export function studentOrganizationDetails(org: Doc<'organizations'>): StudentOr
 		name: org.name,
 		indexNumber: org.indexNumber,
 		fundLetter: org.fundLetter,
-		budgetLines: org.budgetLines,
-		businessPurposeTemplate: org.businessPurposeTemplate
+		budgetLines: org.budgetLines
 	};
 }
 
@@ -421,12 +351,4 @@ function orgPayload(request: Doc<'purchaseRequests'>) {
 
 function reimbursementReasonFor(typeOfPurchase: TypeOfPurchase) {
 	return typeOfPurchase === 'personal_reimbursement' ? fixedPersonalReimbursementReason : '';
-}
-
-function businessPurposeTemplateSearchText(title: string, businessPurposeTemplate: string) {
-	return `${title} ${businessPurposeTemplate}`;
-}
-
-function normalizeSearch(value: string) {
-	return value.trim().toLowerCase();
 }

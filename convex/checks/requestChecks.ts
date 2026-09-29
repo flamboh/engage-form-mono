@@ -1,6 +1,7 @@
 import type { Id } from '../_generated/dataModel';
 import type { DocumentFacts } from '../extraction/facts';
 import type { DocumentSlot, RequestCheck } from '../requestView';
+import { eventDatesPhrase, formatEventDates } from '../events';
 import { sameDay } from './candidates';
 
 export type CheckDocument = {
@@ -94,7 +95,7 @@ function publicityChecks(input: CheckInput): RequestCheck[] {
 				id: 'publicity-date',
 				severity: 'blocking',
 				title: 'Publicity shows a different date',
-				detail: `It says ${describeDate(shown, activityDates[0])}, but the event was ${listDates(activityDates)}. Add publicity for this date.`,
+				detail: `It says ${describeDate(shown, activityDates[0])}, but the event was ${eventDatesPhrase(activityDates)}. Add publicity for this date.`,
 				fileId: publicity.fileId,
 				slot: 'publicity',
 				action: 'upload'
@@ -104,7 +105,7 @@ function publicityChecks(input: CheckInput): RequestCheck[] {
 				id: 'publicity-date',
 				severity: 'warning',
 				title: 'Check the date on your publicity',
-				detail: `We couldn’t find ${listDates(activityDates)} on it. Reviewers deny publicity for a different date.`,
+				detail: `We couldn’t find ${formatEventDates(activityDates)} on it. Reviewers deny publicity for a different date.`,
 				fileId: publicity.fileId,
 				slot: 'publicity',
 				action: 'confirm'
@@ -287,7 +288,7 @@ function approvalChecks(input: CheckInput): RequestCheck[] {
 					? 'Second approval is for a different date'
 					: 'Second approval doesn’t name the event',
 				otherDate !== undefined && dates.length > 0
-					? `It mentions ${describeDate(otherDate, dates[0])}, but the event was ${listDates(dates)}.`
+					? `It mentions ${describeDate(otherDate, dates[0])}, but the event was ${eventDatesPhrase(dates)}.`
 					: `Reviewers want it to say which event and date it’s for${eventPhrase(input)}.`
 			);
 		}
@@ -314,9 +315,9 @@ function approvalChecks(input: CheckInput): RequestCheck[] {
 function eventPhrase(input: CheckInput) {
 	const name = input.activity.name.trim();
 	const dates = input.activity.dates;
-	if (name !== '' && dates.length > 0) return `, like “${name} on ${listDates(dates)}”`;
+	if (name !== '' && dates.length > 0) return `, like “${name} ${eventDatesPhrase(dates)}”`;
 	if (name !== '') return `, like “${name}”`;
-	return dates.length > 0 ? `, like ${listDates(dates)}` : '';
+	return dates.length > 0 ? `, like ${formatEventDates(dates)}` : '';
 }
 
 function recipientChecks(input: CheckInput): RequestCheck[] {
@@ -476,10 +477,4 @@ function describeDate(date: string, reference: string | undefined) {
 	return reference === undefined && date.startsWith('--')
 		? monthDay
 		: `${weekdays[parsed.getUTCDay()]} ${monthDay}`;
-}
-
-function listDates(dates: string[]) {
-	const shown = dates.map((date) => describeDate(date, date));
-	if (shown.length <= 1) return shown.join('');
-	return `${shown.slice(0, -1).join(', ')} or ${shown.at(-1)}`;
 }

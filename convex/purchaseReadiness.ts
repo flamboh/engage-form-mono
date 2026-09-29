@@ -1,6 +1,12 @@
 import type { Doc, Id } from './_generated/dataModel';
 import { effectiveDocumentationCategories } from './purchaseCategories';
-import { resolveBusinessPurpose } from './businessPurpose';
+import {
+	businessPurposeFactsFrom,
+	generateBusinessPurpose,
+	missingFactLabel,
+	requiresRecipients,
+	type MissingFact
+} from './businessPurpose';
 
 export type ReadinessSection = {
 	section: string;
@@ -85,6 +91,7 @@ export async function evaluatePurchaseReadiness(
 		for (const recipient of request.recipients) {
 			requireSectionText('Recipients', recipient.name, 'Recipient name missing.');
 			requireSectionText('Recipients', recipient.uo95, 'Recipient UO 95 missing.');
+			requireSectionText('Recipients', recipient.reason, 'Recipient reason missing.');
 			if (recipient.value <= 0) add('Recipients', 'Recipient value missing.');
 		}
 	}
@@ -92,10 +99,8 @@ export async function evaluatePurchaseReadiness(
 		add('Purchase details', 'Total amount must be greater than zero.');
 	}
 
-	const businessPurpose = businessPurposeReadiness(request);
-	requireSectionText('Business purpose', businessPurpose.text, 'Business purpose missing.');
-	if (businessPurpose.unresolved) {
-		add('Business purpose', 'Business purpose has unresolved variables.');
+	for (const fact of generateBusinessPurpose(businessPurposeFactsFrom(request)).missing) {
+		if (eventFacts.includes(fact)) add('Event', `${missingFactLabel(fact)}.`);
 	}
 
 	if (request.receiptFileIds.length === 0) add('Files', 'Receipt document missing.');
@@ -183,10 +188,7 @@ export async function evaluatePurchaseReadiness(
 	return { ready: sections.length === 0, sections };
 }
 
-function businessPurposeReadiness(request: Doc<'purchaseRequests'>) {
-	const resolved = resolveBusinessPurpose(request.businessPurposeSource, request);
-	return { text: resolved.text, unresolved: resolved.unresolved.length > 0 };
-}
+const eventFacts: MissingFact[] = ['eventName', 'dates', 'time', 'location', 'attendance'];
 
 const checksSection = 'Document checks';
 
@@ -217,8 +219,4 @@ async function requireOwnedDocument(
 ) {
 	if (id.trim() === '') return;
 	if (!(await documentExists(id))) add(section, reason);
-}
-
-function requiresRecipients(categories: string[]) {
-	return categories.includes('merchandise_apparel') || categories.includes('gifts_prizes');
 }

@@ -1,6 +1,5 @@
 import type { Doc, Id } from '$convex/_generated/dataModel';
 import type { Approver } from '$convex/approvalEmail';
-import { formatBusinessPurposeSource, mentionsPurpose, withPurpose } from '$convex/businessPurpose';
 import type { DocumentSlot, RequestView } from '$convex/requestView';
 import {
 	savedPurchaserDetails,
@@ -16,21 +15,19 @@ import type { UploadSlot } from '$lib/uploads.svelte';
 import type { ReviewField } from './whatsLeft';
 
 export type Purchase = RequestView['purchase'];
+export type Activity = Purchase['activity'];
 
 export type FormState = {
 	typeOfPurchase: Purchase['typeOfPurchase'];
 	documentationCategories: DocumentationCategory[];
 	purchaserSource: Purchase['purchaserSource'];
 	purchaser: PurchaserDetails;
-	activityDate: string;
-	activityTime: string;
-	activityLocation: string;
+	activity: Activity;
 	vendor: string;
 	itemDescription: string;
 	totalAmount: number | null;
 	budgetLineItem: string;
-	businessPurposeText: string;
-	businessPurposeTouched: boolean;
+	businessPurposeOverride: string | null;
 	purpose: string;
 	receiptFileIds: Id<'files'>[];
 	secondApprovalFileId: Id<'files'> | null;
@@ -46,8 +43,6 @@ export type FormState = {
 
 export type RequestBackend = {
 	saveSnapshot(snapshot: FormState, changedFields: (keyof FormState)[]): Promise<void>;
-	applyTemplate(templateId: Id<'businessPurposeTemplates'>): Promise<void>;
-	saveOrganizationTemplate(businessPurposeTemplate: string): Promise<void>;
 	resolveReview(field: ReviewField, value: string): Promise<void>;
 	removeDocument(fileId: Id<'files'>): Promise<void>;
 	retryReading(fileId: Id<'files'>): Promise<void>;
@@ -124,15 +119,12 @@ export class RequestEditor {
 			documentationCategories: purchase.documentationCategories,
 			purchaserSource: purchase.purchaserSource,
 			purchaser: purchase.purchaser,
-			activityDate: purchase.activityDate,
-			activityTime: purchase.activityTime ?? '',
-			activityLocation: purchase.activityLocation ?? '',
+			activity: purchase.activity,
 			vendor: purchase.vendor,
 			itemDescription: purchase.itemDescription,
 			totalAmount: purchase.totalAmount || null,
 			budgetLineItem: purchase.budgetLineItem,
-			businessPurposeText: formatBusinessPurposeSource(purchase.businessPurposeSource),
-			businessPurposeTouched: purchase.businessPurposeTouched,
+			businessPurposeOverride: purchase.businessPurposeOverride,
 			purpose: purchase.purpose ?? '',
 			receiptFileIds: purchase.receiptFileIds,
 			secondApprovalFileId: purchase.secondApprovalFileId,
@@ -215,38 +207,10 @@ export class RequestEditor {
 		});
 	}
 
-	setPurpose(purpose: string, options: { debounce?: boolean } = {}) {
-		const text = this.form?.businessPurposeText ?? '';
-		const append = purpose.trim() !== '' && !mentionsPurpose(text);
-		this.update(
-			append
-				? { purpose, businessPurposeText: withPurpose(text), businessPurposeTouched: true }
-				: { purpose },
-			options
-		);
-		return append;
-	}
-
-	async saveSentenceForFuture() {
-		let saved = false;
-		await this.#run(async () => {
-			await this.flush();
-			const text = this.form?.businessPurposeText ?? '';
-			await this.#backend().saveOrganizationTemplate(text);
-			saved = true;
-		});
-		return saved;
-	}
-
-	async applyTemplate(templateId: Id<'businessPurposeTemplates'>) {
-		await this.#run(async () => {
-			await this.flush();
-			await this.#backend().applyTemplate(templateId);
-			const next = { ...this.overrides };
-			delete next.businessPurposeText;
-			delete next.businessPurposeTouched;
-			this.overrides = next;
-		});
+	updateActivity(patch: Partial<Activity>, options: { debounce?: boolean } = {}) {
+		const current = this.form?.activity;
+		if (current === undefined) return;
+		this.update({ activity: { ...current, ...patch } }, options);
 	}
 
 	async resolveReview(field: ReviewField, value: string) {

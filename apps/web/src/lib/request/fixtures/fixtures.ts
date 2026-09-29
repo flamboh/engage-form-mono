@@ -1,5 +1,5 @@
 import type { Doc, Id } from '$convex/_generated/dataModel';
-import { parseBusinessPurposeText, resolveBusinessPurpose } from '$convex/businessPurpose';
+import { businessPurposeFor, missingFactLabel } from '$convex/businessPurpose';
 import { evaluatePurchaseReadiness, withBlockingChecks } from '$convex/purchaseReadiness';
 import { approvalBasisKey } from '$convex/checks/requestChecks';
 import { mockChecks } from './checks';
@@ -37,23 +37,9 @@ const organization: Doc<'organizations'> = {
 	indexNumber: '123456',
 	fundLetter: 'I',
 	budgetLines: ['Event Expenses', 'Equipment', 'Travel'],
-	businessPurposeTemplate:
-		'{Student Organization} wishes to reimburse {Purchaser} for purchasing {Item Description} from {Vendor} ({Total Amount}) for {Purpose}.',
 	archived: false,
 	updatedAt: now
 };
-
-const template = (id: string, title: string, text: string, age: number) => ({
-	_id: id as Id<'businessPurposeTemplates'>,
-	_creationTime: now,
-	owner: 'mock',
-	organizationId: mockOrganizationId,
-	title,
-	businessPurposeTemplate: text,
-	searchText: `${title} ${text}`,
-	archived: false,
-	updatedAt: now - age
-});
 
 export const mockSaved: SavedData = {
 	organizations: [organization],
@@ -71,32 +57,6 @@ export const mockSaved: SavedData = {
 			archived: false,
 			updatedAt: now
 		}
-	],
-	businessPurposeTemplates: [
-		template(
-			'mock_tpl_meeting',
-			'General meeting snacks',
-			'{Student Organization} held a general meeting on {Activity Date}. {Purchaser} bought {Item Description} from {Vendor} for {Total Amount} to feed members.',
-			1000
-		),
-		template(
-			'mock_tpl_bouldering',
-			'Bouldering night',
-			'{Student Organization} hosted a bouldering night on {Activity Date}, open to all students. {Purchaser} purchased {Item Description} from {Vendor} for {Total Amount}.',
-			2000
-		),
-		template(
-			'mock_tpl_gear',
-			'Gear swap',
-			'{Student Organization} ran a gear swap on {Activity Date}. {Purchaser} bought {Item Description} from {Vendor} for {Total Amount}.',
-			3000
-		),
-		template(
-			'mock_tpl_prizes',
-			'Comp prizes',
-			'{Student Organization} awarded prizes at its climbing competition on {Activity Date}. {Purchaser} purchased {Item Description} from {Vendor} for {Total Amount} for {Recipients}.',
-			4000
-		)
 	]
 };
 
@@ -155,8 +115,7 @@ function basePurchase(): Purchase {
 			name: organization.name,
 			indexNumber: organization.indexNumber,
 			fundLetter: organization.fundLetter,
-			budgetLines: organization.budgetLines,
-			businessPurposeTemplate: organization.businessPurposeTemplate
+			budgetLines: organization.budgetLines
 		},
 		requester: {
 			id: mockUser._id,
@@ -176,14 +135,21 @@ function basePurchase(): Purchase {
 			idCardFrontFileId: mockUser.idCardFrontFileId,
 			idCardBackFileId: null
 		},
-		activityDate: '2026-09-24',
+		activity: {
+			eventId: null,
+			name: 'Bouldering night',
+			dates: ['2026-09-24'],
+			time: '19:00',
+			location: 'Student Rec Center',
+			attendance: 40,
+			openToAllStudents: true
+		},
 		vendor: '',
 		itemDescription: '',
 		totalAmount: 0,
 		budgetLineItem: 'Event Expenses',
 		reimbursementReason: 'Other processes are too slow.',
-		businessPurposeSource: parseBusinessPurposeText(organization.businessPurposeTemplate),
-		businessPurposeTouched: false,
+		businessPurposeOverride: null,
 		purpose: '',
 		receiptFileIds: [],
 		secondApprovalFileId: null,
@@ -201,7 +167,7 @@ function basePurchase(): Purchase {
 		fieldSources: {
 			purchaserSource: 'previous',
 			budgetLineItem: 'previous',
-			businessPurposeSource: 'previous'
+			activity: 'previous'
 		}
 	};
 }
@@ -219,11 +185,10 @@ const receiptDoc = (reading = false, readFailed = false) =>
 const readSources = {
 	purchaserSource: 'previous',
 	budgetLineItem: 'previous',
-	businessPurposeSource: 'previous',
+	activity: 'previous',
 	vendor: 'receipt',
 	itemDescription: 'receipt',
-	totalAmount: 'receipt',
-	activityDate: 'receipt'
+	totalAmount: 'receipt'
 } as const;
 const approvalDoc = () =>
 	document('mock_approval', 'second_approval', 'approval-email.pdf', 'application/pdf', null);
@@ -256,9 +221,11 @@ const complete = {
 };
 const completeDocs = () => [receiptDoc(), publicityDoc(), approvalDoc(), cateringDoc()];
 
+const undated = () => ({ ...basePurchase().activity, dates: [] });
+
 const scenarios: Record<string, () => Scenario> = {
-	empty: () => ({ purchase: { activityDate: '' }, documents: [] }),
-	drop: () => ({ purchase: { activityDate: '' }, documents: [] }),
+	empty: () => ({ purchase: { activity: undated() }, documents: [] }),
+	drop: () => ({ purchase: { activity: undated() }, documents: [] }),
 	reading: () => ({
 		purchase: { receiptFileIds: [file('mock_receipt')] },
 		documents: [receiptDoc(true)],
@@ -275,7 +242,7 @@ const scenarios: Record<string, () => Scenario> = {
 		reviews: [{ field: 'totalAmount', value: '', alternatives: ['19.00', '19.80'] }]
 	}),
 	unreadable: () => ({
-		purchase: { activityDate: '', receiptFileIds: [file('mock_receipt')] },
+		purchase: { activity: undated(), receiptFileIds: [file('mock_receipt')] },
 		documents: [receiptDoc(false, true)]
 	}),
 	reviews: () => ({
@@ -304,9 +271,6 @@ const scenarios: Record<string, () => Scenario> = {
 			totalAmount: 74.5,
 			documentationCategories: ['gifts_prizes'],
 			cateringWaiverFileId: null,
-			businessPurposeSource: parseBusinessPurposeText(
-				mockSaved.businessPurposeTemplates[3].businessPurposeTemplate
-			),
 			recipients: [
 				{ name: 'Avery Chen', uo95: '951000002', reason: '', value: 24.5 },
 				{ name: 'Riley Park', uo95: '', reason: '', value: 0 }
@@ -420,8 +384,8 @@ export function scenarioView(name: string): RequestView {
 		reading: scenario.reading ?? false,
 		reviews: scenario.reviews ?? [],
 		readiness: { ready: false, sections: [] },
-		businessPurposeText: businessPurposeTextFor(purchase),
-		checks: []
+		checks: [],
+		...businessPurposeViewFor(purchase)
 	};
 }
 
@@ -431,14 +395,20 @@ export async function withReadiness(view: RequestView): Promise<RequestView> {
 	return {
 		...view,
 		readiness: withBlockingChecks(readiness, checks),
-		businessPurposeText: businessPurposeTextFor(view.purchase),
+		...businessPurposeViewFor(view.purchase),
 		checks
 	};
 }
 
-export function businessPurposeTextFor(purchase: Purchase) {
-	return resolveBusinessPurpose(purchase.businessPurposeSource, purchase as Doc<'purchaseRequests'>)
-		.text;
+export function businessPurposeViewFor(purchase: Purchase) {
+	const businessPurpose = businessPurposeFor(purchase);
+	return {
+		businessPurposeText: businessPurpose.text,
+		businessPurposeMissing: businessPurpose.missing.map((fact) => ({
+			fact,
+			label: missingFactLabel(fact)
+		}))
+	};
 }
 
 export const mockRead = readReceipt;

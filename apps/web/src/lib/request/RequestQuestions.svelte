@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Doc } from '$convex/_generated/dataModel';
-	import { mentionsPurpose } from '$convex/businessPurpose';
 	import type { FundLetter } from '$lib/purchase/draftDetails';
 	import Chip from './Chip.svelte';
 	import type { RequestEditor } from './editor.svelte';
@@ -13,9 +12,7 @@
 		fundLetter,
 		budgetLines,
 		purchasers,
-		templates,
 		recentPurposes = [],
-		organizationTemplate = null,
 		userName,
 		section
 	}: {
@@ -23,29 +20,14 @@
 		fundLetter: FundLetter;
 		budgetLines: string[];
 		purchasers: Doc<'purchasers'>[];
-		templates: Doc<'businessPurposeTemplates'>[];
 		recentPurposes?: string[];
-		organizationTemplate?: string | null;
 		userName: string;
 		section: 'why' | 'funding';
 	} = $props();
 
-	let showAllTemplates = $state(false);
-	let addedPurpose = $state(false);
-	let savedForFuture = $state(false);
-
 	const form = $derived(editor.form);
 	const categories = $derived(new Set(form?.documentationCategories ?? []));
 	const asuoForced = $derived(fundLetter === 'I');
-	const sortedTemplates = $derived([...templates].sort((a, b) => b.updatedAt - a.updatedAt));
-	const visibleTemplates = $derived(
-		showAllTemplates ? sortedTemplates : sortedTemplates.slice(0, 5)
-	);
-	const selectedTemplateId = $derived(
-		sortedTemplates.find(
-			(template) => template.businessPurposeTemplate === form?.businessPurposeText
-		)?._id
-	);
 	const needsRecipients = $derived(
 		categories.has('merchandise_apparel') || categories.has('gifts_prizes')
 	);
@@ -54,21 +36,10 @@
 	const purposeChips = $derived(
 		recentPurposes.filter((item) => item.toLowerCase() !== purpose.trim().toLowerCase())
 	);
-	const usesPurpose = $derived(mentionsPurpose(form?.businessPurposeText ?? ''));
-	const offerForFuture = $derived(
-		addedPurpose &&
-			usesPurpose &&
-			purpose.trim() !== '' &&
-			organizationTemplate !== null &&
-			!mentionsPurpose(organizationTemplate)
-	);
+	const activity = $derived(form?.activity);
 
 	function setPurpose(value: string, options: { debounce?: boolean } = {}) {
-		if (editor.setPurpose(value, options)) addedPurpose = true;
-	}
-
-	async function saveForFuture() {
-		savedForFuture = await editor.saveSentenceForFuture();
+		editor.update({ purpose: value }, options);
 	}
 
 	const selectedPurchaserId = $derived(
@@ -97,99 +68,79 @@
 					{/each}
 				</div>
 			{/if}
-			{#if savedForFuture}
-				<p class="text-sm text-(--quiet)" role="status">
-					New requests will say what they were for, too.
-				</p>
-			{:else if offerForFuture}
-				<p class="text-sm text-(--quiet)">
-					Added “for {purpose.trim()}” to this Business Purpose.
-					<button
-						class="text-(--pine) underline disabled:opacity-60"
-						type="button"
-						disabled={editor.busy}
-						onclick={saveForFuture}>Use this for future requests</button
-					>
-				</p>
-			{:else if purpose.trim() !== '' && !usesPurpose}
-				<p class="text-sm text-(--quiet)">
-					Your Business Purpose sentence doesn’t mention this yet.
-					<button class="text-(--pine) underline" type="button" onclick={() => setPurpose(purpose)}
-						>Add it</button
-					>
-				</p>
-			{/if}
-			{#if sortedTemplates.length > 0}
-				<div class="flex flex-col gap-2 pt-1">
-					<span class="text-sm text-(--quiet)">Or start from a saved sentence</span>
-					<div class="flex flex-wrap gap-2">
-						{#each visibleTemplates as template (template._id)}
-							<Chip
-								selected={template._id === selectedTemplateId}
-								disabled={editor.busy}
-								onclick={() => void editor.applyTemplate(template._id)}
-							>
-								{template.title}
-							</Chip>
-						{/each}
-						{#if sortedTemplates.length > visibleTemplates.length}
-							<button
-								class="px-2 text-sm text-(--quiet) underline hover:text-(--ink)"
-								type="button"
-								onclick={() => (showAllTemplates = true)}
-							>
-								{sortedTemplates.length - visibleTemplates.length} more
-							</button>
-						{/if}
-					</div>
-				</div>
-			{/if}
 		</div>
 
-		<div id="field-activityDate" class="flex flex-col gap-1.5">
+		<div id="field-activity" class="flex flex-col gap-1.5">
 			<span class="flex items-baseline gap-2">
-				<label class="text-sm font-medium text-(--ink)" for="activity-date"
-					>When was the event?</label
-				>
-				<SourceCue source={editor.sourceOf('activityDate')} />
+				<label class="text-sm font-medium text-(--ink)" for="activity-name">Which event?</label>
+				<SourceCue source={editor.sourceOf('activity')} />
 			</span>
-			<div class="flex flex-wrap items-center gap-2">
-				<input
-					id="activity-date"
-					class="input max-w-56"
-					type="date"
-					value={dateInputValue(form?.activityDate)}
-					onchange={(event) => editor.update({ activityDate: event.currentTarget.value })}
-				/>
-				{#if !form?.activityDate && editor.receiptDate}
-					<Chip onclick={() => editor.update({ activityDate: editor.receiptDate })}>
-						Same day as the receipt, {formatDate(editor.receiptDate)}
-					</Chip>
-				{/if}
-			</div>
-			<div class="mt-2 grid gap-3 sm:grid-cols-[10rem_1fr]">
+			<input
+				id="activity-name"
+				class="input"
+				placeholder="Weekly listening event"
+				value={activity?.name ?? ''}
+				oninput={(event) =>
+					editor.updateActivity({ name: event.currentTarget.value }, { debounce: true })}
+			/>
+			<div class="mt-2 grid gap-3 sm:grid-cols-2">
 				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
-					<span>Time <span class="font-normal text-(--quiet)">optional</span></span>
+					<span>Date</span>
+					<input
+						id="activity-date"
+						class="input"
+						type="date"
+						value={dateInputValue(activity?.dates[0])}
+						onchange={(event) =>
+							editor.updateActivity({
+								dates: event.currentTarget.value === '' ? [] : [event.currentTarget.value]
+							})}
+					/>
+				</label>
+				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
+					<span>Time</span>
 					<input
 						id="activity-time"
 						class="input"
 						type="time"
-						value={form?.activityTime ?? ''}
-						onchange={(event) => editor.update({ activityTime: event.currentTarget.value })}
+						value={activity?.time ?? ''}
+						onchange={(event) => editor.updateActivity({ time: event.currentTarget.value })}
 					/>
 				</label>
 				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
-					<span>Location <span class="font-normal text-(--quiet)">optional</span></span>
+					<span>Location</span>
 					<input
 						id="activity-location"
 						class="input"
 						placeholder="EMU Crater Lake Room"
-						value={form?.activityLocation ?? ''}
+						value={activity?.location ?? ''}
 						oninput={(event) =>
-							editor.update({ activityLocation: event.currentTarget.value }, { debounce: true })}
+							editor.updateActivity({ location: event.currentTarget.value }, { debounce: true })}
+					/>
+				</label>
+				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
+					<span>Attendance</span>
+					<input
+						id="activity-attendance"
+						class="input"
+						type="number"
+						min="1"
+						value={activity?.attendance ?? ''}
+						onchange={(event) =>
+							editor.updateActivity({
+								attendance:
+									event.currentTarget.value === '' ? null : Number(event.currentTarget.value)
+							})}
 					/>
 				</label>
 			</div>
+			{#if editor.receiptDate && (activity?.dates.length ?? 0) === 0}
+				<div class="flex flex-wrap gap-2">
+					<Chip onclick={() => editor.updateActivity({ dates: [editor.receiptDate] })}>
+						Same day as the receipt, {formatDate(editor.receiptDate)}
+					</Chip>
+				</div>
+			{/if}
 		</div>
 
 		<fieldset id="field-purchaser" class="flex flex-col gap-3">

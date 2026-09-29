@@ -1,53 +1,170 @@
 import { expect, test } from 'vitest';
 import {
-	formatActivityTime,
-	mentionsPurpose,
-	parseBusinessPurposeText,
-	resolveBusinessPurpose,
-	withPurpose
+	customTextOmissions,
+	generateBusinessPurpose,
+	missingFactLabel,
+	type BusinessPurposeFacts
 } from '../convex/businessPurpose';
 
-test('withPurpose appends the purpose before the closing period', () => {
-	expect(withPurpose('{Student Organization} bought {Item Description} on {Activity Date}.')).toBe(
-		'{Student Organization} bought {Item Description} on {Activity Date} for {Purpose}.'
-	);
-	expect(withPurpose('Snacks for the club  ')).toBe('Snacks for the club for {Purpose}');
-	expect(withPurpose('')).toBe('For {Purpose}.');
-});
+function facts(overrides: Partial<BusinessPurposeFacts> = {}): BusinessPurposeFacts {
+	return {
+		organization: 'Chess Club',
+		purchaser: 'Jordan Lee',
+		vendor: 'Target',
+		items: 'snacks',
+		total: 24.5,
+		purpose: '',
+		eventName: 'Weekly chess night',
+		dates: ['2026-04-07'],
+		time: '19:00',
+		location: 'EMU 101',
+		attendance: 30,
+		openToAllStudents: true,
+		recipients: [],
+		recipientsRequired: false,
+		today: '2026-04-10',
+		...overrides
+	};
+}
 
-test('withPurpose leaves sentences that already mention the purpose alone', () => {
-	expect(withPurpose('Prizes for {Purpose}.')).toBe('Prizes for {Purpose}.');
-	expect(withPurpose('Prizes for {purpose}.')).toBe('Prizes for {purpose}.');
-	expect(mentionsPurpose('Prizes for {Purposes}.')).toBe(false);
-});
-
-test('formatActivityTime turns input times into readable times', () => {
-	expect(formatActivityTime('19:00')).toBe('7:00 PM');
-	expect(formatActivityTime('00:30')).toBe('12:30 AM');
-	expect(formatActivityTime('12:05')).toBe('12:05 PM');
-	expect(formatActivityTime('noon')).toBe('noon');
-});
-
-test('Time and Location resolve in the Business Purpose', () => {
-	const source = parseBusinessPurposeText(
-		'Trivia night on {Activity Date} at {Time} in {Location}.'
-	);
-	const request = {
-		activityDate: '2026-10-02',
-		activityTime: '19:00',
-		activityLocation: 'EMU Crater Lake Room'
-	} as unknown as Parameters<typeof resolveBusinessPurpose>[1];
-	expect(resolveBusinessPurpose(source, request)).toEqual({
-		text: 'Trivia night on October 2, 2026 at 7:00 PM in EMU Crater Lake Room.',
-		unresolved: []
+test('writes two past-tense sentences with every required fact', () => {
+	expect(generateBusinessPurpose(facts())).toEqual({
+		text: 'Chess Club wishes to reimburse Jordan Lee because they purchased snacks from Target for $24.50. The snacks were served at Chess Club’s weekly chess night on Tuesday 04/07 at 7pm in EMU 101, with about 30 students in attendance.',
+		missing: []
 	});
 });
 
-test('Time and Location stay unresolved when empty', () => {
-	const source = parseBusinessPurposeText('At {Time} in {Location}.');
-	const empty = {} as unknown as Parameters<typeof resolveBusinessPurpose>[1];
-	expect(resolveBusinessPurpose(source, empty).unresolved).toEqual([
-		'activityTime',
-		'activityLocation'
+test('names each prize recipient with their 95# and reason', () => {
+	const { text, missing } = generateBusinessPurpose(
+		facts({
+			items: 'a board game',
+			recipientsRequired: true,
+			recipients: [{ name: 'Sam Rivera', uo95: '951000001', reason: 'winning the tournament' }]
+		})
+	);
+	expect(missing).toEqual([]);
+	expect(text).toContain(
+		'The board game was given to Sam Rivera (951000001) for winning the tournament at Chess Club’s weekly chess night'
+	);
+});
+
+test('lists several recipients', () => {
+	const { text } = generateBusinessPurpose(
+		facts({
+			items: 'two puzzle books',
+			recipientsRequired: true,
+			recipients: [
+				{ name: 'Sam Rivera', uo95: '951000001', reason: 'first place' },
+				{ name: 'Avery Chen', uo95: '951000002', reason: 'second place' }
+			]
+		})
+	);
+	expect(text).toContain(
+		'were given to Sam Rivera (951000001) for first place and Avery Chen (951000002) for second place'
+	);
+});
+
+test('recurring supplies list concrete dates', () => {
+	const { text } = generateBusinessPurpose(
+		facts({
+			items: 'name tags',
+			dates: ['2026-04-07', '2026-04-14', '2026-04-21'],
+			today: '2026-04-22'
+		})
+	);
+	expect(text).toContain(
+		'The name tags were used at Chess Club’s weekly chess nights on Tuesdays (04/07, 04/14, 04/21) at 7pm in EMU 101, with about 30 students at each event.'
+	);
+});
+
+test('weaves in what it was for', () => {
+	expect(generateBusinessPurpose(facts({ purpose: 'a snack table' })).text).toContain(
+		'The snacks were used for a snack table at'
+	);
+});
+
+test('never leaves a blank where a fact is missing', () => {
+	const { text, missing } = generateBusinessPurpose(
+		facts({ attendance: null, time: '', location: '', dates: [], eventName: '' })
+	);
+	expect(missing).toEqual(['eventName', 'dates', 'time', 'location', 'attendance']);
+	expect(text).not.toMatch(/about\s+students|\bon\s+at\b|\{|\}|undefined|null/);
+	expect(missing.map(missingFactLabel)).toContain('Add how many students attended');
+});
+
+test('requires complete recipients when gifts or merchandise are selected', () => {
+	expect(generateBusinessPurpose(facts({ recipientsRequired: true })).missing).toEqual([
+		'recipients'
 	]);
+	expect(
+		generateBusinessPurpose(
+			facts({ recipients: [{ name: 'Sam Rivera', uo95: '', reason: 'winning' }] })
+		).missing
+	).toEqual(['recipients']);
+});
+
+test('private events say members, not students', () => {
+	expect(generateBusinessPurpose(facts({ openToAllStudents: false })).text).toContain(
+		'with about 30 members in attendance'
+	);
+});
+
+test('customized text is checked for the facts it seems to omit', () => {
+	expect(
+		customTextOmissions(
+			'We bought snacks from Target for $24.50 on 04/07 for 30 students.',
+			facts()
+		)
+	).toEqual([]);
+	expect(customTextOmissions('We bought snacks.', facts())).toEqual([
+		'vendor',
+		'total',
+		'attendance',
+		'dates'
+	]);
+});
+
+test('a long weekly run reads as a range', () => {
+	const dates = ['2026-03-31', '2026-04-07', '2026-04-14', '2026-04-21', '2026-04-28'];
+	expect(generateBusinessPurpose(facts({ dates, today: '2026-05-01' })).text).toContain(
+		'weekly chess nights every Tuesday from 03/31 through 04/28 at 7pm'
+	);
+});
+
+test('tense follows the event dates', () => {
+	const dates = ['2026-04-07', '2026-04-14'];
+	const verb = (today: string) =>
+		generateBusinessPurpose(facts({ items: 'name tags', dates, today })).text.split('. ')[1];
+	expect(verb('2026-04-20')).toMatch(/^The name tags were used/);
+	expect(verb('2026-04-10')).toMatch(/^The name tags are used/);
+	expect(verb('2026-04-01')).toMatch(/^The name tags will be used/);
+});
+
+test('refers back to long item descriptions briefly', () => {
+	const second = (items: string) =>
+		generateBusinessPurpose(facts({ items, purpose: 'trivia' })).text.split('. ')[1];
+	expect(second('a Quizlet Plus yearly team subscription')).toMatch(
+		/^The subscription was used for trivia/
+	);
+	expect(second('two bulk packs of pretzels')).toMatch(/^The pretzels were used/);
+	expect(second('rope, tape, chalk, and a first aid kit')).toMatch(/^These items were used/);
+	expect(second('cones and pinnies')).toMatch(/^The cones and pinnies were used/);
+});
+
+test('keeps proper nouns and lowercases common words mid-sentence', () => {
+	expect(generateBusinessPurpose(facts({ eventName: 'Game Night' })).text).toContain(
+		'at Chess Club’s Game Night on'
+	);
+	expect(generateBusinessPurpose(facts({ eventName: 'Halloween tournament' })).text).toContain(
+		'at Chess Club’s Halloween tournament on'
+	);
+	expect(generateBusinessPurpose(facts({ eventName: 'Blitz' })).text).toContain(
+		'at Chess Club’s Blitz event on'
+	);
+});
+
+test('gift purposes read as giving', () => {
+	expect(
+		generateBusinessPurpose(facts({ items: 'mugs', purpose: 'gifts for graduating seniors' })).text
+	).toContain('The mugs were given as gifts to graduating seniors at');
 });

@@ -102,7 +102,7 @@ describe('publicity', () => {
 			fileId: 'flyer'
 		});
 		expect(check.detail).toBe(
-			'It says Tuesday 01/20, but the event was Tuesday 01/13. Add publicity for this date.'
+			'It says Tuesday 01/20, but the event was on Tuesday 01/13. Add publicity for this date.'
 		);
 	});
 
