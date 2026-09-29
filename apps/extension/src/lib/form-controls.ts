@@ -38,18 +38,34 @@ export function setChoice(
 	checked: boolean
 ): ControlResult {
 	const choices = Array.from(document.querySelectorAll<HTMLInputElement>(`input[type="${type}"]`));
-	const labels = choices.map((choice) => choiceLabel(choice, type));
-	const index = pickChoice(labels, target);
-	if (index === null) {
-		if (type === 'checkbox' && !checked) return { ok: true };
-		return { ok: false, message: missMessage(`${type}:${target.labelIncludes}`, labels) };
-	}
+	const resolved = resolveChoice(
+		choices.map((choice) => choiceLabel(choice, type)),
+		target,
+		type,
+		checked
+	);
+	if (resolved.type !== 'found') return resolved.result;
 
-	const input = choices[index];
+	const input = choices[resolved.index];
 	if (input.checked !== checked) input.click();
 	dispatchInput(input);
 
 	return { ok: true };
+}
+
+export function resolveChoice(
+	labels: string[],
+	target: ChoiceTarget,
+	type: 'checkbox' | 'radio',
+	checked: boolean
+): { type: 'found'; index: number } | { type: 'absent'; result: ControlResult } {
+	const index = pickChoice(labels, target);
+	if (index !== null) return { type: 'found', index };
+	if (type === 'checkbox' && !checked) return { type: 'absent', result: { ok: true } };
+	return {
+		type: 'absent',
+		result: { ok: false, message: missMessage(`${type}:${target.labelIncludes}`, labels) }
+	};
 }
 
 export function pickChoice(labels: string[], target: ChoiceTarget) {

@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
-import { missMessage, pickChoice, setFiles } from './form-controls';
+import { samplePurchaseRequest } from '@engage-form/domain';
+import { createFillPlan, type FillAction } from '@engage-form/fill-engine';
+import { missMessage, pickChoice, resolveChoice, setFiles } from './form-controls';
 
 const liveDocumentationLabels = [
 	'Your event is using ASUO funds.',
@@ -21,6 +23,53 @@ test('picks the live 2026-27 gifts or logo designs checkbox', () => {
 		5
 	);
 	expect(pickChoice(liveDocumentationLabels, { labelIncludes: 'no alcohol' })).toBeNull();
+});
+
+function documentationPage(categories: typeof samplePurchaseRequest.documentationCategories) {
+	return createFillPlan('documentation', {
+		...samplePurchaseRequest,
+		documentationCategories: categories,
+		organization: { ...samplePurchaseRequest.organization, fundLetter: 'E' }
+	}).actions.filter(
+		(action): action is Extract<FillAction, { type: 'checkbox' }> => action.type === 'checkbox'
+	);
+}
+
+const pageWithoutGifts = liveDocumentationLabels.filter((label) => !label.includes('gifts'));
+
+test('a missing checkbox that should stay unchecked does not fail the page', () => {
+	const results = documentationPage(['food']).map((action) =>
+		resolveChoice(pageWithoutGifts, action, 'checkbox', action.checked)
+	);
+
+	expect(results.filter((result) => result.type === 'absent')).toEqual([
+		{ type: 'absent', result: { ok: true } }
+	]);
+	expect(
+		results.every((result) => result.type === 'found' || result.result.ok),
+		'every Documentation Inquiry action is satisfied'
+	).toBe(true);
+});
+
+test('a missing checkbox that should be checked fails with the labels on the page', () => {
+	const gifts = documentationPage(['gifts_prizes']).find(
+		(action) => action.checked && action.keywords?.includes('gift')
+	);
+
+	expect(resolveChoice(pageWithoutGifts, gifts!, 'checkbox', true)).toEqual({
+		type: 'absent',
+		result: {
+			ok: false,
+			message:
+				'checkbox:gifts or logo designs (this page has: “Your event is using ASUO funds.”, “Your event is having food.”, “This PO involves printing services.”, “This PO involves office supplies/goods.”, “None of the above”)'
+		}
+	});
+});
+
+test('a missing radio always fails', () => {
+	expect(
+		resolveChoice(['Internal PO'], { labelIncludes: 'Personal Reimbursement' }, 'radio', true)
+	).toMatchObject({ type: 'absent', result: { ok: false } });
 });
 
 test('lists the visible labels when a choice is missing', () => {
