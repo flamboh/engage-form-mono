@@ -1,11 +1,5 @@
 import type { Doc } from './_generated/dataModel';
-import {
-	daysLeft,
-	reimbursementDeadline,
-	requestStage,
-	todayInEugene,
-	type Stage
-} from './lifecycle';
+import { requestLifecycle, todayInEugene, type Stage } from './lifecycle';
 
 export type BudgetLine = Doc<'organizations'>['budgetLines'][number];
 
@@ -190,17 +184,9 @@ export function availableFiscalYears(
 }
 
 export function ledgerStage(request: Doc<'purchaseRequests'>, today: string): Stage {
-	return requestStage({
-		status: request.status,
-		lastFilledAt: request.lastFilledAt,
+	return requestLifecycle(request, {
 		reading: false,
-		receiptFactsComplete:
-			request.vendor.trim() !== '' &&
-			request.itemDescription.trim() !== '' &&
-			request.totalAmount > 0 &&
-			request.receiptFileIds.length > 0,
-		activityDates: request.activity.dates,
-		daysLeft: daysLeft(reimbursementDeadline(request.receiptDate ?? null), today),
+		readinessReady: request.status !== 'draft',
 		today
-	});
+	}).stage;
 }

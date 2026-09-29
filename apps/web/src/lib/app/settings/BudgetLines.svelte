@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Doc } from '$convex/_generated/dataModel';
-	import { fiscalYearLabel, fiscalYearOf } from '$lib/app/fiscalYear';
+	import { currentFiscalYear, fiscalYearLabel } from '$convex/budget';
 	import Button from '$lib/ui/Button.svelte';
 	import Chip from '$lib/ui/Chip.svelte';
 	import InlineError from '$lib/ui/InlineError.svelte';
@@ -19,7 +19,7 @@
 		onsave: (lines: BudgetLine[]) => Promise<string | null>;
 	} = $props();
 
-	const currentYear = fiscalYearOf(Date.now());
+	const currentYear = currentFiscalYear(Date.now());
 	let year = $state(currentYear);
 	let adding = $state(false);
 	let newLine = $state('');

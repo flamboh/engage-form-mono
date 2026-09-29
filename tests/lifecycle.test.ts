@@ -3,7 +3,6 @@ import {
 	daysLeft,
 	effectiveStatus,
 	finishAfter,
-	fiscalYearOf,
 	reimbursementDeadline,
 	requestLifecycle,
 	requestStage,
@@ -95,12 +94,6 @@ describe('dates', () => {
 		expect(requestStage({ ...draft, today: lateNight })).toBe('after_event');
 		const nextMorning = todayInEugene(Date.parse('2026-10-07T08:00:00Z'));
 		expect(requestStage({ ...draft, today: nextMorning })).toBe('to_finish');
-	});
-
-	test('fiscal years start on July 1', () => {
-		expect(fiscalYearOf('2026-06-30')).toBe(2025);
-		expect(fiscalYearOf('2026-07-01')).toBe(2026);
-		expect(fiscalYearOf('bad')).toBeNull();
 	});
 });
 

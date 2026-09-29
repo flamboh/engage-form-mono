@@ -2,7 +2,8 @@ import { z } from 'zod/v4';
 import { zid } from 'convex-helpers/server/zod4';
 import type { Doc } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
-import { fiscalYearOf, requestLifecycle, todayInEugene, type Stage } from '../lifecycle';
+import { fiscalYearOfDate, requestFiscalYear } from '../budget';
+import { requestLifecycle, todayInEugene, type Stage } from '../lifecycle';
 import { ownerFromIdentity, readinessWithChecks, requireOwnedDoc } from '../purchaseModel';
 import { requestExtractions } from '../checks/load';
 import type { PurchaseReadiness } from '../purchaseReadiness';
@@ -120,9 +121,9 @@ export const organizationBoard = authedQuery({
 		);
 		const group = (landing: Stage) =>
 			items.filter((item) => item.landing === landing).map((item) => item.item);
-		const fiscalYear = fiscalYearOf(today);
+		const fiscalYear = fiscalYearOfDate(today);
 		const approvedThisYear = approved.filter(
-			(request) => fiscalYearOf(purchaseDate(request)) === fiscalYear
+			(request) => requestFiscalYear(request) === fiscalYear
 		);
 		return {
 			organization: {
@@ -219,10 +220,6 @@ async function placedItem(ctx: QueryCtx, request: Doc<'purchaseRequests'>, today
 		updatedAt: request.updatedAt
 	};
 	return { landing, item };
-}
-
-function purchaseDate(request: Doc<'purchaseRequests'>) {
-	return request.receiptDate ?? todayInEugene(request.createdAt);
 }
 
 function roundCents(value: number) {

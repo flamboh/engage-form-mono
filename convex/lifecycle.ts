@@ -50,12 +50,6 @@ export function finishAfter(activityDates: string[]): string | null {
 	return dates.at(-1) ?? null;
 }
 
-export function fiscalYearOf(date: string): number | null {
-	const match = isoDate.exec(date);
-	if (match === null) return null;
-	return +match[2] >= 7 ? +match[1] : +match[1] - 1;
-}
-
 export function receiptFactsComplete(input: {
 	vendor: string;
 	itemDescription: string;
