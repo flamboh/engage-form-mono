@@ -9,6 +9,7 @@
 		label,
 		type = 'text',
 		highlight = false,
+		hint = true,
 		class: className = '',
 		editing = $bindable(false),
 		oncommit
@@ -19,6 +20,7 @@
 		label: string;
 		type?: 'text' | 'money' | 'date' | 'time' | 'number';
 		highlight?: boolean;
+		hint?: boolean;
 		class?: string;
 		editing?: boolean;
 		oncommit: (value: string) => void;
@@ -78,10 +80,12 @@
 		{:else}
 			<span class="text-(--quiet)">{placeholder}</span>
 		{/if}
-		<span
-			class="shrink-0 self-center text-xs font-normal text-(--quiet) opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-			aria-hidden="true">Edit</span
-		>
+		{#if hint}
+			<span
+				class="shrink-0 self-center text-xs font-normal text-(--quiet) opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+				aria-hidden="true">Edit</span
+			>
+		{/if}
 	</button>
 {/if}
 

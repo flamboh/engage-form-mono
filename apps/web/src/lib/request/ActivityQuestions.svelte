@@ -196,9 +196,10 @@
 				{/if}
 			</div>
 
-			<div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-base text-(--ink)">
-				<span id="field-time">
+			<p class="sentence text-base leading-loose text-(--ink)">
+				<span id="field-time" class="fact">
 					<EditableValue
+						hint={false}
 						label="Start time"
 						placeholder="Add time"
 						type="time"
@@ -209,8 +210,9 @@
 					/>
 				</span>
 				<span class="text-(--quiet)">in</span>
-				<span id="field-location">
+				<span id="field-location" class="fact">
 					<EditableValue
+						hint={false}
 						label="Location"
 						placeholder="Add building and room"
 						value={activity.location}
@@ -219,8 +221,9 @@
 					/>
 				</span>
 				<span class="text-(--quiet)">with about</span>
-				<span id="field-attendance">
+				<span id="field-attendance" class="fact">
 					<EditableValue
+						hint={false}
 						label="Students attending"
 						placeholder="how many"
 						type="number"
@@ -230,7 +233,7 @@
 					/>
 				</span>
 				<span class="text-(--quiet)">students</span>
-			</div>
+			</p>
 
 			<div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
 				<label class="flex items-center gap-2 text-(--ink)">
@@ -264,6 +267,17 @@
 </div>
 
 <style>
+	.fact {
+		display: inline-block;
+		margin: 0 0.125rem;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
+	.fact :global(button) {
+		border-bottom: 1px dashed var(--quiet);
+	}
+
 	.new {
 		border-color: var(--quiet);
 		color: var(--ink);
