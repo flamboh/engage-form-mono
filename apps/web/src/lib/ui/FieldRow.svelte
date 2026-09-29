@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack, type Snippet } from 'svelte';
 	import SourceCue from './SourceCue.svelte';
-	import type { FieldSource } from './types';
+	import type { Cue } from './types';
 
 	let {
 		label,
@@ -19,7 +19,7 @@
 		label: string;
 		value: string;
 		display?: string;
-		cue?: FieldSource;
+		cue?: Cue;
 		type?: 'text' | 'money' | 'date' | 'time' | 'number' | 'textarea';
 		placeholder?: string;
 		actionLabel?: string;

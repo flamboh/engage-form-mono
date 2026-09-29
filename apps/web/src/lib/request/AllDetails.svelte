@@ -181,7 +181,7 @@
 			label="Involves"
 			value={involvesText}
 			placeholder="Nothing special"
-			cue={editor.sourceOf('documentationCategories') === 'suggested' ? 'suggested' : undefined}
+			cue={editor.sourceOf('documentationCategories') === 'suggested' ? 'items' : undefined}
 			actionLabel="Change"
 			readonly={locked}
 			onaction={() => toggle('involves')}

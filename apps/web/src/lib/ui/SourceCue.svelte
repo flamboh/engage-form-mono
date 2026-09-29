@@ -1,20 +1,20 @@
 <script lang="ts">
-	import type { FieldSource } from './types';
+	import type { Cue } from './types';
 
 	let {
 		source,
 		label
 	}: {
-		source: FieldSource | 'event' | 'items' | undefined;
+		source: Cue | undefined;
 		label?: string;
 	} = $props();
 
-	const labels: Partial<Record<FieldSource | 'event' | 'items', string>> = {
+	const labels: Partial<Record<Cue, string>> = {
 		receipt: 'from receipt',
 		previous: 'same as last time',
 		suggested: 'suggested',
 		event: 'from the event',
-		items: 'from the items'
+		items: 'from items'
 	};
 	const text = $derived(label ?? (source === undefined ? '' : (labels[source] ?? '')));
 </script>
