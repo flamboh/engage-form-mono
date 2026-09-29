@@ -75,6 +75,7 @@
 			.map((check) => ({ title: check.title, blocking: check.severity === 'blocking' }));
 	}
 	const empty = $derived(documents.length === 0 && inFlight.length === 0);
+	const reading = $derived(documents.some((document) => document.reading));
 
 	function hasFiles(event: DragEvent) {
 		return !locked && (event.dataTransfer?.types.includes('Files') ?? false);
@@ -168,7 +169,7 @@
 				/>
 			</li>
 		{/each}
-		{#if !locked}
+		{#if !locked && !reading}
 			<li class={['flex shrink-0', empty && 'lg:col-span-2']}>
 				{#if empty}
 					<FilePick
