@@ -7,9 +7,8 @@ import { requestLifecycle, todayInEugene, type Stage } from '../lifecycle';
 import { ownerFromIdentity, readinessWithChecks, requireOwnedDoc } from '../purchaseModel';
 import { requestExtractions } from '../checks/load';
 import type { PurchaseReadiness } from '../purchaseReadiness';
+import { reasonStep, sentBackStep, stage } from '../requestView';
 import { authedMutation, authedQuery } from './helpers';
-
-const stage = z.enum(['reading', 'after_event', 'to_finish', 'ready', 'filled', 'approved']);
 
 const boardItem = z.object({
 	id: zid('purchaseRequests'),
@@ -31,30 +30,6 @@ const boardItem = z.object({
 
 export type BoardItem = z.infer<typeof boardItem>;
 
-export const sentBackStep = 'Fix what Engage sent back';
-
-const nextStepRules: [RegExp, string][] = [
-	[/^Your UO ID/, 'Add your UO ID (front and back)'],
-	[/^Purchaser UO ID/, 'Add their UO ID (front and back)'],
-	[/^Receipt document missing/, 'Add a receipt'],
-	[/^Receipt documents are limited/, 'Keep it to three receipts'],
-	[/^Vendor missing/, 'Add where it was bought'],
-	[/^Total amount/, 'Add the total'],
-	[/^Item description missing/, 'Say what was bought'],
-	[/^Business purpose/, 'Say what it was for'],
-	[/^Budget line/, 'Pick a budget line'],
-	[/^Recipient/, 'Add who received it'],
-	[/^Office location missing/, 'Add where it will be kept'],
-	[/^Second approval missing/, 'Add a second approval'],
-	[/^Publicity proof missing/, 'Add proof the event was advertised'],
-	[/^Printing invoice missing/, 'Add the printing invoice'],
-	[/^Purchaser profile must belong/, 'Choose who paid again'],
-	[/^(Purchaser|ID card)/, 'Finish who paid'],
-	[/^Requester/, 'Finish your profile'],
-	[/^(Student organization|Index number)/, 'Finish the organization details'],
-	[/^Type of Purchase/, 'Only reimbursements are supported']
-];
-
 const reasonPriority = [
 	'Receipt document missing.',
 	'Vendor missing.',
@@ -68,18 +43,18 @@ export function plainNextStep(
 	checks: { severity: 'blocking' | 'warning'; title: string }[]
 ): string | null {
 	const reasons = readiness.sections
-		.flatMap((section) => section.reasons)
-		.filter((reason) => !checks.some((check) => check.title === reason));
+		.flatMap((section) => section.reasons.map((reason) => ({ section: section.section, reason })))
+		.filter((item) => !checks.some((check) => check.title === item.reason));
 	const blocking = checks.find((check) => check.severity === 'blocking');
-	if (reasons.includes(reasonPriority[0])) return 'Add a receipt';
+	if (reasons.some((item) => item.reason === reasonPriority[0])) return 'Add a receipt';
 	if (blocking !== undefined) return blocking.title;
-	if (reasons.length === 0) return null;
 	const first =
-		reasonPriority.find((reason) => reasons.includes(reason)) ??
-		reasons.find((reason) => !reason.startsWith('Business purpose has')) ??
+		reasonPriority
+			.map((reason) => reasons.find((item) => item.reason === reason))
+			.find((item) => item !== undefined) ??
+		reasons.find((item) => !item.reason.startsWith('Business purpose has')) ??
 		reasons[0];
-	const rule = nextStepRules.find(([pattern]) => pattern.test(first));
-	return rule === undefined ? first.replace(/\.$/, '') : rule[1];
+	return first === undefined ? null : reasonStep(first.section, first.reason).title;
 }
 
 const openLimit = 50;

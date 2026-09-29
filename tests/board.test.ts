@@ -1,11 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
-import {
-	markSentBack,
-	organizationBoard,
-	plainNextStep,
-	sentBackStep
-} from '../convex/authed/board';
+import { markSentBack, organizationBoard, plainNextStep } from '../convex/authed/board';
+import { sentBackStep } from '../convex/requestView';
 import { readinessWithChecks } from '../convex/purchaseModel';
 import type { DocumentFacts } from '../convex/extraction/facts';
 

@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 import { requestSteps, type StepContext } from '../apps/web/src/lib/request/steps';
-import { plainNextStep, sentBackStep } from '../convex/authed/board';
+import { plainNextStep } from '../convex/authed/board';
 import type { Id } from '../convex/_generated/dataModel';
-import type { RequestCheck } from '../convex/requestView';
+import { sentBackStep, type RequestCheck } from '../convex/requestView';
 
 const file = (id: string) => id as Id<'files'>;
 
