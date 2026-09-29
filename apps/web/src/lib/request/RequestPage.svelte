@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Doc, Id } from '$convex/_generated/dataModel';
+	import type { MissingFact } from '$convex/businessPurpose';
 	import type { DocumentSlot, RequestView } from '$convex/requestView';
 	import { requirementPanelsFor, type RequirementPanel } from '$lib/purchase/builderFlow';
 	import type { SavedData } from '$lib/purchase/draftDetails';
@@ -22,6 +23,7 @@
 		view,
 		saved,
 		user,
+		events = [],
 		recentPurposes = [],
 		approvers = [],
 		organizationId,
@@ -32,6 +34,7 @@
 		view: RequestView | undefined;
 		saved: SavedData | undefined;
 		user: Doc<'users'> | null;
+		events?: Doc<'events'>[];
 		recentPurposes?: string[];
 		approvers?: SavedApprover[];
 		organizationId: Id<'organizations'>;
@@ -62,11 +65,6 @@
 	);
 	const purchasers = $derived(
 		(saved?.purchasers ?? []).filter((purchaser) => purchaser.organizationId === organizationId)
-	);
-	const templates = $derived(
-		(saved?.businessPurposeTemplates ?? []).filter(
-			(template) => template.organizationId === organizationId
-		)
 	);
 	const inFlight = $derived(
 		pending.filter((upload) => upload.status === 'uploading' || upload.status === 'attaching')
@@ -100,21 +98,13 @@
 			.map(panelSlot)
 			.filter((slot): slot is DocumentSlot => slot !== null && !hasDocument(slot))
 	);
-	const unresolvedVariables = $derived(
-		[...(view?.businessPurposeText ?? '').matchAll(/\{([^{}]+)\}/g)].map((match) => match[1])
-	);
-	const purposeMissing = $derived(
-		form !== null && form.businessPurposeText.includes('{Purpose}') && form.purpose.trim() === ''
-	);
 	const items = $derived(
 		view === undefined
 			? []
 			: whatsLeft({
 					readiness: view.readiness,
 					reviews: editor.reviews,
-					reading,
-					purposeMissing,
-					onlyPurposeUnresolved: unresolvedVariables.every((name) => name === 'Purpose')
+					reading
 				}).filter((item) => item.target.kind !== 'slot' || !uploadingSlots.has(item.target.slot))
 	);
 	const deferReceiptFields = $derived(reading || missingSlots.includes('receipt'));
@@ -145,6 +135,19 @@
 		if (slot === 'recipient_list') return false;
 		return form[slotField[slot]] !== null;
 	}
+
+	const factField: Record<MissingFact, string> = {
+		vendor: 'vendor',
+		items: 'itemDescription',
+		total: 'totalAmount',
+		purchaser: 'purchaser',
+		eventName: 'event',
+		dates: 'dates',
+		time: 'time',
+		location: 'location',
+		attendance: 'attendance',
+		recipients: 'recipients'
+	};
 
 	const uploadingItem: LeftItem = {
 		key: 'uploading',
@@ -189,14 +192,24 @@
 	function jumpTo(target: LeftTarget) {
 		if (target.kind === 'link') return;
 		if (target.kind === 'field' && target.field === 'details') detailsOpen = true;
-		const id =
+		jumpToId(
 			target.kind === 'slot'
 				? `slot-${target.slot}`
 				: target.kind === 'review'
 					? `review-${target.field}`
-					: `field-${target.field}`;
+					: `field-${target.field}`
+		);
+	}
+
+	function jumpToFact(fact: MissingFact) {
+		jumpToId(`field-${factField[fact]}`, 'field-event');
+	}
+
+	function jumpToId(id: string, fallback?: string) {
 		requestAnimationFrame(() => {
-			const element = document.getElementById(id);
+			const element =
+				document.getElementById(id) ??
+				(fallback === undefined ? null : document.getElementById(fallback));
 			if (element === null) return;
 			const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 			element.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
@@ -281,20 +294,23 @@
 						{fundLetter}
 						{budgetLines}
 						{purchasers}
-						{templates}
+						{events}
 						{recentPurposes}
-						organizationTemplate={organization?.businessPurposeTemplate ?? null}
 						userName={user?.name ?? purchase.requester.name}
 						section="why"
 					/>
 					<PurchaseSummary {editor} {reading} />
-					<BusinessPurposeCard {editor} resolvedText={view.businessPurposeText} />
+					<BusinessPurposeCard
+						{editor}
+						text={view.businessPurposeText}
+						missing={view.businessPurposeMissing}
+						onjump={jumpToFact}
+					/>
 					<RequestQuestions
 						{editor}
 						{fundLetter}
 						{budgetLines}
 						{purchasers}
-						{templates}
 						{recentPurposes}
 						userName={user?.name ?? purchase.requester.name}
 						section="funding"

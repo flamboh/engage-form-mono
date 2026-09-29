@@ -8,10 +8,9 @@
 		inputClass,
 		labelClass,
 		primaryButtonClass,
-		secondaryButtonClass,
-		textareaClass
+		secondaryButtonClass
 	} from '$lib/app/styles';
-	import { DEFAULT_BUSINESS_PURPOSE, SUGGESTED_BUDGET_LINES } from '$lib/welcome/defaults';
+	import { SUGGESTED_BUDGET_LINES } from '$lib/welcome/defaults';
 	import { useConvexClient } from 'convex-svelte';
 
 	type FundLetter = Doc<'organizations'>['fundLetter'];
@@ -19,13 +18,11 @@
 	let {
 		organization,
 		submitLabel,
-		showTemplate = false,
 		onSaved,
 		onCancel
 	}: {
 		organization: Doc<'organizations'> | null;
 		submitLabel: string;
-		showTemplate?: boolean;
 		onSaved: (id: Id<'organizations'>) => void | Promise<void>;
 		onCancel?: () => void;
 	} = $props();
@@ -40,7 +37,6 @@
 	let fundLetter = $state<FundLetter>(start?.fundLetter ?? 'I');
 	let budgetLines = $state<string[]>(start ? [...start.budgetLines] : []);
 	let newLine = $state('');
-	let businessPurposeTemplate = $state(start?.businessPurposeTemplate ?? DEFAULT_BUSINESS_PURPOSE);
 	let saving = $state(false);
 	let error = $state('');
 
@@ -81,8 +77,7 @@
 				name: name.trim(),
 				indexNumber: indexNumber.trim(),
 				fundLetter,
-				budgetLines: lines,
-				businessPurposeTemplate
+				budgetLines: lines
 			});
 			newLine = '';
 			budgetLines = lines;
@@ -204,16 +199,6 @@
 			</div>
 		{/if}
 	</div>
-
-	{#if showTemplate}
-		<label class={labelClass}>
-			Default business purpose
-			<span class={hintClass}>
-				Words in braces, like {'{Vendor}'} or {'{Total Amount}'}, fill in from each request.
-			</span>
-			<textarea class={textareaClass} required bind:value={businessPurposeTemplate}></textarea>
-		</label>
-	{/if}
 
 	{#if error}<p class="text-sm text-red-700" role="alert">{error}</p>{/if}
 	<div class="flex items-center gap-3">

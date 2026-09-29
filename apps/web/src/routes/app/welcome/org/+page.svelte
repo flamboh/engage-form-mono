@@ -13,5 +13,5 @@
 <OrganizationForm
 	organization={null}
 	submitLabel="Continue"
-	onSaved={() => goto('/app/welcome/extension')}
+	onSaved={() => goto('/app/welcome/event')}
 />

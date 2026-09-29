@@ -1,6 +1,5 @@
 <script lang="ts">
-	import type { Id } from '$convex/_generated/dataModel';
-	import { parseBusinessPurposeText } from '$convex/businessPurpose';
+	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import type { DocumentSlot, RequestView } from '$convex/requestView';
 	import { startUploads, uploadsFor, type UploadTransport } from '$lib/uploads.svelte';
 	import type { RequestBackend } from '../editor.svelte';
@@ -11,6 +10,7 @@
 	import {
 		mockApprovers,
 		mockEngageUrl,
+		mockEvents,
 		mockOrganizationId,
 		mockRead,
 		mockReceiptImage,
@@ -28,6 +28,7 @@
 	const initial = scenarioView(initialScenario);
 	let view = $state<RequestView>(initial);
 	let approvers = $state<SavedApprover[]>(mockApprovers());
+	let events = $state<Doc<'events'>[]>(initialScenario === 'no-events' ? [] : mockEvents);
 	const pending = $derived(uploadsFor(mockRequestId));
 	const session = { getToken: async () => null };
 	const files: Record<string, File> = {};
@@ -46,6 +47,7 @@
 		const next = await withReadiness($state.snapshot(view) as RequestView);
 		view.readiness = next.readiness;
 		view.businessPurposeText = next.businessPurposeText;
+		view.businessPurposeMissing = next.businessPurposeMissing;
 	}
 
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -98,26 +100,25 @@
 	const backend: RequestBackend = {
 		saveSnapshot: async (snapshot) => {
 			await wait(120);
-			const { businessPurposeText, totalAmount, ...rest } = snapshot;
-			Object.assign(view.purchase, rest, {
-				totalAmount: totalAmount ?? 0,
-				businessPurposeSource: parseBusinessPurposeText(businessPurposeText)
-			});
+			const { totalAmount, ...rest } = snapshot;
+			Object.assign(view.purchase, rest, { totalAmount: totalAmount ?? 0 });
 			await refresh();
 		},
-		applyTemplate: async (templateId) => {
+		saveEvent: async ({ id, ...details }) => {
 			await wait(150);
-			const template = mockSaved.businessPurposeTemplates.find((item) => item._id === templateId);
-			if (template === undefined) throw new Error('Template not found.');
-			view.purchase.businessPurposeSource = parseBusinessPurposeText(
-				template.businessPurposeTemplate
-			);
-			view.purchase.businessPurposeTouched = true;
-			await refresh();
-		},
-		saveOrganizationTemplate: async (businessPurposeTemplate) => {
-			await wait(150);
-			mockSaved.organizations[0].businessPurposeTemplate = businessPurposeTemplate;
+			const eventId = id ?? (`mock_event_${++counter}` as Id<'events'>);
+			const saved: Doc<'events'> = {
+				_id: eventId,
+				_creationTime: Date.now(),
+				owner: 'mock',
+				organizationId: mockOrganizationId,
+				...details,
+				lastUsedAt: Date.now(),
+				archived: false,
+				updatedAt: Date.now()
+			};
+			events = [saved, ...events.filter((item) => item._id !== eventId)];
+			return eventId;
 		},
 		resolveReview: async (field, value) => {
 			await wait(150);
@@ -211,6 +212,7 @@
 		'gear swap supplies'
 	]}
 	{approvers}
+	{events}
 	organizationId={mockOrganizationId}
 	{pending}
 	{backend}

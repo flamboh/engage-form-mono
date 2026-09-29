@@ -17,7 +17,7 @@
 		display?: string;
 		placeholder: string;
 		label: string;
-		type?: 'text' | 'money' | 'date';
+		type?: 'text' | 'money' | 'date' | 'time' | 'number';
 		highlight?: boolean;
 		class?: string;
 		editing?: boolean;
@@ -47,8 +47,8 @@
 		<input
 			class="w-full border border-(--pine) bg-white px-2 py-1 text-(--ink) outline-none focus-visible:ring-2 focus-visible:ring-(--pine)/30"
 			class:pl-5={type === 'money'}
-			type={type === 'date' ? 'date' : 'text'}
-			inputmode={type === 'money' ? 'decimal' : undefined}
+			type={type === 'date' || type === 'time' ? type : 'text'}
+			inputmode={type === 'money' ? 'decimal' : type === 'number' ? 'numeric' : undefined}
 			aria-label={label}
 			bind:value={draft}
 			onblur={commit}
@@ -61,7 +61,7 @@
 					draft = type === 'date' ? dateInputValue(value) : value;
 					node.value = draft;
 					node.focus();
-					if (type !== 'date') node.select();
+					if (type !== 'date' && type !== 'time') node.select();
 				})}
 		/>
 	</span>

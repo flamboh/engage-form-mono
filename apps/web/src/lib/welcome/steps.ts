@@ -1,4 +1,4 @@
-export const WELCOME_STEPS = ['profile', 'org', 'extension'] as const;
+export const WELCOME_STEPS = ['profile', 'org', 'event', 'extension'] as const;
 export type WelcomeStep = (typeof WELCOME_STEPS)[number];
 
 export type WelcomeState = {
@@ -19,5 +19,6 @@ export function wizardComplete(state: WelcomeState): boolean {
 export const STEP_LABELS: Record<WelcomeStep, string> = {
 	profile: 'About you',
 	org: 'Your organization',
+	event: 'Regular event',
 	extension: 'Chrome extension'
 };

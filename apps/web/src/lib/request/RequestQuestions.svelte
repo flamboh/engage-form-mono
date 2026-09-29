@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { Doc } from '$convex/_generated/dataModel';
-	import { mentionsPurpose } from '$convex/businessPurpose';
 	import type { FundLetter } from '$lib/purchase/draftDetails';
+	import ActivityQuestions from './ActivityQuestions.svelte';
 	import Chip from './Chip.svelte';
 	import type { RequestEditor } from './editor.svelte';
-	import { categoryOptions, dateInputValue, formatDate } from './labels';
+	import { categoryOptions } from './labels';
 	import RecipientsEditor from './RecipientsEditor.svelte';
 	import SourceCue from './SourceCue.svelte';
 
@@ -13,9 +13,8 @@
 		fundLetter,
 		budgetLines,
 		purchasers,
-		templates,
+		events = [],
 		recentPurposes = [],
-		organizationTemplate = null,
 		userName,
 		section
 	}: {
@@ -23,29 +22,15 @@
 		fundLetter: FundLetter;
 		budgetLines: string[];
 		purchasers: Doc<'purchasers'>[];
-		templates: Doc<'businessPurposeTemplates'>[];
+		events?: Doc<'events'>[];
 		recentPurposes?: string[];
-		organizationTemplate?: string | null;
 		userName: string;
 		section: 'why' | 'funding';
 	} = $props();
 
-	let showAllTemplates = $state(false);
-	let addedPurpose = $state(false);
-	let savedForFuture = $state(false);
-
 	const form = $derived(editor.form);
 	const categories = $derived(new Set(form?.documentationCategories ?? []));
 	const asuoForced = $derived(fundLetter === 'I');
-	const sortedTemplates = $derived([...templates].sort((a, b) => b.updatedAt - a.updatedAt));
-	const visibleTemplates = $derived(
-		showAllTemplates ? sortedTemplates : sortedTemplates.slice(0, 5)
-	);
-	const selectedTemplateId = $derived(
-		sortedTemplates.find(
-			(template) => template.businessPurposeTemplate === form?.businessPurposeText
-		)?._id
-	);
 	const needsRecipients = $derived(
 		categories.has('merchandise_apparel') || categories.has('gifts_prizes')
 	);
@@ -54,23 +39,6 @@
 	const purposeChips = $derived(
 		recentPurposes.filter((item) => item.toLowerCase() !== purpose.trim().toLowerCase())
 	);
-	const usesPurpose = $derived(mentionsPurpose(form?.businessPurposeText ?? ''));
-	const offerForFuture = $derived(
-		addedPurpose &&
-			usesPurpose &&
-			purpose.trim() !== '' &&
-			organizationTemplate !== null &&
-			!mentionsPurpose(organizationTemplate)
-	);
-
-	function setPurpose(value: string, options: { debounce?: boolean } = {}) {
-		if (editor.setPurpose(value, options)) addedPurpose = true;
-	}
-
-	async function saveForFuture() {
-		savedForFuture = await editor.saveSentenceForFuture();
-	}
-
 	const selectedPurchaserId = $derived(
 		form?.purchaserSource.kind === 'purchaser' ? form.purchaserSource.purchaserId : null
 	);
@@ -78,6 +46,8 @@
 
 {#if section === 'why'}
 	<div class="flex flex-col gap-7">
+		<ActivityQuestions {editor} {events} />
+
 		<div id="field-why" class="flex flex-col gap-3">
 			<label class="text-lg font-semibold text-(--ink)" for="purpose-input">What was it for?</label>
 			<input
@@ -85,111 +55,19 @@
 				class="input"
 				maxlength="200"
 				autocomplete="off"
-				placeholder="Prizes for trivia night"
+				placeholder="Snacks to bring members together"
 				value={purpose}
-				oninput={(event) => setPurpose(event.currentTarget.value, { debounce: true })}
+				oninput={(event) =>
+					editor.update({ purpose: event.currentTarget.value }, { debounce: true })}
 			/>
 			{#if purposeChips.length > 0}
 				<div class="flex flex-wrap items-center gap-2" aria-label="Recent answers">
 					<span class="text-xs text-(--quiet)">Recent</span>
 					{#each purposeChips as item (item)}
-						<Chip onclick={() => setPurpose(item)}>{item}</Chip>
+						<Chip onclick={() => editor.update({ purpose: item })}>{item}</Chip>
 					{/each}
 				</div>
 			{/if}
-			{#if savedForFuture}
-				<p class="text-sm text-(--quiet)" role="status">
-					New requests will say what they were for, too.
-				</p>
-			{:else if offerForFuture}
-				<p class="text-sm text-(--quiet)">
-					Added “for {purpose.trim()}” to this Business Purpose.
-					<button
-						class="text-(--pine) underline disabled:opacity-60"
-						type="button"
-						disabled={editor.busy}
-						onclick={saveForFuture}>Use this for future requests</button
-					>
-				</p>
-			{:else if purpose.trim() !== '' && !usesPurpose}
-				<p class="text-sm text-(--quiet)">
-					Your Business Purpose sentence doesn’t mention this yet.
-					<button class="text-(--pine) underline" type="button" onclick={() => setPurpose(purpose)}
-						>Add it</button
-					>
-				</p>
-			{/if}
-			{#if sortedTemplates.length > 0}
-				<div class="flex flex-col gap-2 pt-1">
-					<span class="text-sm text-(--quiet)">Or start from a saved sentence</span>
-					<div class="flex flex-wrap gap-2">
-						{#each visibleTemplates as template (template._id)}
-							<Chip
-								selected={template._id === selectedTemplateId}
-								disabled={editor.busy}
-								onclick={() => void editor.applyTemplate(template._id)}
-							>
-								{template.title}
-							</Chip>
-						{/each}
-						{#if sortedTemplates.length > visibleTemplates.length}
-							<button
-								class="px-2 text-sm text-(--quiet) underline hover:text-(--ink)"
-								type="button"
-								onclick={() => (showAllTemplates = true)}
-							>
-								{sortedTemplates.length - visibleTemplates.length} more
-							</button>
-						{/if}
-					</div>
-				</div>
-			{/if}
-		</div>
-
-		<div id="field-activityDate" class="flex flex-col gap-1.5">
-			<span class="flex items-baseline gap-2">
-				<label class="text-sm font-medium text-(--ink)" for="activity-date"
-					>When was the event?</label
-				>
-				<SourceCue source={editor.sourceOf('activityDate')} />
-			</span>
-			<div class="flex flex-wrap items-center gap-2">
-				<input
-					id="activity-date"
-					class="input max-w-56"
-					type="date"
-					value={dateInputValue(form?.activityDate)}
-					onchange={(event) => editor.update({ activityDate: event.currentTarget.value })}
-				/>
-				{#if !form?.activityDate && editor.receiptDate}
-					<Chip onclick={() => editor.update({ activityDate: editor.receiptDate })}>
-						Same day as the receipt, {formatDate(editor.receiptDate)}
-					</Chip>
-				{/if}
-			</div>
-			<div class="mt-2 grid gap-3 sm:grid-cols-[10rem_1fr]">
-				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
-					<span>Time <span class="font-normal text-(--quiet)">optional</span></span>
-					<input
-						id="activity-time"
-						class="input"
-						type="time"
-						value={form?.activityTime ?? ''}
-						onchange={(event) => editor.update({ activityTime: event.currentTarget.value })}
-					/>
-				</label>
-				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
-					<span>Location <span class="font-normal text-(--quiet)">optional</span></span>
-					<input
-						id="activity-location"
-						class="input"
-						placeholder="EMU Crater Lake Room"
-						value={form?.activityLocation ?? ''}
-						oninput={(event) =>
-							editor.update({ activityLocation: event.currentTarget.value }, { debounce: true })}
-					/>
-				</label>
-			</div>
 		</div>
 
 		<fieldset id="field-purchaser" class="flex flex-col gap-3">
