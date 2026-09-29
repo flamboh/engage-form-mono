@@ -269,6 +269,11 @@
 			padding-bottom: 2px;
 		}
 
+		.filters > :global(*) {
+			flex-shrink: 0;
+			white-space: nowrap;
+		}
+
 		.ledger {
 			table-layout: fixed;
 		}
