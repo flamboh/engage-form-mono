@@ -2,7 +2,7 @@ import { z } from 'zod/v4';
 import { zid } from 'convex-helpers/server/zod4';
 import type { Doc } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
-import { fiscalYearOfDate, requestFiscalYear } from '../budget';
+import { fiscalYearOfDate, hasAllocations, requestFiscalYear } from '../budget';
 import { requestLifecycle, todayInEugene, type Stage } from '../lifecycle';
 import { ownerFromIdentity, readinessWithChecks, requireOwnedDoc } from '../purchaseModel';
 import { requestExtractions } from '../checks/load';
@@ -129,7 +129,7 @@ export const organizationBoard = authedQuery({
 			organization: {
 				id: organization._id,
 				name: organization.name,
-				hasAllocations: organization.budgetLines.some((line) => line.allocations.length > 0)
+				hasAllocations: hasAllocations(organization.budgetLines)
 			},
 			readyToFill: group('ready').sort(byUpdatedAt),
 			toFinish: group('to_finish').sort(byDaysLeft),

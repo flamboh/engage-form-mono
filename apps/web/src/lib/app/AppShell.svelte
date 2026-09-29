@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
+	import { hasAllocations } from '$convex/budget';
 	import AccountMenu from '$lib/app/AccountMenu.svelte';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
 	import { useQuery } from 'convex-svelte';
@@ -29,14 +30,12 @@
 		);
 	});
 	const homeHref = $derived(current ? `/app/org/${current._id}` : '/app');
-	const hasAllocations = $derived(
-		current?.budgetLines.some((line) => line.allocations.length > 0) ?? false
-	);
+	const tracking = $derived(current ? hasAllocations(current.budgetLines) : false);
 	const tabs = $derived(
 		current
 			? [
 					{ href: `/app/org/${current._id}`, label: 'Requests', match: 'requests' },
-					...(hasAllocations
+					...(tracking
 						? [{ href: `/app/org/${current._id}/budget`, label: 'Budget', match: 'budget' }]
 						: [])
 				]

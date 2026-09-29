@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api } from '$convex/_generated/api';
 	import type { Doc } from '$convex/_generated/dataModel';
+	import { hasAllocations } from '$convex/budget';
 	import OrganizationEvents from '$lib/app/OrganizationEvents.svelte';
 	import BudgetLines from '$lib/app/settings/BudgetLines.svelte';
 	import OrganizationPeople from '$lib/app/settings/OrganizationPeople.svelte';
@@ -37,7 +38,7 @@
 		}
 	);
 
-	const hasAllocations = $derived(current.budgetLines.some((line) => line.allocations.length > 0));
+	const tracking = $derived(hasAllocations(current.budgetLines));
 
 	async function save(patch: Patch) {
 		const next = { ...current, ...patch };
@@ -117,7 +118,7 @@
 
 	<BudgetLines
 		lines={current.budgetLines}
-		budgetHref={hasAllocations ? `/app/org/${organization._id}/budget` : null}
+		budgetHref={tracking ? `/app/org/${organization._id}/budget` : null}
 		onsave={(budgetLines) => save({ budgetLines })}
 	/>
 
