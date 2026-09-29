@@ -8,6 +8,19 @@
 @plugin '@tailwindcss/typography';
 
 :root {
+	--paper: #f8f8f4;
+	--surface: #ffffff;
+	--ink: #17211c;
+	--quiet: #5f6a64;
+	--line: #dfe2da;
+	--pine: #1d5b40;
+	--pine-deep: #134430;
+	--pine-soft: #e5efe9;
+	--marker: #fde55c;
+	--marker-deep: #e3bd00;
+	--marker-soft: #fff8cc;
+	--alert: #b3261e;
+	--alert-soft: #fbeae8;
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.145 0 0);
 	--card: oklch(1 0 0);
@@ -43,6 +56,19 @@
 }
 
 @theme inline {
+	--color-paper: var(--paper);
+	--color-surface: var(--surface);
+	--color-ink: var(--ink);
+	--color-quiet: var(--quiet);
+	--color-line: var(--line);
+	--color-pine: var(--pine);
+	--color-pine-deep: var(--pine-deep);
+	--color-pine-soft: var(--pine-soft);
+	--color-marker: var(--marker);
+	--color-marker-deep: var(--marker-deep);
+	--color-marker-soft: var(--marker-soft);
+	--color-alert: var(--alert);
+	--color-alert-soft: var(--alert-soft);
 	--font-sans: 'Outfit Variable', sans-serif;
 	--font-heading: 'Outfit Variable', sans-serif;
 	--color-background: var(--background);
