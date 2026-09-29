@@ -73,7 +73,7 @@ export const activity = z.object({
 	openToAllStudents: z.boolean()
 });
 
-export const budgetAllocation = z.object({ fiscalYear: z.number(), amount: z.number() });
+const budgetAllocation = z.object({ fiscalYear: z.number(), amount: z.number() });
 
 export const budgetLine = z.object({
 	name: z.string(),
@@ -250,38 +250,4 @@ export const documentPayload = z.object({
 	contentType: z.string(),
 	size: z.number(),
 	url: z.string()
-});
-
-export const assembledPurchase = z.object({
-	id: zid('purchaseRequests'),
-	status: purchaseStatus,
-	typeOfPurchase,
-	documentationCategories: z.array(documentationCategory),
-	organization: z.object({
-		id: zid('organizations').nullable(),
-		name: z.string(),
-		indexNumber: z.string(),
-		fundLetter,
-		budgetLines: z.array(z.string())
-	}),
-	requester: requesterDetails,
-	purchaser: purchaserDetails,
-	vendor: z.string(),
-	itemDescription: z.string(),
-	totalAmount: z.number(),
-	budgetLineItem: z.string(),
-	reimbursementReason: z.string(),
-	businessPurposeText: z.string(),
-	requesterIsPurchaser: z.boolean(),
-	receiptFileIds: z.array(zid('files')),
-	secondApprovalFileId: zid('files').nullable(),
-	publicityFileId: zid('files').nullable(),
-	cateringWaiverFileId: zid('files').nullable(),
-	printingInvoiceFileId: zid('files').nullable(),
-	brandApprovalFileId: zid('files').nullable(),
-	officeLocation: z.string(),
-	buildingManagerApprovalFileId: zid('files').nullable(),
-	computerPriceQuoteFileId: zid('files').nullable(),
-	recipients: z.array(recipient),
-	documents: z.array(documentPayload)
 });

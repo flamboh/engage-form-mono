@@ -80,7 +80,7 @@ export function effectiveCategories(
 	return [...categories];
 }
 
-export function receiptSummary(draft: Draft, receiptDate: string) {
+function receiptSummary(draft: Draft, receiptDate: string) {
 	const money = formatMoney(draft.totalAmount);
 	const parts = [
 		money,
@@ -92,7 +92,7 @@ export function receiptSummary(draft: Draft, receiptDate: string) {
 	return [bought, line].filter(Boolean).join(', ');
 }
 
-export function eventSummary(activity: Draft['activity']) {
+function eventSummary(activity: Draft['activity']) {
 	return [
 		activity.name,
 		activity.dates.map(shortDate).join(', '),

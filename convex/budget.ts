@@ -71,7 +71,7 @@ export function requestFiscalYear(
 	return fiscalYearOfDate(requestDate(request));
 }
 
-export function allocationFor(line: BudgetLine, year: number): number | null {
+function allocationFor(line: BudgetLine, year: number): number | null {
 	return line.allocations.find((allocation) => allocation.fiscalYear === year)?.amount ?? null;
 }
 

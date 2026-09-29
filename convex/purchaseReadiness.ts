@@ -173,8 +173,8 @@ export async function evaluatePurchaseReadiness(
 	return { ready: sections.length === 0, sections };
 }
 
-export const selfIdCardReason = 'Your UO ID (front and back) missing.';
-export const purchaserIdCardReason = 'Purchaser UO ID (front and back) missing.';
+const selfIdCardReason = 'Your UO ID (front and back) missing.';
+const purchaserIdCardReason = 'Purchaser UO ID (front and back) missing.';
 
 function idCardReason(request: Doc<'purchaseRequests'>) {
 	return request.purchaserSource.kind === 'self' ? selfIdCardReason : purchaserIdCardReason;
