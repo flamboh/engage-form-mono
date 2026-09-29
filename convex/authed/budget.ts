@@ -40,6 +40,7 @@ const budgetSummaryShape = z.object({
 			spent: z.number(),
 			pending: z.number(),
 			remaining: z.number().nullable(),
+			purchases: z.number(),
 			approvedCount: z.number(),
 			pendingVendors: z.array(z.string())
 		})

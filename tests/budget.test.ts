@@ -12,6 +12,7 @@ import {
 	summarizeBudget,
 	type BudgetLine
 } from '../convex/budget';
+import { csvFilename, ledgerCsv } from '../apps/web/src/lib/budget/csv';
 
 vi.stubEnv('FILES_BASE_URL', 'https://files.example');
 vi.stubEnv('FILES_SIGNING_SECRET', 'test-secret');
@@ -79,6 +80,7 @@ describe('summarizeBudget', () => {
 				spent: 100.3,
 				pending: 50.5,
 				remaining: 449.2,
+				purchases: 4,
 				approvedCount: 2,
 				pendingVendors: ['Costco', 'Safeway']
 			}
@@ -422,3 +424,47 @@ function request(
 		...overrides
 	};
 }
+
+describe('ledger CSV', () => {
+	test('writes one row per purchase with plain amounts and Eugene dates', () => {
+		const csv = ledgerCsv([
+			{
+				id: 'purchase_1' as Id<'purchaseRequests'>,
+				receiptDate: '2026-09-12',
+				vendor: 'Costco',
+				itemDescription: 'chips, "salsa"',
+				budgetLineItem: 'Event Expenses',
+				eventName: 'Weekly listening event',
+				eventDates: ['2026-09-15', '2026-09-22'],
+				stage: 'approved',
+				totalAmount: 1052.4,
+				filledAt: Date.parse('2026-09-16T06:30:00Z'),
+				approvedAt: Date.parse('2026-09-20T18:00:00Z')
+			},
+			{
+				id: 'purchase_2' as Id<'purchaseRequests'>,
+				receiptDate: '2026-09-02',
+				vendor: '=HYPERLINK("x")',
+				itemDescription: 'lattes',
+				budgetLineItem: 'Food',
+				eventName: '',
+				eventDates: [],
+				stage: 'to_finish',
+				totalAmount: 19.8,
+				filledAt: null,
+				approvedAt: null
+			}
+		]);
+		expect(csv.startsWith('\uFEFF')).toBe(true);
+		expect(csv.slice(1).split('\r\n')).toEqual([
+			'Bought,Vendor,Items,Budget line,Event,Event dates,Status,Amount,Filled,Approved',
+			'2026-09-12,Costco,"chips, ""salsa""",Event Expenses,Weekly listening event,2026-09-15 2026-09-22,Approved,1052.40,2026-09-15,2026-09-20',
+			`2026-09-02,"'=HYPERLINK(""x"")",lattes,Food,,,To finish,19.80,,`,
+			''
+		]);
+	});
+
+	test('names the file after the organization and fiscal year', () => {
+		expect(csvFilename('Album Listening Club', '2026–27')).toBe('album-listening-club-2026-27.csv');
+	});
+});

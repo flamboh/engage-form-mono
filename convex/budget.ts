@@ -22,6 +22,7 @@ export type BudgetLineSummary = {
 	spent: number;
 	pending: number;
 	remaining: number | null;
+	purchases: number;
 	approvedCount: number;
 	pendingVendors: string[];
 };
@@ -98,6 +99,7 @@ export function summarizeBudget(
 			allocated: number | null;
 			spent: number;
 			pending: number;
+			purchases: number;
 			approvedCount: number;
 			pendingVendors: string[];
 		}
@@ -108,6 +110,7 @@ export function summarizeBudget(
 			allocated: allocated === null ? null : cents(allocated),
 			spent: 0,
 			pending: 0,
+			purchases: 0,
 			approvedCount: 0,
 			pendingVendors: []
 		});
@@ -115,10 +118,18 @@ export function summarizeBudget(
 	for (const request of requests) {
 		let row = rows.get(request.budgetLineItem);
 		if (row === undefined) {
-			row = { allocated: null, spent: 0, pending: 0, approvedCount: 0, pendingVendors: [] };
+			row = {
+				allocated: null,
+				spent: 0,
+				pending: 0,
+				purchases: 0,
+				approvedCount: 0,
+				pendingVendors: []
+			};
 			rows.set(request.budgetLineItem, row);
 		}
 		const amount = cents(request.totalAmount);
+		row.purchases += 1;
 		if (request.status === 'approved') {
 			row.spent += amount;
 			row.approvedCount += 1;
@@ -148,6 +159,7 @@ export function summarizeBudget(
 			spent: dollars(row.spent),
 			pending: dollars(row.pending),
 			remaining: remaining === null ? null : dollars(remaining),
+			purchases: row.purchases,
 			approvedCount: row.approvedCount,
 			pendingVendors: row.pendingVendors.slice(0, PENDING_VENDORS)
 		});
