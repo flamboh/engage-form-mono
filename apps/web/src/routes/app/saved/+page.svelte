@@ -3,6 +3,7 @@
 	import type { Id } from '$convex/_generated/dataModel';
 	import AppShell from '$lib/app/AppShell.svelte';
 	import PurchaserForm from '$lib/app/PurchaserForm.svelte';
+	import OrganizationEvents from '$lib/app/OrganizationEvents.svelte';
 	import { errorMessage, secondaryButtonClass } from '$lib/app/styles';
 	import OrganizationForm from '$lib/welcome/OrganizationForm.svelte';
 	import ProfileForm from '$lib/welcome/ProfileForm.svelte';
@@ -218,6 +219,21 @@
 					{/if}
 				{/each}
 			</ul>
+		</section>
+
+		<section id="events" class="flex scroll-mt-20 flex-col gap-3">
+			<div>
+				<h2 class="text-lg font-semibold">Events</h2>
+				<p class="text-sm text-stone-500">
+					Meetings and events you hold often. Pick one on a request to fill in when, where, and how
+					many came.
+				</p>
+			</div>
+			{#each activeOrganizations as organization (organization._id)}
+				<OrganizationEvents {organization} showName={activeOrganizations.length > 1} />
+			{:else}
+				<p class="text-sm text-stone-500">Add an organization first.</p>
+			{/each}
 		</section>
 
 		<label class="flex items-center gap-2 self-start text-sm text-stone-600">

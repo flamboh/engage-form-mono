@@ -9,6 +9,7 @@
 		label,
 		type = 'text',
 		highlight = false,
+		hint = true,
 		class: className = '',
 		editing = $bindable(false),
 		oncommit
@@ -17,8 +18,9 @@
 		display?: string;
 		placeholder: string;
 		label: string;
-		type?: 'text' | 'money' | 'date';
+		type?: 'text' | 'money' | 'date' | 'time' | 'number';
 		highlight?: boolean;
+		hint?: boolean;
 		class?: string;
 		editing?: boolean;
 		oncommit: (value: string) => void;
@@ -47,8 +49,8 @@
 		<input
 			class="w-full border border-(--pine) bg-white px-2 py-1 text-(--ink) outline-none focus-visible:ring-2 focus-visible:ring-(--pine)/30"
 			class:pl-5={type === 'money'}
-			type={type === 'date' ? 'date' : 'text'}
-			inputmode={type === 'money' ? 'decimal' : undefined}
+			type={type === 'date' || type === 'time' ? type : 'text'}
+			inputmode={type === 'money' ? 'decimal' : type === 'number' ? 'numeric' : undefined}
 			aria-label={label}
 			bind:value={draft}
 			onblur={commit}
@@ -61,7 +63,7 @@
 					draft = type === 'date' ? dateInputValue(value) : value;
 					node.value = draft;
 					node.focus();
-					if (type !== 'date') node.select();
+					if (type !== 'date' && type !== 'time') node.select();
 				})}
 		/>
 	</span>
@@ -78,10 +80,12 @@
 		{:else}
 			<span class="text-(--quiet)">{placeholder}</span>
 		{/if}
-		<span
-			class="shrink-0 self-center text-xs font-normal text-(--quiet) opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-			aria-hidden="true">Edit</span
-		>
+		{#if hint}
+			<span
+				class="shrink-0 self-center text-xs font-normal text-(--quiet) opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+				aria-hidden="true">Edit</span
+			>
+		{/if}
 	</button>
 {/if}
 

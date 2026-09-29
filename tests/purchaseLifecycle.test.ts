@@ -198,6 +198,7 @@ function extensionGetCtx(request: Doc<'purchaseRequests'>) {
 	return {
 		auth: { getUserIdentity: async () => ({ tokenIdentifier: 'owner' }) },
 		db: {
+			query: () => ({ withIndex: () => ({ take: async () => [] }) }),
 			get: async (id: string) => {
 				if (id === request._id) return request;
 				if (id.startsWith('file_')) return file(id);

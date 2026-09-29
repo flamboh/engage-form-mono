@@ -30,6 +30,9 @@
 		clerkContext.currentSession ? { organizationId, excludeId: purchaseRequestId } : 'skip'
 	);
 
+	const eventsQuery = useQuery(api.authed.events.listEvents, () =>
+		clerkContext.currentSession ? { organizationId } : 'skip'
+	);
 	const approversQuery = useQuery(api.authed.approvers.recentApprovers, () =>
 		clerkContext.currentSession ? { organizationId } : 'skip'
 	);
@@ -49,6 +52,8 @@
 				changedFields
 			});
 		},
+		saveEvent: ({ id, ...details }) =>
+			client.mutation(api.authed.events.upsertEvent, { id, organizationId, ...details }),
 		resolveReview: async (field, value) => {
 			await client.mutation(api.authed.documents.resolveReview, {
 				purchaseRequestId,
@@ -83,6 +88,15 @@
 		forgetApprover: async (id) => {
 			await client.mutation(api.authed.approvers.forgetApprover, { id });
 		},
+		answerFoodPackaging: async (packaged) => {
+			await client.mutation(api.authed.checks.answerFoodPackaging, {
+				purchaseRequestId,
+				packaged
+			});
+		},
+		confirmCheck: async (checkId) => {
+			await client.mutation(api.authed.checks.confirmCheck, { purchaseRequestId, checkId });
+		},
 		upload: (files, slot) => {
 			const session = clerkContext.currentSession;
 			if (!session) return;
@@ -95,6 +109,7 @@
 	view={viewQuery.data}
 	saved={savedQuery.data}
 	user={userQuery.data ?? null}
+	events={eventsQuery.data ?? []}
 	recentPurposes={purposesQuery.data ?? []}
 	approvers={approversQuery.data ?? []}
 	{organizationId}

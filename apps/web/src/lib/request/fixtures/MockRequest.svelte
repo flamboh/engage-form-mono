@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Id } from '$convex/_generated/dataModel';
+	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import type { DocumentSlot, RequestView } from '$convex/requestView';
 	import { startUploads, uploadsFor, type UploadTransport } from '$lib/uploads.svelte';
 	import type { RequestBackend } from '../editor.svelte';
@@ -10,6 +10,7 @@
 	import {
 		mockApprovers,
 		mockEngageUrl,
+		mockEvents,
 		mockOrganizationId,
 		mockRead,
 		mockReceiptImage,
@@ -20,6 +21,7 @@
 		scenarioView,
 		withReadiness
 	} from './fixtures';
+	import { confirmMockCheck } from './checks';
 
 	let { scenario }: { scenario: string } = $props();
 
@@ -27,6 +29,7 @@
 	const initial = scenarioView(initialScenario);
 	let view = $state<RequestView>(initial);
 	let approvers = $state<SavedApprover[]>(mockApprovers());
+	let events = $state<Doc<'events'>[]>(initialScenario === 'no-events' ? [] : mockEvents);
 	const pending = $derived(uploadsFor(mockRequestId));
 	const session = { getToken: async () => null };
 	const files: Record<string, File> = {};
@@ -45,6 +48,8 @@
 		const next = await withReadiness($state.snapshot(view) as RequestView);
 		view.readiness = next.readiness;
 		view.businessPurposeText = next.businessPurposeText;
+		view.businessPurposeMissing = next.businessPurposeMissing;
+		view.checks = next.checks;
 	}
 
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -100,6 +105,22 @@
 			const { totalAmount, ...rest } = snapshot;
 			Object.assign(view.purchase, rest, { totalAmount: totalAmount ?? 0 });
 			await refresh();
+		},
+		saveEvent: async ({ id, ...details }) => {
+			await wait(150);
+			const eventId = id ?? (`mock_event_${++counter}` as Id<'events'>);
+			const saved: Doc<'events'> = {
+				_id: eventId,
+				_creationTime: Date.now(),
+				owner: 'mock',
+				organizationId: mockOrganizationId,
+				...details,
+				lastUsedAt: Date.now(),
+				archived: false,
+				updatedAt: Date.now()
+			};
+			events = [saved, ...events.filter((item) => item._id !== eventId)];
+			return eventId;
 		},
 		resolveReview: async (field, value) => {
 			await wait(150);
@@ -162,6 +183,16 @@
 			await wait(120);
 			approvers = approvers.filter((saved) => saved.id !== id);
 		},
+		answerFoodPackaging: async (packaged) => {
+			await wait(120);
+			view.purchase.foodIndividuallyPackaged = packaged;
+			await refresh();
+		},
+		confirmCheck: async (checkId) => {
+			await wait(120);
+			view.purchase.checkConfirmations = confirmMockCheck(view, checkId);
+			await refresh();
+		},
 		upload: (files, slot) => {
 			startUploads(session, mockRequestId, files, slot, transport);
 		}
@@ -193,6 +224,7 @@
 		'gear swap supplies'
 	]}
 	{approvers}
+	{events}
 	organizationId={mockOrganizationId}
 	{pending}
 	{backend}

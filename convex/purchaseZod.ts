@@ -200,7 +200,9 @@ export const purchaseRequestDoc = z.object({
 		.record(z.string(), z.enum(['user', 'receipt', 'previous', 'suggested']))
 		.optional(),
 	receiptDate: z.string().optional(),
-	purpose: z.string().optional()
+	purpose: z.string().optional(),
+	foodIndividuallyPackaged: z.boolean().nullable().optional(),
+	checkConfirmations: z.array(z.object({ id: z.string(), key: z.string() })).optional()
 });
 
 export const savedData = z.object({

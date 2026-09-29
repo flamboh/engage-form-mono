@@ -8,6 +8,7 @@ import {
 	vendorCandidates,
 	type DocumentText
 } from './candidates';
+import { factQuestions, parseFacts, type DocumentFacts, type FactsPlan } from './facts';
 
 export const jevUrl = 'https://api.typesafe.ai/v1/systemone';
 export const confidentThreshold = 0.85;
@@ -62,12 +63,14 @@ export type DocumentExtraction = {
 	totalAmount: ParsedField | null;
 	receiptDate: ParsedField | null;
 	items: string[];
+	facts: DocumentFacts;
 };
 
 type DocumentPlan = {
 	request: JevRequest;
 	vendors: string[];
 	itemLines: string[];
+	facts: FactsPlan;
 };
 
 export function buildDocumentRequest(text: DocumentText): DocumentPlan {
@@ -79,7 +82,9 @@ export function buildDocumentRequest(text: DocumentText): DocumentPlan {
 		...text.hints.itemNames.filter((name) => !text.lines.includes(name))
 	].slice(0, 150);
 
+	const facts = factQuestions(text);
 	const questions: Record<string, Question> = {
+		...facts.questions,
 		document_kind: {
 			type: 'choice',
 			instructions:
@@ -140,7 +145,8 @@ export function buildDocumentRequest(text: DocumentText): DocumentPlan {
 	return {
 		request: { state: { document: text.lines.join('\n') }, model: 'jev-latest', questions },
 		vendors: vendors.map((vendor) => vendor.text),
-		itemLines
+		itemLines,
+		facts: facts.plan
 	};
 }
 
@@ -175,7 +181,8 @@ export function parseDocumentResponse(
 		vendor,
 		totalAmount: choiceField(answers.total, (choice) => choice),
 		receiptDate: choiceField(answers.date, (choice) => dates.get(choice) ?? null),
-		items
+		items,
+		facts: parseFacts(plan.facts, text, answers, items)
 	};
 }
 

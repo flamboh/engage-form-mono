@@ -5,6 +5,7 @@ import {
 	savedPurchaserDetails,
 	userAsPurchaser,
 	type DocumentationCategory,
+	type EventDetails,
 	type PurchaserDetails,
 	type Recipient,
 	type SavedData
@@ -43,6 +44,7 @@ export type FormState = {
 
 export type RequestBackend = {
 	saveSnapshot(snapshot: FormState, changedFields: (keyof FormState)[]): Promise<void>;
+	saveEvent(event: EventDetails & { id?: Id<'events'> }): Promise<Id<'events'>>;
 	resolveReview(field: ReviewField, value: string): Promise<void>;
 	removeDocument(fileId: Id<'files'>): Promise<void>;
 	retryReading(fileId: Id<'files'>): Promise<void>;
@@ -54,6 +56,8 @@ export type RequestBackend = {
 	upload(files: File[], slot: UploadSlot): void;
 	rememberApprover(approver: Approver): Promise<void>;
 	forgetApprover(id: Id<'approvers'>): Promise<void>;
+	answerFoodPackaging(packaged: boolean): Promise<void>;
+	confirmCheck(checkId: string): Promise<void>;
 };
 
 export type FillPhase = 'idle' | 'opening' | 'sent';
@@ -211,6 +215,33 @@ export class RequestEditor {
 		this.update({ activity: { ...current, ...patch } }, options);
 	}
 
+	chooseEvent(event: EventDetails & { _id: Id<'events'> }) {
+		const activity = this.form?.activity;
+		if (activity === undefined) return;
+		this.update({
+			activity: {
+				eventId: event._id,
+				name: event.name,
+				dates: activity.dates,
+				time: event.time,
+				location: event.location,
+				attendance: event.attendance,
+				openToAllStudents: event.openToAllStudents
+			}
+		});
+	}
+
+	toggleDate(date: string) {
+		const dates = this.form?.activity.dates ?? [];
+		this.updateActivity({
+			dates: dates.includes(date) ? dates.filter((item) => item !== date) : [...dates, date].sort()
+		});
+	}
+
+	saveEvent(event: EventDetails & { id?: Id<'events'> }) {
+		return this.#backend().saveEvent(event);
+	}
+
 	async resolveReview(field: ReviewField, value: string) {
 		const key = field === 'receiptDate' ? null : field;
 		const hadOverride = key !== null && key in this.overrides;
@@ -246,6 +277,14 @@ export class RequestEditor {
 
 	async retryReading(fileId: Id<'files'>) {
 		await this.#run(() => this.#backend().retryReading(fileId));
+	}
+
+	async answerFoodPackaging(packaged: boolean) {
+		await this.#run(() => this.#backend().answerFoodPackaging(packaged));
+	}
+
+	async confirmCheck(checkId: string) {
+		await this.#run(() => this.#backend().confirmCheck(checkId));
 	}
 
 	upload(files: File[], slot: UploadSlot) {

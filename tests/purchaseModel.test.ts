@@ -315,17 +315,14 @@ test('manual ASUO Funds selection requires Publicity Proof', async () => {
 	});
 });
 
-test('Food requires Catering Waiver', async () => {
+test('Food leaves the Catering Waiver to document checks', async () => {
 	await expect(
 		evaluatePurchaseReadiness({
 			...request,
 			documentationCategories: ['food'],
 			cateringWaiverFileId: null
 		})
-	).resolves.toEqual({
-		ready: false,
-		sections: [{ section: 'Files', reasons: ['Catering waiver missing.'] }]
-	});
+	).resolves.toEqual({ ready: true, sections: [] });
 });
 
 test('Printing Services requires Printing Invoice', async () => {
@@ -458,7 +455,7 @@ test('category requirements are additive', async () => {
 			{ section: 'Purchase details', reasons: ['Office location missing.'] },
 			{
 				section: 'Files',
-				reasons: ['Catering waiver missing.', 'Printing invoice missing.']
+				reasons: ['Printing invoice missing.']
 			}
 		]
 	});
@@ -572,6 +569,7 @@ test('reports blocked Draft reasons grouped by section', async () => {
 test('Ready gate rejects blocked Drafts with sectioned reasons', async () => {
 	const ctx = {
 		db: {
+			query: () => ({ withIndex: () => ({ take: async () => [] }) }),
 			get: async () => ({ owner: request.owner })
 		}
 	};
@@ -595,6 +593,7 @@ test('Ready gate rejects blocked Drafts with sectioned reasons', async () => {
 test('Ready gate rejects document ids that are not owned records', async () => {
 	const ctx = {
 		db: {
+			query: () => ({ withIndex: () => ({ take: async () => [] }) }),
 			get: async (id: string) => (id === 'file_receipt' ? null : { owner: request.owner })
 		}
 	};

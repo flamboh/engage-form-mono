@@ -32,7 +32,7 @@
 
 	<main class="mx-auto flex max-w-xl flex-col gap-8 px-4 pt-8 pb-16 sm:px-6">
 		{#if currentStep}
-			<ol class="grid grid-cols-3 gap-2" aria-label="Setup steps">
+			<ol class="grid grid-cols-4 gap-2" aria-label="Setup steps">
 				{#each WELCOME_STEPS as step, i (step)}
 					<li class="flex flex-col gap-2">
 						<span class="h-1 rounded-full {i <= currentIndex ? 'bg-[#154733]' : 'bg-stone-200'}"

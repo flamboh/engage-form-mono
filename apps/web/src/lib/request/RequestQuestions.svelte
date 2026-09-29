@@ -1,9 +1,10 @@
 <script lang="ts">
 	import type { Doc } from '$convex/_generated/dataModel';
 	import type { FundLetter } from '$lib/purchase/draftDetails';
+	import ActivityQuestions from './ActivityQuestions.svelte';
 	import Chip from './Chip.svelte';
 	import type { RequestEditor } from './editor.svelte';
-	import { categoryOptions, dateInputValue, formatDate } from './labels';
+	import { categoryOptions } from './labels';
 	import RecipientsEditor from './RecipientsEditor.svelte';
 	import SourceCue from './SourceCue.svelte';
 
@@ -12,6 +13,7 @@
 		fundLetter,
 		budgetLines,
 		purchasers,
+		events = [],
 		recentPurposes = [],
 		userName,
 		section
@@ -20,6 +22,7 @@
 		fundLetter: FundLetter;
 		budgetLines: string[];
 		purchasers: Doc<'purchasers'>[];
+		events?: Doc<'events'>[];
 		recentPurposes?: string[];
 		userName: string;
 		section: 'why' | 'funding';
@@ -36,12 +39,6 @@
 	const purposeChips = $derived(
 		recentPurposes.filter((item) => item.toLowerCase() !== purpose.trim().toLowerCase())
 	);
-	const activity = $derived(form?.activity);
-
-	function setPurpose(value: string, options: { debounce?: boolean } = {}) {
-		editor.update({ purpose: value }, options);
-	}
-
 	const selectedPurchaserId = $derived(
 		form?.purchaserSource.kind === 'purchaser' ? form.purchaserSource.purchaserId : null
 	);
@@ -49,6 +46,8 @@
 
 {#if section === 'why'}
 	<div class="flex flex-col gap-7">
+		<ActivityQuestions {editor} {events} />
+
 		<div id="field-why" class="flex flex-col gap-3">
 			<label class="text-lg font-semibold text-(--ink)" for="purpose-input">What was it for?</label>
 			<input
@@ -56,89 +55,17 @@
 				class="input"
 				maxlength="200"
 				autocomplete="off"
-				placeholder="Prizes for trivia night"
+				placeholder="Snacks to bring members together"
 				value={purpose}
-				oninput={(event) => setPurpose(event.currentTarget.value, { debounce: true })}
+				oninput={(event) =>
+					editor.update({ purpose: event.currentTarget.value }, { debounce: true })}
 			/>
 			{#if purposeChips.length > 0}
 				<div class="flex flex-wrap items-center gap-2" aria-label="Recent answers">
 					<span class="text-xs text-(--quiet)">Recent</span>
 					{#each purposeChips as item (item)}
-						<Chip onclick={() => setPurpose(item)}>{item}</Chip>
+						<Chip onclick={() => editor.update({ purpose: item })}>{item}</Chip>
 					{/each}
-				</div>
-			{/if}
-		</div>
-
-		<div id="field-activity" class="flex flex-col gap-1.5">
-			<span class="flex items-baseline gap-2">
-				<label class="text-sm font-medium text-(--ink)" for="activity-name">Which event?</label>
-				<SourceCue source={editor.sourceOf('activity')} />
-			</span>
-			<input
-				id="activity-name"
-				class="input"
-				placeholder="Weekly listening event"
-				value={activity?.name ?? ''}
-				oninput={(event) =>
-					editor.updateActivity({ name: event.currentTarget.value }, { debounce: true })}
-			/>
-			<div class="mt-2 grid gap-3 sm:grid-cols-2">
-				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
-					<span>Date</span>
-					<input
-						id="activity-date"
-						class="input"
-						type="date"
-						value={dateInputValue(activity?.dates[0])}
-						onchange={(event) =>
-							editor.updateActivity({
-								dates: event.currentTarget.value === '' ? [] : [event.currentTarget.value]
-							})}
-					/>
-				</label>
-				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
-					<span>Time</span>
-					<input
-						id="activity-time"
-						class="input"
-						type="time"
-						value={activity?.time ?? ''}
-						onchange={(event) => editor.updateActivity({ time: event.currentTarget.value })}
-					/>
-				</label>
-				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
-					<span>Location</span>
-					<input
-						id="activity-location"
-						class="input"
-						placeholder="EMU Crater Lake Room"
-						value={activity?.location ?? ''}
-						oninput={(event) =>
-							editor.updateActivity({ location: event.currentTarget.value }, { debounce: true })}
-					/>
-				</label>
-				<label class="flex flex-col gap-1.5 text-sm font-medium text-(--ink)">
-					<span>Attendance</span>
-					<input
-						id="activity-attendance"
-						class="input"
-						type="number"
-						min="1"
-						value={activity?.attendance ?? ''}
-						onchange={(event) =>
-							editor.updateActivity({
-								attendance:
-									event.currentTarget.value === '' ? null : Number(event.currentTarget.value)
-							})}
-					/>
-				</label>
-			</div>
-			{#if editor.receiptDate && (activity?.dates.length ?? 0) === 0}
-				<div class="flex flex-wrap gap-2">
-					<Chip onclick={() => editor.updateActivity({ dates: [editor.receiptDate] })}>
-						Same day as the receipt, {formatDate(editor.receiptDate)}
-					</Chip>
 				</div>
 			{/if}
 		</div>

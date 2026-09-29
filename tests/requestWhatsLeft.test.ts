@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { whatsLeft } from '../apps/web/src/lib/request/whatsLeft';
+import type { Id } from '../convex/_generated/dataModel';
 
 const readiness = {
 	sections: [
@@ -95,4 +96,61 @@ test('a removed-receipt check asks whether the typed value is still right', () =
 	const review = items.find((item) => item.key === 'review-vendor');
 	expect(review).toMatchObject({ label: 'Check the store' });
 	expect(review?.detail).toBe('You removed a receipt. Is Test Edited Store still right?');
+});
+
+test('missing event facts point at their own fields', () => {
+	const items = whatsLeft({
+		readiness: {
+			sections: [
+				{
+					section: 'Event',
+					reasons: ['Add the event date.', 'Add how many students attended.']
+				}
+			]
+		},
+		reviews: [],
+		reading: false
+	});
+	expect(items.map((item) => item.target)).toEqual([
+		{ kind: 'field', field: 'dates' },
+		{ kind: 'field', field: 'attendance' }
+	]);
+});
+
+test('document checks become their own items, blocking first and warnings last', () => {
+	const items = whatsLeft({
+		readiness: {
+			sections: [
+				{ section: 'Files', reasons: ['Receipt document missing.'] },
+				{ section: 'Document checks', reasons: ['Add the catering waiver'] }
+			]
+		},
+		reviews: [],
+		reading: false,
+		checks: [
+			{
+				id: 'receipt-card:file_1',
+				severity: 'warning',
+				title: 'Show the last 4 digits of your card',
+				detail: 'Reviewers need to see the card that paid.',
+				fileId: 'file_1' as Id<'files'>,
+				slot: 'receipt',
+				action: 'upload'
+			},
+			{
+				id: 'catering-waiver',
+				severity: 'blocking',
+				title: 'Add the catering waiver',
+				detail: 'Food that wasn’t individually packaged needs a waiver.',
+				fileId: null,
+				slot: 'catering_waiver',
+				action: 'upload'
+			}
+		]
+	});
+	expect(items.map((item) => [item.key, item.blocking])).toEqual([
+		['receipt', true],
+		['check-catering-waiver', true],
+		['check-receipt-card:file_1', false]
+	]);
 });

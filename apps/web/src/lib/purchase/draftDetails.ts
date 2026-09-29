@@ -5,6 +5,10 @@ export type SavedData = {
 	organizations: Doc<'organizations'>[];
 	purchasers: Doc<'purchasers'>[];
 };
+export type EventDetails = Pick<
+	Doc<'events'>,
+	'name' | 'weekday' | 'time' | 'location' | 'attendance' | 'openToAllStudents'
+>;
 export type DocumentationCategory = Doc<'purchaseRequests'>['documentationCategories'][number];
 export type FundLetter = Doc<'organizations'>['fundLetter'];
 export type PurchaserDetails = {
