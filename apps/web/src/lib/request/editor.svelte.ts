@@ -13,7 +13,7 @@ import {
 import { createSingleFlight } from '$lib/singleFlight';
 import { SvelteSet } from 'svelte/reactivity';
 import type { UploadSlot } from '$lib/uploads.svelte';
-import type { ReviewField } from './whatsLeft';
+import type { ReviewField } from './labels';
 
 export type Purchase = RequestView['purchase'];
 export type Activity = Purchase['activity'];
@@ -58,7 +58,14 @@ export type RequestBackend = {
 	forgetApprover(id: Id<'approvers'>): Promise<void>;
 	answerFoodPackaging(packaged: boolean): Promise<void>;
 	confirmCheck(checkId: string): Promise<void>;
+	confirmFields(fields: ConfirmableField[]): Promise<void>;
+	markSentBack(note: string): Promise<void>;
+	uploadIdCard(side: IdSide, file: File): Promise<Id<'files'>>;
+	saveIdCards(purchaser: PurchaserDetails, source: Purchase['purchaserSource']): Promise<void>;
 };
+
+export type ConfirmableField = 'activity' | 'purchaserSource' | 'budgetLineItem';
+export type IdSide = 'front' | 'back';
 
 export type FillPhase = 'idle' | 'opening' | 'sent';
 export type FieldSource = 'user' | 'receipt' | 'previous' | 'suggested';
@@ -73,6 +80,9 @@ export class RequestEditor {
 	engageUrl = $state('');
 	busy = $state(false);
 	saving = $state(false);
+	confirmed = $state<ConfirmableField[]>([]);
+	idUploading = $state<IdSide | null>(null);
+	idCardAdded = $state(false);
 
 	#getView: () => RequestView | undefined;
 	#getUser: () => Doc<'users'> | null;
@@ -158,6 +168,7 @@ export class RequestEditor {
 
 	sourceOf(field: string, overrideKey: string = field): FieldSource | undefined {
 		if (overrideKey in this.overrides) return 'user';
+		if ((this.confirmed as string[]).includes(field)) return 'user';
 		return this.purchase?.fieldSources?.[field];
 	}
 
@@ -326,6 +337,53 @@ export class RequestEditor {
 			this.fillPhase = 'idle';
 			this.error = message(err);
 		}
+	}
+
+	async confirmFields(fields: ConfirmableField[]) {
+		const previous = this.confirmed;
+		this.confirmed = [...previous, ...fields.filter((field) => !previous.includes(field))];
+		try {
+			await this.#backend().confirmFields(fields);
+		} catch (err) {
+			this.confirmed = previous;
+			this.error = message(err);
+		}
+	}
+
+	async addIdCard(side: IdSide, file: File) {
+		const form = this.form;
+		if (form === null || this.idUploading !== null) return;
+		this.idUploading = side;
+		this.error = '';
+		try {
+			const fileId = await this.#backend().uploadIdCard(side, file);
+			const current = this.form?.purchaser ?? form.purchaser;
+			const purchaser =
+				side === 'front'
+					? { ...current, idCardFrontFileId: fileId }
+					: { ...current, idCardBackFileId: fileId };
+			this.update({ purchaser });
+			await this.flush();
+			this.idCardAdded = true;
+			await this.#backend().saveIdCards(
+				purchaser,
+				this.form?.purchaserSource ?? form.purchaserSource
+			);
+		} catch (err) {
+			this.error = message(err);
+		} finally {
+			this.idUploading = null;
+		}
+	}
+
+	async sendBack(note: string) {
+		let sent = false;
+		await this.#run(async () => {
+			await this.#backend().markSentBack(note.trim());
+			this.fillPhase = 'idle';
+			sent = true;
+		});
+		return sent;
 	}
 
 	async markApproved() {

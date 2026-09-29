@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
-	import type { DocumentSlot, RequestCheck, RequestDocument } from '$convex/requestView';
+	import type { RequestCheck, RequestDocument } from '$convex/requestView';
 	import {
 		dismissUpload,
 		localPreviewFor,
@@ -8,39 +8,32 @@
 		type PendingUpload,
 		type UploadSlot
 	} from '$lib/uploads.svelte';
+	import { isAcceptableUpload } from '$lib/imageConvert';
 	import DocumentTile from './DocumentTile.svelte';
-	import DropTarget from './DropTarget.svelte';
 	import FilePick from './FilePick.svelte';
-	import PackagingQuestion from './PackagingQuestion.svelte';
-	import { kindLabels, slotHints, slotLabels } from './labels';
+	import { kindLabels, slotLabels } from './labels';
 
 	let {
 		documents,
 		pending,
-		missingSlots,
 		checks = [],
-		packaged = null,
 		locked = false,
 		onfiles,
 		onremove,
 		onretryreading,
-		refreshpreview,
-		onapproval,
-		onpackaged
+		refreshpreview
 	}: {
 		documents: RequestDocument[];
 		pending: PendingUpload[];
-		missingSlots: DocumentSlot[];
 		checks?: RequestCheck[];
-		packaged?: boolean | null;
 		onfiles: (files: File[], slot: UploadSlot) => void;
 		locked?: boolean;
 		onremove: (fileId: Id<'files'>) => void;
 		onretryreading: (fileId: Id<'files'>) => void;
 		refreshpreview: (fileId: Id<'files'>) => Promise<string | null>;
-		onapproval: () => void;
-		onpackaged: (packaged: boolean) => void;
 	} = $props();
+
+	let dragDepth = $state(0);
 
 	let freshUrls = $state<Record<string, string>>({});
 	let expired = $state<Record<string, boolean>>({});
@@ -71,11 +64,9 @@
 	const inFlight = $derived(
 		pending.filter((upload) => upload.fileId === null || !knownIds.has(upload.fileId))
 	);
-	const receiptMissing = $derived(missingSlots.includes('receipt'));
-	const waiverNeeded = $derived(checks.some((check) => check.id === 'catering-waiver'));
-	const targetSlots = $derived([
-		...missingSlots.filter((slot) => slot !== 'receipt' && slot !== 'catering_waiver'),
-		...(waiverNeeded ? (['catering_waiver'] as const) : [])
+	const ordered = $derived([
+		...documents.filter((document) => document.kind === 'receipt'),
+		...documents.filter((document) => document.kind !== 'receipt')
 	]);
 
 	function notesFor(fileId: Id<'files'>) {
@@ -84,138 +75,133 @@
 			.map((check) => ({ title: check.title, blocking: check.severity === 'blocking' }));
 	}
 	const empty = $derived(documents.length === 0 && inFlight.length === 0);
+
+	function hasFiles(event: DragEvent) {
+		return !locked && (event.dataTransfer?.types.includes('Files') ?? false);
+	}
+
+	function dragEnter(event: DragEvent) {
+		if (!hasFiles(event)) return;
+		event.preventDefault();
+		dragDepth += 1;
+	}
+
+	function dragLeave(event: DragEvent) {
+		if (!hasFiles(event)) return;
+		dragDepth = Math.max(0, dragDepth - 1);
+	}
+
+	function dragOver(event: DragEvent) {
+		if (!hasFiles(event)) return;
+		event.preventDefault();
+		if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+	}
+
+	function drop(event: DragEvent) {
+		if (!hasFiles(event)) return;
+		dragDepth = 0;
+		if (event.defaultPrevented) return;
+		event.preventDefault();
+		const files = [...(event.dataTransfer?.files ?? [])].filter(isAcceptableUpload);
+		if (files.length > 0) onfiles(files, 'auto');
+	}
 </script>
 
-{#snippet approvalAction()}
-	<span class="flex flex-wrap items-baseline gap-x-2">
-		<button
-			class="text-sm font-medium text-(--pine) underline hover:text-(--pine-deep) focus-visible:outline-2 focus-visible:outline-(--pine)"
-			type="button"
-			onclick={onapproval}
-		>
-			Get it approved
-		</button>
-		<span class="text-xs text-(--quiet)">We’ll write the email.</span>
-	</span>
-{/snippet}
+<svelte:window
+	ondragenter={dragEnter}
+	ondragleave={dragLeave}
+	ondragover={dragOver}
+	ondrop={drop}
+/>
 
-<section
-	id="field-documents"
-	class="flex flex-col gap-3 lg:gap-4"
-	aria-labelledby="documents-heading"
->
-	<h2 id="documents-heading" class="text-sm font-semibold text-(--ink) max-lg:sr-only">
-		Documents
-	</h2>
-
-	{#if !empty}
-		<ul
-			class="-mx-4 flex snap-x scroll-px-4 items-stretch gap-2 overflow-x-auto px-4 pt-1 pb-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-3 lg:overflow-visible lg:px-0"
-		>
-			{#each documents as document (document.fileId)}
-				<li class="w-48 shrink-0 snap-start lg:w-auto">
-					<DocumentTile
-						label={kindLabels[document.kind] ?? 'Document'}
-						filename={document.filename}
-						contentType={document.contentType}
-						preview={localPreviewFor(document.fileId) ??
-							freshUrls[document.fileId] ??
-							document.previewUrl}
-						status={document.reading ? 'reading' : document.readFailed ? 'unreadable' : 'saved'}
-						expired={expired[document.fileId] ?? false}
-						renderable={!unrenderable[document.fileId]}
-						notes={notesFor(document.fileId)}
-						onremove={locked ? undefined : () => onremove(document.fileId)}
-						onretryreading={readable.has(document.kind) && !locked
-							? () => onretryreading(document.fileId)
-							: undefined}
-						onpreviewerror={() =>
-							void previewFailed(
-								document.fileId,
-								freshUrls[document.fileId] ?? document.previewUrl
-							)}
-					/>
-				</li>
-			{/each}
-			{#each inFlight as upload (upload.id)}
-				<li class="w-48 shrink-0 snap-start lg:w-auto">
-					<DocumentTile
-						label={upload.slot === 'auto' ? 'New document' : slotLabels[upload.slot]}
-						filename={upload.filename}
-						contentType={upload.contentType}
-						preview={upload.objectUrl}
-						status={upload.status === 'failed' ? 'failed' : 'uploading'}
-						error={upload.error}
-						onretry={upload.retryable ? () => retryUpload(upload.id) : undefined}
-						ondismiss={() => dismissUpload(upload.id)}
-					/>
-				</li>
-			{/each}
-			<li class="flex shrink-0 gap-2 lg:hidden">
-				<FilePick
-					class="add-tile flex min-h-14 w-16 items-center justify-center gap-1 border border-dashed text-sm font-medium text-(--pine)"
-					label="Add documents"
-					multiple
-					onfiles={(files) => onfiles(files, 'auto')}
-				>
-					<span class="text-lg leading-none" aria-hidden="true">+</span>
-					Add
-				</FilePick>
-				<FilePick
-					class="add-tile hidden min-h-14 w-18 items-center justify-center border border-dashed text-sm font-medium text-(--pine) pointer-coarse:flex"
-					label="Take a photo"
-					capture
-					onfiles={(files) => onfiles(files, 'auto')}
-				>
-					Camera
-				</FilePick>
-			</li>
-		</ul>
-	{/if}
-
-	<div class={empty ? '' : 'hidden lg:block'}>
-		<DropTarget
-			id={receiptMissing ? 'slot-receipt' : undefined}
-			slot="auto"
-			title={empty ? 'Add your receipt' : 'Drop receipts, flyers, approvals'}
-			hint={empty
-				? 'Drop a photo or PDF here. We’ll fill in the store, items, and total.'
-				: 'We’ll sort each file into the right place.'}
-			{onfiles}
-		/>
+{#if dragDepth > 0}
+	<div
+		class="overlay pointer-events-none fixed inset-0 z-40 grid place-items-center p-6"
+		aria-hidden="true"
+	>
+		<div class="border-2 border-dashed border-(--pine) bg-(--surface) px-8 py-6 text-center">
+			<p class="text-lg font-semibold text-(--ink)">Drop to add</p>
+			<p class="text-sm text-(--quiet)">Receipts, flyers, approvals. We’ll sort each one.</p>
+		</div>
 	</div>
+{/if}
 
-	{#if packaged !== null}
-		<div
-			id="field-packaging"
-			class="flex items-center justify-between gap-3 border-t border-(--line) pt-3"
-		>
-			<span class="text-sm text-(--ink)">Snacks individually packaged?</span>
-			<PackagingQuestion value={packaged} disabled={locked} onanswer={onpackaged} />
-		</div>
-	{/if}
-
-	{#if targetSlots.length > 0}
-		<div class="hidden flex-col gap-2 lg:flex">
-			<h3 class="text-xs font-medium text-(--quiet)">Still needed</h3>
-			{#each targetSlots as slot (slot)}
-				<DropTarget
-					id={`slot-${slot}`}
-					{slot}
-					title={slotLabels[slot]}
-					hint={slotHints[slot] ?? ''}
-					compact
-					{onfiles}
-					children={slot === 'second_approval' ? approvalAction : undefined}
+<section id="field-documents" class="flex flex-col gap-3" aria-label="Documents">
+	<ul
+		class="-mx-4 flex snap-x scroll-px-4 items-stretch gap-2 overflow-x-auto px-4 pt-1 pb-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:overflow-visible lg:px-0"
+	>
+		{#each ordered as document, index (document.fileId)}
+			<li
+				class={['w-48 shrink-0 snap-start lg:w-auto', index === 0 && 'lg:col-span-2 lg:max-w-48']}
+			>
+				<DocumentTile
+					label={kindLabels[document.kind] ?? 'Document'}
+					filename={document.filename}
+					contentType={document.contentType}
+					preview={localPreviewFor(document.fileId) ??
+						freshUrls[document.fileId] ??
+						document.previewUrl}
+					status={document.reading ? 'reading' : document.readFailed ? 'unreadable' : 'saved'}
+					expired={expired[document.fileId] ?? false}
+					renderable={!unrenderable[document.fileId]}
+					notes={notesFor(document.fileId)}
+					onremove={locked ? undefined : () => onremove(document.fileId)}
+					onretryreading={readable.has(document.kind) && !locked
+						? () => onretryreading(document.fileId)
+						: undefined}
+					onpreviewerror={() =>
+						void previewFailed(document.fileId, freshUrls[document.fileId] ?? document.previewUrl)}
 				/>
-			{/each}
-		</div>
-	{/if}
+			</li>
+		{/each}
+		{#each inFlight as upload (upload.id)}
+			<li class={['w-48 shrink-0 snap-start lg:w-auto', empty && 'lg:col-span-2 lg:max-w-48']}>
+				<DocumentTile
+					label={upload.slot === 'auto' ? 'New document' : slotLabels[upload.slot]}
+					filename={upload.filename}
+					contentType={upload.contentType}
+					preview={upload.objectUrl}
+					status={upload.status === 'failed' ? 'failed' : 'uploading'}
+					error={upload.error}
+					onretry={upload.retryable ? () => retryUpload(upload.id) : undefined}
+					ondismiss={() => dismissUpload(upload.id)}
+				/>
+			</li>
+		{/each}
+		{#if !locked}
+			<li class={['flex shrink-0', empty && 'lg:col-span-2']}>
+				{#if empty}
+					<FilePick
+						class="add-tile flex min-h-14 w-full flex-col items-center justify-center gap-1 border border-dashed px-4 py-6 text-center text-sm lg:aspect-[3/4] lg:max-w-48"
+						label="Add the receipt"
+						multiple
+						onfiles={(files) => onfiles(files, 'auto')}
+					>
+						<span class="font-medium text-(--ink)">Add the receipt</span>
+						<span class="text-xs text-(--quiet)">Drop it anywhere, or choose a file</span>
+					</FilePick>
+				{:else}
+					<FilePick
+						class="add-tile flex min-h-14 w-14 items-center justify-center border border-dashed text-lg text-(--pine) lg:aspect-square lg:w-full"
+						label="Add documents"
+						multiple
+						onfiles={(files) => onfiles(files, 'auto')}
+					>
+						<span aria-hidden="true">+</span>
+					</FilePick>
+				{/if}
+			</li>
+		{/if}
+	</ul>
 </section>
 
 <style>
 	:global(.add-tile) {
 		border-color: color-mix(in oklab, var(--pine) 45%, var(--line));
-		background: white;
+		background: var(--surface);
+	}
+
+	.overlay {
+		background: color-mix(in oklab, var(--paper) 80%, transparent);
 	}
 </style>

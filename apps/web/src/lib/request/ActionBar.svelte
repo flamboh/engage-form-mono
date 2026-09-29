@@ -1,32 +1,34 @@
 <script lang="ts">
+	import Button from '$lib/ui/Button.svelte';
 	import type { RequestEditor } from './editor.svelte';
+	import { monthDay } from './labels';
+
+	export type BarMode =
+		| { kind: 'loading' }
+		| { kind: 'reading' }
+		| { kind: 'tracked'; left: number; finishFirst: boolean; eventAhead: boolean }
+		| { kind: 'steps'; left: number; next: string }
+		| { kind: 'ready' }
+		| { kind: 'filled'; filledAt: number }
+		| { kind: 'approved' };
 
 	let {
 		editor,
-		status,
-		lastFilledAt,
-		ready,
-		blockingCount,
-		reviewCount,
-		reading,
-		onjumpfirst
+		mode,
+		boardHref,
+		trackedHref,
+		onfinish,
+		onsentback
 	}: {
 		editor: RequestEditor;
-		status: 'draft' | 'ready' | 'approved' | undefined;
-		lastFilledAt: number | null;
-		ready: boolean;
-		blockingCount: number;
-		reviewCount: number;
-		reading: boolean;
-		onjumpfirst: () => void;
+		mode: BarMode;
+		boardHref: string;
+		trackedHref: string;
+		onfinish: () => void;
+		onsentback: () => void;
 	} = $props();
 
-	const filled = $derived(status === 'ready' && lastFilledAt !== null);
-	const filledOn = $derived(
-		lastFilledAt === null
-			? ''
-			: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(lastFilledAt)
-	);
+	const opening = $derived(editor.fillPhase === 'opening');
 </script>
 
 <div
@@ -36,70 +38,77 @@
 		<div class="min-w-0 text-sm" role="status" aria-live="polite">
 			{#if editor.error}
 				<p class="text-(--alert)">{editor.error}</p>
-			{:else if status === 'approved'}
-				<p class="font-medium text-(--ink)">Approved</p>
-				<p class="text-(--quiet)">This request is done.</p>
-			{:else if editor.fillPhase === 'sent' && !filled}
-				<p class="font-medium text-(--ink)">Engage is filling…</p>
+			{:else if mode.kind === 'reading'}
+				<p class="font-semibold text-(--ink)">It’s tracked already</p>
+				<p class="text-(--quiet)">You can leave. It keeps reading.</p>
+			{:else if mode.kind === 'tracked'}
+				<p class="font-semibold text-(--ink)">Tracked</p>
+				<p class="text-(--quiet)">
+					{mode.left}
+					{mode.left === 1 ? 'thing' : 'things'} to finish{mode.eventAhead
+						? ' after the event'
+						: ''}
+				</p>
+			{:else if mode.kind === 'steps'}
+				<p class="font-semibold text-(--ink)">
+					{mode.left}
+					{mode.left === 1 ? 'thing' : 'things'} left
+				</p>
+				<p class="truncate text-(--quiet)">Next: {mode.next}</p>
+			{:else if mode.kind === 'ready' && editor.fillPhase === 'sent'}
+				<p class="font-semibold text-(--ink)">Filling on Engage…</p>
 				<p class="text-(--quiet)">
 					Keep the Engage tab open.
 					<a class="underline" href={editor.engageUrl} target="_blank" rel="noreferrer"
 						>Open it again</a
 					>
 				</p>
-			{:else if filled}
-				<p class="font-medium text-(--ink)">Filled on Engage {filledOn}</p>
-				<p class="text-(--quiet)">Mark it approved once SOFS signs off.</p>
-			{:else if ready}
-				<p class="font-medium text-(--ink)">Ready for Engage</p>
-				<p class="text-(--quiet)">
-					{reviewCount > 0
-						? `${reviewCount} ${reviewCount === 1 ? 'value' : 'values'} to double-check`
-						: 'Engage fills itself in a new tab.'}
+			{:else if mode.kind === 'ready'}
+				<p class="font-semibold text-(--ink)">Ready for Engage</p>
+				<p class="text-(--quiet) max-sm:hidden">
+					The extension fills it in a new tab. You review and submit.
 				</p>
-			{:else if reading && blockingCount === 0}
-				<p class="font-medium text-(--ink)">Reading your receipt…</p>
-			{:else}
-				<p class="font-medium text-(--ink)">
-					{reading ? 'Reading your receipt… ' : ''}{blockingCount}
-					{blockingCount === 1 ? 'thing' : 'things'} left
-				</p>
+			{:else if mode.kind === 'filled'}
+				<p class="font-semibold text-(--ink)">Filled on Engage {monthDay(mode.filledAt)}</p>
+				<button
+					class="text-(--quiet) underline underline-offset-3 hover:text-(--ink) disabled:opacity-60"
+					type="button"
+					disabled={opening}
+					onclick={() => void editor.fill()}>{opening ? 'Opening Engage…' : 'Fill again'}</button
+				>
+			{:else if mode.kind === 'approved'}
+				<p class="font-semibold text-(--ink)">Approved</p>
+				<p class="text-(--quiet)">This request is done.</p>
 			{/if}
 		</div>
 
 		<div class="flex shrink-0 items-center gap-2">
-			{#if status === 'approved'}
-				<button
-					class="secondary-action"
-					type="button"
-					disabled={editor.busy}
-					onclick={() => void editor.reopen()}>Reopen</button
-				>
-			{:else if filled}
-				<button
-					class="secondary-action hidden sm:inline-flex"
-					type="button"
-					disabled={editor.fillPhase === 'opening'}
-					onclick={() => void editor.fill()}
-					>{editor.fillPhase === 'opening' ? 'Opening Engage…' : 'Fill again'}</button
-				>
-				<button
-					class="primary-action"
-					type="button"
-					disabled={editor.busy}
-					onclick={() => void editor.markApproved()}>Mark approved</button
-				>
-			{:else if ready}
-				<button
-					class="primary-action"
-					type="button"
-					disabled={editor.fillPhase === 'opening'}
-					onclick={() => void editor.fill()}
-				>
-					{editor.fillPhase === 'opening' ? 'Opening Engage…' : 'Fill on Engage'}
-				</button>
-			{:else if blockingCount > 0}
-				<button class="secondary-action" type="button" onclick={onjumpfirst}>Show next</button>
+			{#if mode.kind === 'reading'}
+				<Button variant="secondary" href={trackedHref}>Back to board</Button>
+			{:else if mode.kind === 'tracked'}
+				{#if mode.finishFirst}
+					<Button variant="secondary" href={trackedHref}>Done for now</Button>
+					<Button variant="primary" onclick={onfinish}>Finish now</Button>
+				{:else}
+					<Button variant="secondary" onclick={onfinish}>Finish now</Button>
+					<Button variant="primary" href={trackedHref}>Done for now</Button>
+				{/if}
+			{:else if mode.kind === 'steps'}
+				<Button variant="secondary" href={boardHref}>Finish later</Button>
+			{:else if mode.kind === 'ready'}
+				<Button variant="secondary" href={boardHref}>Later</Button>
+				<Button variant="primary" busy={opening} onclick={() => void editor.fill()}>
+					{opening ? 'Opening Engage…' : 'Fill on Engage'}
+				</Button>
+			{:else if mode.kind === 'filled'}
+				<Button variant="secondary" disabled={editor.busy} onclick={onsentback}>Sent back</Button>
+				<Button variant="primary" busy={editor.busy} onclick={() => void editor.markApproved()}>
+					Mark approved
+				</Button>
+			{:else if mode.kind === 'approved'}
+				<Button variant="secondary" busy={editor.busy} onclick={() => void editor.reopen()}>
+					Reopen
+				</Button>
 			{/if}
 		</div>
 	</div>
@@ -108,53 +117,5 @@
 <style>
 	.bar {
 		background: color-mix(in oklab, var(--paper) 88%, transparent);
-	}
-
-	.primary-action,
-	.secondary-action {
-		display: inline-flex;
-		min-height: 2.75rem;
-		align-items: center;
-		padding: 0 1.25rem;
-		font-size: 0.9375rem;
-		font-weight: 600;
-		transition:
-			background-color 120ms,
-			transform 120ms;
-	}
-
-	.primary-action {
-		background: var(--pine);
-		color: white;
-	}
-
-	.primary-action:hover:not(:disabled) {
-		background: var(--pine-deep);
-	}
-
-	.secondary-action {
-		border: 1px solid var(--ink);
-		color: var(--ink);
-	}
-
-	.secondary-action:hover:not(:disabled) {
-		background: var(--ink);
-		color: white;
-	}
-
-	.primary-action:active:not(:disabled),
-	.secondary-action:active:not(:disabled) {
-		transform: scale(0.98);
-	}
-
-	.primary-action:disabled,
-	.secondary-action:disabled {
-		opacity: 0.6;
-	}
-
-	.primary-action:focus-visible,
-	.secondary-action:focus-visible {
-		outline: 2px solid var(--pine);
-		outline-offset: 2px;
 	}
 </style>

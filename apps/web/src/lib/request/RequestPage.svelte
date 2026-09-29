@@ -1,23 +1,25 @@
 <script lang="ts">
 	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import type { MissingFact } from '$convex/businessPurpose';
-	import type { DocumentSlot, RequestCheck, RequestView } from '$convex/requestView';
-	import { requirementPanelsFor, type RequirementPanel } from '$lib/purchase/builderFlow';
+	import { receiptFactsComplete, todayInEugene, type Stage } from '$convex/lifecycle';
+	import type { RequestView, StepId } from '$convex/requestView';
 	import type { SavedData } from '$lib/purchase/draftDetails';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { dismissUpload, type PendingUpload, type UploadSlot } from '$lib/uploads.svelte';
-	import ActionBar from './ActionBar.svelte';
-	import ApprovalDialog, { type SavedApprover } from './ApprovalDialog.svelte';
-	import BusinessPurposeCard from './BusinessPurposeCard.svelte';
-	import DeleteRequest from './DeleteRequest.svelte';
-	import DocumentsRail from './DocumentsRail.svelte';
-	import EditDetails from './EditDetails.svelte';
-	import { RequestEditor, slotField, type RequestBackend } from './editor.svelte';
-	import PurchaseSummary from './PurchaseSummary.svelte';
-	import RequestQuestions from './RequestQuestions.svelte';
-	import WhatsLeft from './WhatsLeft.svelte';
+	import StatusPill from '$lib/ui/StatusPill.svelte';
 	import { onDestroy } from 'svelte';
-	import { whatsLeft, type LeftField, type LeftItem, type LeftTarget } from './whatsLeft';
+	import ActionBar, { type BarMode } from './ActionBar.svelte';
+	import AllDetails from './AllDetails.svelte';
+	import ApprovalDialog, { type SavedApprover } from './ApprovalDialog.svelte';
+	import DocumentStrip from './DocumentStrip.svelte';
+	import { RequestEditor, type RequestBackend } from './editor.svelte';
+	import FilledView from './FilledView.svelte';
+	import RequestMenu from './RequestMenu.svelte';
+	import SentBackDialog from './SentBackDialog.svelte';
+	import StepBody from './StepBody.svelte';
+	import StepList from './StepList.svelte';
+	import { requestSteps, stepsLeft } from './steps';
+	import TrackedView from './TrackedView.svelte';
 
 	let {
 		view,
@@ -49,11 +51,13 @@
 		() => backend
 	);
 
-	let detailsOpen = $state(false);
+	let finishing = $state(false);
 	let approvalDialog = $state<ApprovalDialog | null>(null);
+	let sentBackDialog = $state<SentBackDialog | null>(null);
 
 	onDestroy(() => void editor.flush());
 
+	const today = todayInEugene(Date.now());
 	const purchase = $derived(view?.purchase);
 	const form = $derived(editor.form);
 	const organization = $derived(saved?.organizations.find((org) => org._id === organizationId));
@@ -66,6 +70,7 @@
 	const purchasers = $derived(
 		(saved?.purchasers ?? []).filter((purchaser) => purchaser.organizationId === organizationId)
 	);
+	const userName = $derived(user?.name ?? purchase?.requester.name ?? '');
 	const inFlight = $derived(
 		pending.filter((upload) => upload.status === 'uploading' || upload.status === 'attaching')
 	);
@@ -73,100 +78,71 @@
 		(view?.reading ?? false) ||
 			inFlight.some((upload) => upload.slot === 'auto' || upload.slot === 'receipt')
 	);
-	const panels = $derived(
-		form === null
-			? []
-			: requirementPanelsFor({
-					categories: form.documentationCategories,
-					fundLetter,
-					purchaserIsSelf: form.purchaserSource.kind === 'self'
-				})
-	);
-	const pendingSlots = $derived(new Set(inFlight.map((upload) => upload.slot)));
-	const uploadingSlots = $derived(
-		new Set(inFlight.map((upload) => (upload.slot === 'auto' ? 'receipt' : upload.slot)))
-	);
-	const missingSlots = $derived(
-		panels
-			.filter((panel) => panel.required)
-			.map(panelSlot)
-			.filter((slot): slot is DocumentSlot => slot !== null && !hasDocument(slot))
-	);
-	const optionalSlots = $derived(
-		panels
-			.filter((panel) => !panel.required)
-			.map(panelSlot)
-			.filter((slot): slot is DocumentSlot => slot !== null && !hasDocument(slot))
-	);
-	const items = $derived(
-		view === undefined
-			? []
-			: whatsLeft({
-					readiness: view.readiness,
-					reviews: editor.reviews,
-					checks: view.checks,
-					reading
-				}).filter((item) => item.target.kind !== 'slot' || !uploadingSlots.has(item.target.slot))
-	);
-	const deferReceiptFields = $derived(reading || missingSlots.includes('receipt'));
-	const blocking = $derived(
-		items.filter((item) => item.blocking && !(deferReceiptFields && item.waitsForReceipt))
-	);
 	const ready = $derived(
 		(view?.readiness.ready ?? false) && inFlight.length === 0 && !(view?.reading ?? false)
 	);
-	const visibleItems = $derived.by((): LeftItem[] => {
-		const shown = deferReceiptFields ? items.filter((item) => !item.waitsForReceipt) : items;
-		if (shown.length > 0 || ready || reading) return shown;
-		return [inFlight.length > 0 ? uploadingItem : (items[0] ?? detailsItem)];
-	});
+	const steps = $derived(
+		view === undefined || form === null
+			? []
+			: requestSteps(view, form, {
+					reviewCount: editor.reviews.length,
+					sourceOf: (field) => editor.sourceOf(field),
+					keep: editor.idCardAdded ? new Set<StepId>(['idCard']) : undefined
+				})
+	);
+	const current = $derived(steps.find((step) => step.state === 'current') ?? null);
+	const left = $derived(stepsLeft(steps));
 	const approved = $derived(purchase?.status === 'approved');
-	const title = $derived(form?.vendor || form?.itemDescription || 'New purchase request');
+	const filled = $derived(purchase?.status === 'ready' && purchase.lastFilledAt !== null);
+	const closed = $derived(approved || filled);
+	const tracked = $derived.by(() => {
+		if (view === undefined || form === null || closed || finishing || ready) return false;
+		if (reading || view.stage === 'reading' || view.stage === 'after_event') return true;
+		return !receiptFactsComplete({
+			...form,
+			totalAmount: form.totalAmount ?? 0,
+			receiptCount: form.receiptFileIds.length
+		});
+	});
+	const allDetails = $derived(page.url.searchParams.get('view') === 'all');
+	const stage = $derived.by((): Stage | null => {
+		if (view === undefined) return null;
+		if (reading && !closed) return 'reading';
+		return view.stage;
+	});
+	const eventAhead = $derived(view?.finishAfter != null && view.finishAfter > today);
+	const barMode = $derived.by((): BarMode => {
+		if (view === undefined || purchase === undefined) return { kind: 'loading' };
+		if (approved) return { kind: 'approved' };
+		if (filled && purchase.lastFilledAt !== null) {
+			return { kind: 'filled', filledAt: purchase.lastFilledAt };
+		}
+		if (tracked && reading) return { kind: 'reading' };
+		if (tracked) {
+			return {
+				kind: 'tracked',
+				left: Math.max(1, left),
+				finishFirst: view.finishAfter !== null && view.finishAfter <= today,
+				eventAhead
+			};
+		}
+		if (ready && (current === null || current.id === 'review')) return { kind: 'ready' };
+		return { kind: 'steps', left, next: current?.title ?? 'Look it over' };
+	});
+	const title = $derived(
+		form?.vendor || form?.itemDescription || (reading ? 'New receipt' : 'New request')
+	);
+	const boardHref = $derived(`/app/org/${organizationId}`);
+	const trackedHref = $derived(`/app/org/${organizationId}?tracked=${purchase?._id ?? ''}`);
+	const stepsHref = $derived(viewHref(null));
+	const allHref = $derived(viewHref('all'));
 
-	function panelSlot(panel: RequirementPanel): DocumentSlot | null {
-		if (panel.id === 'receipts') return 'receipt';
-		if (panel.id === 'office_location' || panel.id === 'recipients') return null;
-		return panel.id;
+	function viewHref(value: 'all' | null) {
+		const url = new URL(page.url);
+		if (value === null) url.searchParams.delete('view');
+		else url.searchParams.set('view', value);
+		return `${url.pathname}${url.search}`;
 	}
-
-	function hasDocument(slot: DocumentSlot) {
-		if (pendingSlots.has(slot) || (slot === 'receipt' && pendingSlots.has('auto'))) return true;
-		if (form === null) return false;
-		if (slot === 'receipt') return form.receiptFileIds.length > 0;
-		if (slot === 'recipient_list') return false;
-		return form[slotField[slot]] !== null;
-	}
-
-	const factField: Record<MissingFact, string> = {
-		vendor: 'vendor',
-		items: 'itemDescription',
-		total: 'totalAmount',
-		purchaser: 'purchaser',
-		eventName: 'event',
-		dates: 'dates',
-		time: 'time',
-		location: 'location',
-		attendance: 'attendance',
-		recipients: 'recipients'
-	};
-
-	const uploadingItem: LeftItem = {
-		key: 'uploading',
-		label: 'Adding your documents',
-		detail: 'This finishes on its own in a moment.',
-		target: { kind: 'field', field: 'documents' },
-		blocking: true,
-		waitsForReceipt: false
-	};
-
-	const detailsItem: LeftItem = {
-		key: 'details',
-		label: 'Look over the details',
-		detail: 'Something still needs a value before Engage.',
-		target: { kind: 'field', field: 'details' },
-		blocking: true,
-		waitsForReceipt: false
-	};
 
 	function flushIfHidden() {
 		if (document.visibilityState === 'hidden') void editor.flush();
@@ -182,51 +158,18 @@
 		editor.upload(files, slot);
 	}
 
-	function jump(item: LeftItem) {
-		jumpTo(item.target);
+	function finishNow() {
+		finishing = true;
+		window.scrollTo({ top: 0 });
 	}
 
-	function jumpToField(field: LeftField) {
-		jumpTo({ kind: 'field', field });
-	}
-
-	function checkAnchor(check: RequestCheck) {
-		if (check.action === 'answer') return 'whats-left';
-		if (check.slot === null) return 'field-recipients';
-		return check.fileId === null ? `slot-${check.slot}` : 'field-documents';
-	}
-
-	function jumpTo(target: LeftTarget) {
-		if (target.kind === 'link') return;
-		if (target.kind === 'field' && target.field === 'details') detailsOpen = true;
-		jumpToId(
-			target.kind === 'check'
-				? checkAnchor(target.check)
-				: target.kind === 'slot'
-					? `slot-${target.slot}`
-					: target.kind === 'review'
-						? `review-${target.field}`
-						: `field-${target.field}`,
-			'field-event'
-		);
-	}
-
-	function jumpToFact(fact: MissingFact) {
-		jumpToId(`field-${factField[fact]}`, 'field-event');
-	}
-
-	function jumpToId(id: string, fallback?: string) {
+	function jumpToStep(id: StepId) {
+		finishing = true;
 		requestAnimationFrame(() => {
-			const element =
-				document.getElementById(id) ??
-				(fallback === undefined ? null : document.getElementById(fallback));
+			const element = document.getElementById(`step-${id}`);
 			if (element === null) return;
 			const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 			element.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
-			const focusable = element.matches('button, input, textarea, a, summary')
-				? element
-				: element.querySelector<HTMLElement>('button, input, textarea, a, summary');
-			focusable?.focus({ preventScroll: true });
 		});
 	}
 </script>
@@ -240,49 +183,75 @@
 			<div class="min-w-0">
 				<a
 					class="text-sm text-(--quiet) hover:text-(--ink) focus-visible:outline-2 focus-visible:outline-(--pine)"
-					href={`/app/org/${organizationId}`}
+					href={boardHref}
 				>
+					<span aria-hidden="true">←</span>
 					{organization?.name ?? purchase?.studentOrganization.name ?? 'Back to board'}
 				</a>
 				<h1 class="truncate text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
 			</div>
-			{#if purchase}
-				<span class="shrink-0 border border-(--line) bg-white px-2 py-1 text-xs font-medium">
-					{purchase.status === 'approved'
-						? 'Approved'
-						: purchase.status === 'ready' && purchase.lastFilledAt !== null
-							? 'Filled'
-							: purchase.status === 'ready'
-								? 'Ready'
-								: 'Draft'}
-				</span>
+			{#if purchase && stage !== null}
+				<div class="flex shrink-0 items-center gap-2 sm:gap-3">
+					<span class="max-sm:hidden"><StatusPill {stage} /></span>
+					{#if !tracked || allDetails}
+						<nav
+							class="flex border border-(--line) bg-(--surface) text-sm"
+							aria-label="Request view"
+						>
+							<a
+								class={[
+									'px-3 py-1.5',
+									allDetails ? 'text-(--quiet) hover:text-(--ink)' : 'bg-(--ink) text-white'
+								]}
+								href={stepsHref}
+								aria-current={allDetails ? undefined : 'page'}>{closed ? 'Status' : 'Steps'}</a
+							>
+							<a
+								class={[
+									'px-3 py-1.5 whitespace-nowrap',
+									allDetails ? 'bg-(--ink) text-white' : 'text-(--quiet) hover:text-(--ink)'
+								]}
+								href={allHref}
+								aria-current={allDetails ? 'page' : undefined}>All details</a
+							>
+						</nav>
+					{/if}
+					{#if purchase.status === 'draft'}
+						<RequestMenu
+							{editor}
+							documentCount={view?.documents.length ?? 0}
+							ondeleted={async () => {
+								for (const item of pending) dismissUpload(item.id);
+								await goto(boardHref, { replaceState: true });
+							}}
+						/>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	</header>
 
 	<div
-		class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 sm:gap-8 sm:px-6 sm:py-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-14 lg:py-10"
+		class="mx-auto grid w-full max-w-6xl flex-1 grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 sm:gap-8 sm:px-6 sm:py-6 lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-14 lg:py-10"
 	>
 		<aside class="min-w-0">
-			<DocumentsRail
+			<DocumentStrip
 				documents={view?.documents ?? []}
 				{pending}
-				{missingSlots}
 				checks={view?.checks ?? []}
-				packaged={purchase?.foodIndividuallyPackaged ?? null}
-				onpackaged={(packaged) => void editor.answerFoodPackaging(packaged)}
 				onfiles={upload}
-				locked={approved}
+				locked={closed}
 				onremove={(fileId) => void editor.removeDocument(fileId)}
 				onretryreading={(fileId) => void editor.retryReading(fileId)}
 				refreshpreview={(fileId) => editor.freshPreview(fileId)}
-				onapproval={() => approvalDialog?.show()}
 			/>
 		</aside>
 
-		<main class="flex max-w-2xl min-w-0 flex-col gap-8 pb-10 lg:gap-10">
+		<main class="flex max-w-2xl min-w-0 flex-col gap-6 pb-10">
 			{#if loadError}
-				<p class="border border-(--alert) bg-white p-4 text-sm text-(--alert)">{loadError}</p>
+				<p class="border-l-[3px] border-(--alert) bg-(--surface) px-4 py-3 text-sm text-(--ink)">
+					{loadError}
+				</p>
 			{:else if view === undefined || purchase === undefined}
 				<div class="flex flex-col gap-4" aria-busy="true" aria-label="Loading request">
 					<span class="shimmer h-6 w-40"></span>
@@ -291,62 +260,58 @@
 					<span class="shimmer h-5 w-64 max-w-full"></span>
 				</div>
 			{:else}
-				{#if purchase.status === 'draft'}
-					<WhatsLeft
-						items={visibleItems}
-						{reading}
-						{ready}
-						onjump={jump}
-						onfiles={upload}
-						onapproval={() => approvalDialog?.show()}
-						onconfirm={(checkId) => void editor.confirmCheck(checkId)}
-						onpackaged={(packaged) => void editor.answerFoodPackaging(packaged)}
-					/>
+				{#if purchase.reviewerNote && !closed}
+					<section class="note px-5 py-4" aria-label="Sent back by Engage">
+						<p class="text-sm font-semibold text-(--ink)">Engage sent this back</p>
+						<p class="text-sm leading-relaxed text-(--ink)">“{purchase.reviewerNote}”</p>
+					</section>
 				{/if}
-				<div class="contents" inert={approved}>
-					<RequestQuestions
+				{#if allDetails}
+					<AllDetails
 						{editor}
-						{fundLetter}
-						{budgetLines}
-						{purchasers}
+						{view}
 						{events}
-						{recentPurposes}
-						userName={user?.name ?? purchase.requester.name}
-						section="why"
-					/>
-					<PurchaseSummary {editor} {reading} />
-					<BusinessPurposeCard
-						{editor}
-						text={view.businessPurposeText}
-						missing={view.businessPurposeMissing}
-						onjump={jumpToFact}
-					/>
-					<RequestQuestions
-						{editor}
-						{fundLetter}
-						{budgetLines}
 						{purchasers}
+						{budgetLines}
+						{fundLetter}
 						{recentPurposes}
-						userName={user?.name ?? purchase.requester.name}
-						section="funding"
-					/>
-					<EditDetails
-						{editor}
-						{purchase}
-						{optionalSlots}
-						bind:open={detailsOpen}
+						{userName}
+						{organization}
+						{reading}
+						locked={closed}
 						onfiles={upload}
 					/>
-				</div>
-				{#if purchase.status === 'draft'}
-					<DeleteRequest
+				{:else if closed}
+					<FilledView {view} allDetailsHref={allHref} />
+				{:else if tracked}
+					<TrackedView
 						{editor}
-						documentCount={view.documents.length}
-						ondeleted={async () => {
-							for (const upload of pending) dismissUpload(upload.id);
-							await goto(`/app/org/${organizationId}`, { replaceState: true });
-						}}
+						{reading}
+						{events}
+						{budgetLines}
+						{recentPurposes}
+						finishAfter={view.finishAfter}
+						deadline={view.deadline}
+						{today}
 					/>
+				{:else}
+					<StepList {steps}>
+						{#snippet body(step)}
+							<StepBody
+								{step}
+								{editor}
+								{view}
+								{events}
+								{purchasers}
+								{budgetLines}
+								{userName}
+								{organization}
+								{reading}
+								onfiles={upload}
+								onapproval={() => approvalDialog?.show()}
+							/>
+						{/snippet}
+					</StepList>
 				{/if}
 			{/if}
 		</main>
@@ -360,42 +325,36 @@
 		requesterEmail={purchase?.requester.email ?? user?.studentEmail ?? ''}
 		onremember={(approver) => void backend.rememberApprover(approver).catch(() => {})}
 		onforget={(id) => void backend.forgetApprover(id).catch(() => {})}
-		onjump={jumpToField}
+		onjump={jumpToStep}
+	/>
+
+	<SentBackDialog
+		bind:this={sentBackDialog}
+		busy={editor.busy}
+		onsend={(note) => editor.sendBack(note)}
 	/>
 
 	<ActionBar
 		{editor}
-		status={purchase?.status}
-		lastFilledAt={purchase?.lastFilledAt ?? null}
-		{ready}
-		blockingCount={blocking.length}
-		reviewCount={editor.reviews.length}
-		{reading}
-		onjumpfirst={() => {
-			const first = blocking[0];
-			if (first !== undefined) jump(first);
-		}}
+		mode={barMode}
+		{boardHref}
+		{trackedHref}
+		onfinish={finishNow}
+		onsentback={() => sentBackDialog?.show()}
 	/>
 </div>
 
 <style>
-	.request {
-		--paper: #f8f8f4;
-		--ink: #17211c;
-		--quiet: #5f6a64;
-		--line: #dfe2da;
-		--pine: #1d5b40;
-		--pine-deep: #134430;
-		--pine-soft: #e5efe9;
-		--marker: #fde55c;
-		--marker-deep: #e3bd00;
-		--alert: #b3261e;
+	.note {
+		border: 1px solid var(--line);
+		border-left: 3px solid var(--marker-deep);
+		background: var(--marker-soft);
 	}
 
 	.request :global(.input) {
 		width: 100%;
 		border: 1px solid var(--line);
-		background: white;
+		background: var(--surface);
 		padding: 0.5rem 0.75rem;
 		font-size: 0.9375rem;
 		color: var(--ink);

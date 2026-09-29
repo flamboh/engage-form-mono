@@ -10,12 +10,12 @@
 		editor,
 		text,
 		missing,
-		onjump
+		readonly = false
 	}: {
 		editor: RequestEditor;
 		text: string;
 		missing: { fact: MissingFact; label: string }[];
-		onjump: (fact: MissingFact) => void;
+		readonly?: boolean;
 	} = $props();
 
 	let editing = $state(false);
@@ -57,30 +57,33 @@
 	}
 </script>
 
-<section id="field-businessPurpose" class="flex flex-col gap-3" aria-labelledby="purpose-heading">
-	<div class="flex items-baseline justify-between gap-3">
-		<h2 id="purpose-heading" class="flex items-baseline gap-2 text-lg font-semibold text-(--ink)">
-			Business Purpose
-			<span class="text-xs font-normal text-(--quiet)">
-				{override === null ? 'written from this request' : 'your wording'}
-			</span>
-		</h2>
-		<div class="flex items-baseline gap-3 text-sm">
-			{#if override !== null}
-				<button class="text-(--quiet) underline hover:text-(--ink)" type="button" onclick={reset}>
-					Reset to generated
+<section id="field-businessPurpose" class="flex flex-col gap-3" aria-label="Business Purpose">
+	<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+		<p class="text-sm text-(--quiet)">
+			{override === null
+				? 'Written from this request. Engage reviewers look for every fact in it.'
+				: 'Your wording. Engage reviewers look for every fact in it.'}
+		</p>
+		{#if !readonly}
+			<div class="flex items-baseline gap-4 text-sm">
+				{#if override !== null}
+					<button
+						class="text-(--quiet) underline underline-offset-3 hover:text-(--ink)"
+						type="button"
+						onclick={reset}
+					>
+						Reset
+					</button>
+				{/if}
+				<button
+					class="text-(--quiet) underline underline-offset-3 hover:text-(--ink)"
+					type="button"
+					onclick={() => (editing ? (editing = false) : customize())}
+				>
+					{editing ? 'Done' : 'Customize'}
 				</button>
-			{/if}
-			{#if editing}
-				<button class="text-(--pine) underline" type="button" onclick={() => (editing = false)}>
-					Done
-				</button>
-			{:else}
-				<button class="text-(--pine) underline" type="button" onclick={customize}>
-					Customize
-				</button>
-			{/if}
-		</div>
+			</div>
+		{/if}
 	</div>
 
 	{#if editing}
@@ -93,7 +96,7 @@
 			{@attach (node) => node.focus()}
 		></textarea>
 	{:else if shown.trim() === ''}
-		<p class="text-sm text-(--quiet)">Pick the event and add the receipt to write this.</p>
+		<p class="text-sm text-(--quiet)">Written once the receipt and event facts are in.</p>
 	{:else}
 		<p class="purpose max-w-prose pl-4 text-base leading-relaxed text-(--ink)">{shown}</p>
 	{/if}
@@ -108,17 +111,12 @@
 	{/if}
 
 	{#if missing.length > 0}
-		<ul class="flex flex-col gap-1 text-sm" aria-label="Still needed for the Business Purpose">
+		<ul
+			class="flex flex-col gap-1 text-sm text-(--quiet)"
+			aria-label="Still needed for the Business Purpose"
+		>
 			{#each missing as item (item.fact)}
-				<li>
-					<button
-						class="text-(--pine) underline decoration-dotted underline-offset-4 hover:decoration-solid"
-						type="button"
-						onclick={() => onjump(item.fact)}
-					>
-						{item.label}
-					</button>
-				</li>
+				<li>{item.label}</li>
 			{/each}
 		</ul>
 	{/if}
@@ -134,7 +132,6 @@
 		width: 0.5rem;
 		height: 0.5rem;
 		margin-right: 0.25rem;
-		border-radius: 9999px;
 		background: var(--marker-deep);
 	}
 </style>

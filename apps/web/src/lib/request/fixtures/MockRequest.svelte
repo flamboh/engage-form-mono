@@ -50,6 +50,10 @@
 		view.businessPurposeText = next.businessPurposeText;
 		view.businessPurposeMissing = next.businessPurposeMissing;
 		view.checks = next.checks;
+		view.stage = next.stage;
+		view.finishAfter = next.finishAfter;
+		view.deadline = next.deadline;
+		view.daysLeft = next.daysLeft;
 	}
 
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -100,10 +104,14 @@
 	}
 
 	const backend: RequestBackend = {
-		saveSnapshot: async (snapshot) => {
+		saveSnapshot: async (snapshot, changed) => {
 			await wait(120);
 			const { totalAmount, ...rest } = snapshot;
 			Object.assign(view.purchase, rest, { totalAmount: totalAmount ?? 0 });
+			view.purchase.fieldSources = {
+				...view.purchase.fieldSources,
+				...Object.fromEntries(changed.map((field) => [field, 'user' as const]))
+			};
 			await refresh();
 		},
 		saveEvent: async ({ id, ...details }) => {
@@ -158,16 +166,19 @@
 			await wait(400);
 			if (!view.readiness.ready) throw new Error('Purchase request is not ready.');
 			view.purchase.status = 'ready';
+			view.purchase.reviewerNote = null;
 			setTimeout(() => (view.purchase.lastFilledAt = Date.now()), 5000);
 			return { engageUrl: mockEngageUrl };
 		},
 		markApproved: async () => {
 			await wait(150);
 			view.purchase.status = 'approved';
+			await refresh();
 		},
 		reopen: async () => {
 			await wait(150);
 			view.purchase.status = 'ready';
+			await refresh();
 		},
 		discard: async () => {
 			await wait(150);
@@ -193,6 +204,31 @@
 			view.purchase.checkConfirmations = confirmMockCheck(view, checkId);
 			await refresh();
 		},
+		confirmFields: async (fields) => {
+			await wait(120);
+			view.purchase.fieldSources = {
+				...view.purchase.fieldSources,
+				...Object.fromEntries(fields.map((field) => [field, 'user' as const]))
+			};
+			await refresh();
+		},
+		markSentBack: async (note) => {
+			await wait(150);
+			if (view.purchase.status !== 'ready' || view.purchase.lastFilledAt === null) {
+				throw new Error('Only requests filled on Engage can be sent back.');
+			}
+			view.purchase.status = 'draft';
+			view.purchase.lastFilledAt = null;
+			view.purchase.reviewerNote = note;
+			await refresh();
+		},
+		uploadIdCard: async (side) => {
+			await wait(600);
+			return `mock_id_${side}_${++counter}` as Id<'files'>;
+		},
+		saveIdCards: async () => {
+			await wait(120);
+		},
 		upload: (files, slot) => {
 			startUploads(session, mockRequestId, files, slot, transport);
 		}
@@ -208,7 +244,7 @@
 			class="px-1.5 py-0.5 hover:bg-white/20"
 			class:bg-white={name === scenario}
 			class:text-black={name === scenario}
-			href={`?mock=${name}`}
+			href={`?mock=${name}${name === 'all-details' ? '&view=all' : ''}`}
 			data-sveltekit-reload>{name}</a
 		>
 	{/each}

@@ -2,6 +2,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
+	import { uploadFile } from '$lib/upload';
 	import { settleUploads, startUploads, uploadsFor } from '$lib/uploads.svelte';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import type { RequestBackend } from './editor.svelte';
@@ -96,6 +97,47 @@
 		},
 		confirmCheck: async (checkId) => {
 			await client.mutation(api.authed.checks.confirmCheck, { purchaseRequestId, checkId });
+		},
+		confirmFields: async (fields) => {
+			await client.mutation(api.authed.documents.confirmFields, { purchaseRequestId, fields });
+		},
+		markSentBack: async (note) => {
+			await client.mutation(api.authed.board.markSentBack, { purchaseRequestId, note });
+		},
+		uploadIdCard: async (side, file) => {
+			const session = clerkContext.currentSession;
+			if (!session) throw new Error('Sign in again to add the photo.');
+			return await uploadFile(session, side === 'front' ? 'id_front' : 'id_back', file);
+		},
+		saveIdCards: async (purchaser, source) => {
+			if (purchaser.idCardBackFileId === null) return;
+			const ids = {
+				idCardFrontFileId: purchaser.idCardFrontFileId,
+				idCardBackFileId: purchaser.idCardBackFileId
+			};
+			if (source.kind === 'self') {
+				const user = userQuery.data;
+				if (!user) return;
+				await client.mutation(api.authed.purchaseBuilder.upsertUserProfile, {
+					name: user.name,
+					uo95: user.uo95,
+					permanentAddress: user.permanentAddress,
+					studentEmail: user.studentEmail,
+					phone: user.phone,
+					...ids
+				});
+				return;
+			}
+			const saved = savedQuery.data?.purchasers.find((item) => item._id === source.purchaserId);
+			if (saved === undefined) return;
+			await client.mutation(api.authed.purchaseBuilder.upsertPurchaser, {
+				id: saved._id,
+				organizationId: saved.organizationId,
+				name: saved.name,
+				uo95: saved.uo95,
+				permanentAddress: saved.permanentAddress,
+				...ids
+			});
 		},
 		upload: (files, slot) => {
 			const session = clerkContext.currentSession;
