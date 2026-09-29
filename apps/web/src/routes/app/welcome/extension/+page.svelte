@@ -7,6 +7,9 @@
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
 	import { prefetchRequest } from '$lib/request/prefetch';
 	import { startUploads } from '$lib/uploads.svelte';
+	import Button from '$lib/ui/Button.svelte';
+	import InlineError from '$lib/ui/InlineError.svelte';
+	import SectionHeader from '$lib/ui/SectionHeader.svelte';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 
 	const clerkContext = getClerkContext();
@@ -40,7 +43,7 @@
 
 <div class="flex flex-col gap-2">
 	<h1 class="text-2xl font-semibold tracking-tight">Set up the Chrome extension</h1>
-	<p class="text-sm text-stone-600">
+	<p class="text-sm text-quiet">
 		It types your request into Engage for you. You can do this now or when your first request is
 		ready.
 	</p>
@@ -49,15 +52,14 @@
 <ExtensionSteps />
 
 {#if organization}
-	<div class="flex flex-col gap-4 border-t border-stone-200 pt-8">
-		<h2 class="text-lg font-semibold">Have a receipt handy?</h2>
+	<div class="flex flex-col gap-4 pt-4">
+		<SectionHeader title="Have a receipt handy?" />
 		<ReceiptDrop busy={starting} onFiles={startRequest} />
-		{#if error}<p class="text-sm text-red-700" role="alert">{error}</p>{/if}
-		<a
-			class="self-start text-sm font-medium text-[#154733] underline underline-offset-4"
-			href={`/app/org/${organization._id}`}
-		>
-			Go to {organization.name}
-		</a>
+		{#if error}<InlineError message={error} />{/if}
+		<div>
+			<Button variant="secondary" href={`/app/org/${organization._id}`}>
+				Go to {organization.name}
+			</Button>
+		</div>
 	</div>
 {/if}

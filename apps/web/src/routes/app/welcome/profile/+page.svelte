@@ -9,8 +9,8 @@
 
 <div class="flex flex-col gap-2">
 	<h1 class="text-2xl font-semibold tracking-tight">About you</h1>
-	<p class="text-sm text-stone-600">
-		Engage asks for these on every reimbursement. Add them once and we'll fill them in each time.
+	<p class="text-sm text-quiet">
+		Engage asks for these on every reimbursement. Add them once and we’ll fill them in each time.
 	</p>
 </div>
 

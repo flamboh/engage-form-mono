@@ -13,4 +13,4 @@
 	});
 </script>
 
-<p class="text-sm text-stone-500">Loading…</p>
+<p class="text-sm text-quiet">Loading…</p>
