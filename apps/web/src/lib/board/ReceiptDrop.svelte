@@ -105,7 +105,9 @@
 				</Button>
 			</span>
 			<span class="hidden sm:flex">
-				<Button variant="primary" disabled={busy} onclick={() => pickerInput?.click()}>Choose files</Button>
+				<Button variant="primary" disabled={busy} onclick={() => pickerInput?.click()}
+					>Choose files</Button
+				>
 			</span>
 			{#if onEmpty}
 				<span class="text-center">

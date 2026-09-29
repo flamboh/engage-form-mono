@@ -9,11 +9,11 @@
 	} from '$convex/events';
 	import EventForm from '$lib/app/EventForm.svelte';
 	import type { EventDetails } from '$lib/purchase/draftDetails';
-	import Chip from './Chip.svelte';
+	import Chip from '$lib/ui/Chip.svelte';
 	import EditableValue from './EditableValue.svelte';
 	import type { RequestEditor } from './editor.svelte';
 	import { dateInputValue } from './labels';
-	import SourceCue from './SourceCue.svelte';
+	import SourceCue from '$lib/ui/SourceCue.svelte';
 
 	let { editor, events }: { editor: RequestEditor; events: Doc<'events'>[] } = $props();
 

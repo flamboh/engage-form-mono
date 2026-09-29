@@ -4,6 +4,7 @@ import { evaluatePurchaseReadiness, withBlockingChecks } from '$convex/purchaseR
 import { approvalBasisKey } from '$convex/checks/requestChecks';
 import { mockChecks } from './checks';
 import type { RequestDocument, RequestReview, RequestView } from '$convex/requestView';
+import { requestLifecycle, todayInEugene } from '$convex/lifecycle';
 import type { SavedData } from '$lib/purchase/draftDetails';
 
 type Purchase = RequestView['purchase'];
@@ -14,6 +15,8 @@ export const mockEngageUrl = 'https://engage.uoregon.edu/submitter/form/start/00
 
 const file = (name: string) => name as Id<'files'>;
 const now = Date.UTC(2026, 8, 28, 17);
+const dayMs = 86_400_000;
+const inDays = (days: number) => todayInEugene(Date.now() + days * dayMs);
 
 export const mockUser: Doc<'users'> = {
 	_id: 'mock_user' as Id<'users'>,
@@ -25,7 +28,7 @@ export const mockUser: Doc<'users'> = {
 	studentEmail: 'jlee@uoregon.edu',
 	phone: '541-555-0100',
 	idCardFrontFileId: file('mock_id_front'),
-	idCardBackFileId: null,
+	idCardBackFileId: file('mock_id_back'),
 	updatedAt: now
 };
 
@@ -122,7 +125,7 @@ export const mockSaved: SavedData = {
 			uo95: '951000001',
 			permanentAddress: '1200 Alder St, Eugene, OR 97401',
 			idCardFrontFileId: file('mock_sam_id'),
-			idCardBackFileId: null,
+			idCardBackFileId: file('mock_sam_id_back'),
 			archived: false,
 			updatedAt: now
 		}
@@ -194,7 +197,7 @@ function basePurchase(): Purchase {
 			uo95: mockUser.uo95,
 			permanentAddress: mockUser.permanentAddress,
 			idCardFrontFileId: mockUser.idCardFrontFileId,
-			idCardBackFileId: null
+			idCardBackFileId: mockUser.idCardBackFileId
 		},
 		purchaser: {
 			id: mockUser._id,
@@ -202,7 +205,7 @@ function basePurchase(): Purchase {
 			uo95: mockUser.uo95,
 			permanentAddress: mockUser.permanentAddress,
 			idCardFrontFileId: mockUser.idCardFrontFileId,
-			idCardBackFileId: null
+			idCardBackFileId: mockUser.idCardBackFileId
 		},
 		activity: meetingActivity,
 		vendor: '',
@@ -284,6 +287,21 @@ const complete = {
 	cateringWaiverFileId: file('mock_catering')
 };
 const completeDocs = () => [receiptDoc(), publicityDoc(), approvalDoc(), cateringDoc()];
+const confirmedSources = {
+	purchaserSource: 'user',
+	budgetLineItem: 'previous',
+	activity: 'user',
+	vendor: 'receipt',
+	itemDescription: 'receipt',
+	totalAmount: 'receipt'
+} as const;
+const finishing = {
+	...complete,
+	fieldSources: confirmedSources,
+	cateringWaiverFileId: null,
+	receiptDate: inDays(-9),
+	activity: { ...meetingActivity, dates: [inDays(-2)] }
+};
 
 const scenarios: Record<string, () => Scenario> = {
 	empty: () => ({ purchase: {}, documents: [] }),
@@ -367,7 +385,50 @@ const scenarios: Record<string, () => Scenario> = {
 		purchase: { ...complete, secondApprovalFileId: null },
 		documents: [receiptDoc(), publicityDoc(), cateringDoc()]
 	}),
-	ready: () => ({ purchase: complete, documents: completeDocs() }),
+	tracked: () => ({
+		purchase: {
+			...complete,
+			fieldSources: { ...readSources, activity: 'suggested' },
+			receiptDate: inDays(0),
+			activity: { ...meetingActivity, dates: [inDays(7)] },
+			secondApprovalFileId: null,
+			publicityFileId: null,
+			cateringWaiverFileId: null
+		},
+		documents: [receiptDoc()]
+	}),
+	'finish-packaging': () => ({
+		purchase: { ...finishing, secondApprovalFileId: null, publicityFileId: null },
+		documents: [receiptDoc()]
+	}),
+	'finish-approval': () => ({
+		purchase: { ...finishing, foodIndividuallyPackaged: true, secondApprovalFileId: null },
+		documents: [receiptDoc(), publicityDoc()]
+	}),
+	'all-details': () => ({
+		purchase: { ...finishing, publicityFileId: null, secondApprovalFileId: null },
+		documents: [receiptDoc()]
+	}),
+	'sent-back': () => ({
+		purchase: {
+			...finishing,
+			foodIndividuallyPackaged: true,
+			reviewerNote: 'Please add the event date and attendance to the Business Purpose.'
+		},
+		documents: [receiptDoc(), publicityDoc(), approvalDoc()]
+	}),
+	'id-card': () => ({
+		purchase: {
+			...finishing,
+			foodIndividuallyPackaged: true,
+			purchaser: { ...basePurchase().purchaser, idCardBackFileId: null }
+		},
+		documents: [receiptDoc(), publicityDoc(), approvalDoc()]
+	}),
+	ready: () => ({
+		purchase: { ...complete, fieldSources: confirmedSources },
+		documents: completeDocs()
+	}),
 	custom: () => ({
 		purchase: {
 			...complete,
@@ -377,7 +438,7 @@ const scenarios: Record<string, () => Scenario> = {
 		documents: completeDocs()
 	}),
 	filled: () => ({
-		purchase: { ...complete, status: 'ready', lastFilledAt: now },
+		purchase: { ...complete, fieldSources: confirmedSources, status: 'ready', lastFilledAt: now },
 		documents: completeDocs()
 	}),
 	approved: () => ({
@@ -471,25 +532,33 @@ export const scenarioNames = Object.keys(scenarios);
 export function scenarioView(name: string): RequestView {
 	const scenario = (scenarios[name] ?? scenarios.reading)();
 	const purchase = { ...basePurchase(), ...scenario.purchase };
+	const reading = scenario.reading ?? false;
 	return {
 		purchase,
 		documents: scenario.documents,
-		reading: scenario.reading ?? false,
+		reading,
 		reviews: scenario.reviews ?? [],
 		readiness: { ready: false, sections: [] },
 		...businessPurposeView(purchase),
-		checks: []
+		checks: [],
+		...requestLifecycle(purchase, { reading, readinessReady: false, today: inDays(0) })
 	};
 }
 
 export async function withReadiness(view: RequestView): Promise<RequestView> {
 	const readiness = await evaluatePurchaseReadiness(view.purchase as Doc<'purchaseRequests'>);
 	const checks = mockChecks(view.purchase);
+	const withChecks = withBlockingChecks(readiness, checks);
 	return {
 		...view,
-		readiness: withBlockingChecks(readiness, checks),
+		readiness: withChecks,
 		...businessPurposeView(view.purchase),
-		checks
+		checks,
+		...requestLifecycle(view.purchase, {
+			reading: view.reading,
+			readinessReady: withChecks.ready,
+			today: inDays(0)
+		})
 	};
 }
 

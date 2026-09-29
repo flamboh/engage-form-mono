@@ -9,7 +9,7 @@
 		type Approver
 	} from '$convex/approvalEmail';
 	import type { RequestEditor } from './editor.svelte';
-	import type { LeftField } from './whatsLeft';
+	import type { StepId } from '$convex/requestView';
 
 	export type SavedApprover = Approver & { id: Id<'approvers'> };
 
@@ -28,17 +28,17 @@
 		requesterEmail: string;
 		onremember: (approver: Approver) => void;
 		onforget: (id: Id<'approvers'>) => void;
-		onjump: (field: LeftField) => void;
+		onjump: (step: StepId) => void;
 	} = $props();
 
 	const missingCopy: Partial<
-		Record<ApprovalEmailField, { blank: string; ask: string; field: LeftField | null }>
+		Record<ApprovalEmailField, { blank: string; ask: string; field: StepId | null }>
 	> = {
-		itemDescription: { blank: 'items', ask: 'what was bought', field: 'itemDescription' },
-		vendor: { blank: 'store', ask: 'the store', field: 'vendor' },
-		totalAmount: { blank: 'total', ask: 'the total', field: 'totalAmount' },
-		eventName: { blank: 'event', ask: 'which event', field: 'why' },
-		dates: { blank: 'date', ask: 'the event date', field: 'why' },
+		itemDescription: { blank: 'items', ask: 'what was bought', field: 'receipt' },
+		vendor: { blank: 'store', ask: 'the store', field: 'receipt' },
+		totalAmount: { blank: 'total', ask: 'the total', field: 'receipt' },
+		eventName: { blank: 'event', ask: 'which event', field: 'event' },
+		dates: { blank: 'date', ask: 'the event date', field: 'event' },
 		purchaser: { blank: 'purchaser', ask: 'who paid', field: 'purchaser' },
 		studentOrganization: { blank: 'organization', ask: 'your organization’s name', field: null }
 	};
@@ -141,7 +141,7 @@
 		copiedTimer = setTimeout(() => (copied = null), 2000);
 	}
 
-	function jump(field: LeftField) {
+	function jump(field: StepId) {
 		close();
 		onjump(field);
 	}

@@ -1,4 +1,5 @@
 import type { DocumentSlot } from '$convex/requestView';
+import { isoDate, parseIsoDate, weekdayName } from '../../../../../convex/events';
 import type { DocumentationCategory } from '$lib/purchase/draftDetails';
 
 export const slotLabels: Record<DocumentSlot, string> = {
@@ -60,10 +61,14 @@ export function formatDate(value: string) {
 	}).format(date);
 }
 
-export function reviewDisplay(
-	field: 'vendor' | 'totalAmount' | 'receiptDate' | 'itemDescription',
-	value: string
-) {
+export type ReviewField = 'vendor' | 'totalAmount' | 'receiptDate' | 'itemDescription';
+
+export function reviewProposal(review: { value: string; alternatives: string[] }) {
+	if (review.value.trim() !== '') return review.value;
+	return review.alternatives.find((alternative) => alternative.trim() !== '') ?? '';
+}
+
+export function reviewDisplay(field: ReviewField, value: string) {
 	if (field === 'totalAmount') return formatMoney(Number(value.replace(/[$,\s]/g, ''))) || value;
 	if (field === 'receiptDate') return formatDate(value);
 	return value;
@@ -71,4 +76,32 @@ export function reviewDisplay(
 
 export function dateInputValue(value: string | null | undefined) {
 	return value !== null && value !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+}
+
+export function shortDate(value: string) {
+	const date = parseIsoDate(value);
+	if (date === null) return value;
+	return `${weekdayName(date.getUTCDay()).slice(0, 3)} ${value.slice(5, 7)}/${value.slice(8, 10)}`;
+}
+
+export function monthDay(value: string | number) {
+	const date = typeof value === 'number' ? new Date(value) : parseIsoDate(value);
+	if (date === null) return typeof value === 'string' ? value : '';
+	return new Intl.DateTimeFormat('en-US', {
+		month: 'short',
+		day: 'numeric',
+		timeZone: typeof value === 'number' ? 'America/Los_Angeles' : 'UTC'
+	}).format(date);
+}
+
+export function shiftDate(value: string, days: number) {
+	const date = parseIsoDate(value);
+	if (date === null) return null;
+	return isoDate(new Date(date.getTime() + days * 86_400_000));
+}
+
+export function categoryList(categories: readonly DocumentationCategory[]) {
+	return categoryOptions
+		.filter((option) => categories.includes(option.value))
+		.map((option) => option.label);
 }

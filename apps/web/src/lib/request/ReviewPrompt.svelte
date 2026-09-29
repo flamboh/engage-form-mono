@@ -1,7 +1,6 @@
 <script lang="ts">
-	import Chip from './Chip.svelte';
-	import { reviewDisplay } from './labels';
-	import { reviewProposal, type ReviewField } from './whatsLeft';
+	import Chip from '$lib/ui/Chip.svelte';
+	import { reviewDisplay, reviewProposal, type ReviewField } from './labels';
 
 	let {
 		field,
