@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
 import { getReadyPurchaseForFill, listReadyPurchases } from '../convex/extension';
 import { saveDraftSnapshot } from '../convex/authed/purchaseBuilder';
+import { requestFill } from '../convex/authed/extension';
 
 vi.stubEnv('FILES_BASE_URL', 'https://files.example');
 vi.stubEnv('FILES_SIGNING_SECRET', 'test-secret');
@@ -181,6 +182,33 @@ function saveCtx(request: Doc<'purchaseRequests'>, patches: Partial<Doc<'purchas
 		}
 	};
 }
+
+test('filling a sent-back request again clears the reviewer note', async () => {
+	const sentBack = { ...readyRequest, status: 'draft', reviewerNote: 'Wrong date' } as const;
+	const patches: [string, Record<string, unknown>][] = [];
+	const ctx = {
+		auth: { getUserIdentity: async () => ({ tokenIdentifier: 'owner' }) },
+		db: {
+			get: async (id: string) => {
+				if (id === sentBack._id) return sentBack;
+				if (id.startsWith('file_')) return file(id);
+				return null;
+			},
+			query: () => ({
+				withIndex: () => ({
+					take: async () => [],
+					unique: async () => ({ _id: 'user_1', owner: 'owner' })
+				})
+			}),
+			patch: async (id: string, patch: Record<string, unknown>) => void patches.push([id, patch])
+		}
+	};
+	await requestFill._handler(ctx as never, { purchaseRequestId: sentBack._id });
+	expect(patches[0]).toEqual([
+		sentBack._id,
+		{ status: 'ready', reviewerNote: null, updatedAt: expect.any(Number) }
+	]);
+});
 
 function extensionListCtx(rows: Doc<'purchaseRequests'>[]) {
 	return {

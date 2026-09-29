@@ -2,26 +2,39 @@ import { z } from 'zod/v4';
 import { zid } from 'convex-helpers/server/zod4';
 import type { Doc } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
+import { fiscalYearOf, requestLifecycle, todayInEugene, type Stage } from '../lifecycle';
 import { ownerFromIdentity, readinessWithChecks, requireOwnedDoc } from '../purchaseModel';
 import { requestExtractions } from '../checks/load';
 import type { PurchaseReadiness } from '../purchaseReadiness';
-import { authedQuery } from './helpers';
+import { authedMutation, authedQuery } from './helpers';
+
+const stage = z.enum(['reading', 'after_event', 'to_finish', 'ready', 'filled', 'approved']);
 
 const boardItem = z.object({
 	id: zid('purchaseRequests'),
 	vendor: z.string(),
 	itemDescription: z.string(),
 	totalAmount: z.number(),
-	date: z.string(),
-	receiptCount: z.number(),
-	reading: z.boolean(),
+	receiptDate: z.string().nullable(),
+	budgetLineItem: z.string(),
+	stage,
 	nextStep: z.string().nullable(),
+	finishAfter: z.string().nullable(),
+	deadline: z.string().nullable(),
+	daysLeft: z.number().nullable(),
+	reading: z.boolean(),
+	receiptCount: z.number(),
+	lastFilledAt: z.number().nullable(),
 	updatedAt: z.number()
 });
 
 export type BoardItem = z.infer<typeof boardItem>;
 
+export const sentBackStep = 'Fix what Engage sent back';
+
 const nextStepRules: [RegExp, string][] = [
+	[/^Your UO ID/, 'Add your UO ID (front and back)'],
+	[/^Purchaser UO ID/, 'Add their UO ID (front and back)'],
 	[/^Receipt document missing/, 'Add a receipt'],
 	[/^Receipt documents are limited/, 'Keep it to three receipts'],
 	[/^Vendor missing/, 'Add where it was bought'],
@@ -68,19 +81,27 @@ export function plainNextStep(
 	return rule === undefined ? first.replace(/\.$/, '') : rule[1];
 }
 
+const openLimit = 50;
+const approvedLimit = 500;
+
 export const organizationBoard = authedQuery({
-	args: { organizationId: zid('organizations') },
+	args: { organizationId: zid('organizations'), today: z.string().optional() },
 	returns: z.object({
-		organization: z.object({ id: zid('organizations'), name: z.string() }),
-		needsInfo: z.array(boardItem),
+		organization: z.object({
+			id: zid('organizations'),
+			name: z.string(),
+			hasAllocations: z.boolean()
+		}),
 		readyToFill: z.array(boardItem),
+		toFinish: z.array(boardItem),
+		afterEvent: z.array(boardItem),
 		waitingOnEngage: z.array(boardItem),
-		approved: z.array(boardItem),
-		hasMoreApproved: z.boolean()
+		approvedThisYear: z.object({ count: z.number(), total: z.number() })
 	}),
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		const organization = await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
+		const today = args.today ?? todayInEugene(Date.now());
 		const byStatus = (status: Doc<'purchaseRequests'>['status'], limit: number) =>
 			ctx.db
 				.query('purchaseRequests')
@@ -90,29 +111,53 @@ export const organizationBoard = authedQuery({
 				.order('desc')
 				.take(limit);
 		const [drafts, ready, approved] = await Promise.all([
-			byStatus('draft', 40),
-			byStatus('ready', 40),
-			byStatus('approved', 11)
+			byStatus('draft', openLimit),
+			byStatus('ready', openLimit),
+			byStatus('approved', approvedLimit)
 		]);
-		const [draftItems, readyItems] = await Promise.all([
-			Promise.all(drafts.map((request) => checkedItem(ctx, request))),
-			Promise.all(ready.map((request) => checkedItem(ctx, request)))
-		]);
-		const stillReady = ready.filter((_, index) => readyItems[index].nextStep === null);
+		const items = await Promise.all(
+			[...drafts, ...ready].map((request) => placedItem(ctx, request, today))
+		);
+		const group = (landing: Stage) =>
+			items.filter((item) => item.landing === landing).map((item) => item.item);
+		const fiscalYear = fiscalYearOf(today);
+		const approvedThisYear = approved.filter(
+			(request) => fiscalYearOf(purchaseDate(request)) === fiscalYear
+		);
 		return {
-			organization: { id: organization._id, name: organization.name },
-			needsInfo: [...draftItems, ...readyItems.filter((item) => item.nextStep !== null)].sort(
-				(left, right) => right.updatedAt - left.updatedAt
-			),
-			readyToFill: stillReady
-				.filter((request) => request.lastFilledAt === null)
-				.map((request) => baseItem(request)),
-			waitingOnEngage: stillReady
-				.filter((request) => request.lastFilledAt !== null)
-				.map((request) => baseItem(request)),
-			approved: approved.slice(0, 10).map((request) => baseItem(request)),
-			hasMoreApproved: approved.length > 10
+			organization: {
+				id: organization._id,
+				name: organization.name,
+				hasAllocations: organization.budgetLines.some((line) => line.allocations.length > 0)
+			},
+			readyToFill: group('ready').sort(byUpdatedAt),
+			toFinish: group('to_finish').sort(byDaysLeft),
+			afterEvent: group('after_event').sort(byFinishAfter),
+			waitingOnEngage: group('filled').sort(byUpdatedAt),
+			approvedThisYear: {
+				count: approvedThisYear.length,
+				total: roundCents(approvedThisYear.reduce((sum, request) => sum + request.totalAmount, 0))
+			}
 		};
+	}
+});
+
+export const markSentBack = authedMutation({
+	args: { purchaseRequestId: zid('purchaseRequests'), note: z.string() },
+	returns: z.null(),
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
+		if (request.status !== 'ready' || request.lastFilledAt === null) {
+			throw new Error('Only requests filled on Engage can be sent back.');
+		}
+		await ctx.db.patch(request._id, {
+			status: 'draft',
+			lastFilledAt: null,
+			reviewerNote: args.note.trim(),
+			updatedAt: Date.now()
+		});
+		return null;
 	}
 });
 
@@ -143,29 +188,61 @@ export const recentPurposes = authedQuery({
 	}
 });
 
-function baseItem(request: Doc<'purchaseRequests'>): BoardItem {
-	return {
-		id: request._id,
-		vendor: request.vendor,
-		itemDescription: request.itemDescription,
-		totalAmount: request.totalAmount,
-		date: request.receiptDate ?? request.activity.dates[0] ?? '',
-		receiptCount: request.receiptFileIds.length,
-		reading: false,
-		nextStep: null,
-		updatedAt: request.updatedAt
-	};
-}
-
-async function checkedItem(ctx: QueryCtx, request: Doc<'purchaseRequests'>): Promise<BoardItem> {
+async function placedItem(ctx: QueryCtx, request: Doc<'purchaseRequests'>, today: string) {
 	const extractions = await requestExtractions(ctx, request);
 	const reading = extractions.some(
 		(extraction) => extraction.status === 'pending' || extraction.status === 'running'
 	);
 	const { readiness, checks } = await readinessWithChecks(ctx, request, extractions);
-	return {
-		...baseItem(request),
+	const context = { reading, readinessReady: readiness.ready, today };
+	const lifecycle = requestLifecycle(request, context);
+	const landing =
+		lifecycle.stage === 'reading'
+			? requestLifecycle(request, { ...context, reading: false }).stage
+			: lifecycle.stage;
+	const nextStep = plainNextStep(readiness, checks);
+	const item: BoardItem = {
+		id: request._id,
+		vendor: request.vendor,
+		itemDescription: request.itemDescription,
+		totalAmount: request.totalAmount,
+		receiptDate: request.receiptDate ?? null,
+		budgetLineItem: request.budgetLineItem,
+		stage: lifecycle.stage,
+		nextStep: nextStep ?? (request.reviewerNote === null ? null : sentBackStep),
+		finishAfter: lifecycle.finishAfter,
+		deadline: lifecycle.deadline,
+		daysLeft: lifecycle.daysLeft,
 		reading,
-		nextStep: plainNextStep(readiness, checks)
+		receiptCount: request.receiptFileIds.length,
+		lastFilledAt: request.lastFilledAt,
+		updatedAt: request.updatedAt
 	};
+	return { landing, item };
+}
+
+function purchaseDate(request: Doc<'purchaseRequests'>) {
+	return request.receiptDate ?? todayInEugene(request.createdAt);
+}
+
+function roundCents(value: number) {
+	return Math.round(value * 100) / 100;
+}
+
+function byUpdatedAt(left: BoardItem, right: BoardItem) {
+	return right.updatedAt - left.updatedAt;
+}
+
+function byDaysLeft(left: BoardItem, right: BoardItem) {
+	if (left.daysLeft === right.daysLeft) return byUpdatedAt(left, right);
+	if (left.daysLeft === null) return 1;
+	if (right.daysLeft === null) return -1;
+	return left.daysLeft - right.daysLeft;
+}
+
+function byFinishAfter(left: BoardItem, right: BoardItem) {
+	if (left.finishAfter === right.finishAfter) return byUpdatedAt(left, right);
+	if (left.finishAfter === null) return 1;
+	if (right.finishAfter === null) return -1;
+	return left.finishAfter < right.finishAfter ? -1 : 1;
 }

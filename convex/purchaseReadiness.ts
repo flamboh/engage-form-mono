@@ -69,8 +69,9 @@ export async function evaluatePurchaseReadiness(
 	requireSectionText('Purchaser', request.purchaser.name, 'Purchaser name missing.');
 	requireSectionText('Purchaser', request.purchaser.uo95, 'Purchaser UO 95 missing.');
 	requireSectionText('Purchaser', request.purchaser.permanentAddress, 'Purchaser address missing.');
-	if (request.purchaser.idCardFrontFileId === null) add('Purchaser', 'ID card document missing.');
-	if (request.purchaser.idCardBackFileId === null) add('Purchaser', 'Back of ID card missing.');
+	if (await idCardMissing(request, options.documentExists)) {
+		add('Purchaser', idCardReason(request));
+	}
 
 	requireSectionText('Purchase details', request.vendor, 'Vendor missing.');
 	requireSectionText('Purchase details', request.itemDescription, 'Item description missing.');
@@ -129,24 +130,6 @@ export async function evaluatePurchaseReadiness(
 	}
 
 	if (options.documentExists !== undefined) {
-		if (request.purchaser.idCardFrontFileId !== null) {
-			await requireOwnedDocument(
-				add,
-				options.documentExists,
-				request.purchaser.idCardFrontFileId,
-				'Purchaser',
-				'ID card document missing.'
-			);
-		}
-		if (request.purchaser.idCardBackFileId !== null) {
-			await requireOwnedDocument(
-				add,
-				options.documentExists,
-				request.purchaser.idCardBackFileId,
-				'Purchaser',
-				'Back of ID card missing.'
-			);
-		}
 		if (request.receiptFileIds.length > 0) {
 			for (const id of request.receiptFileIds) {
 				await requireOwnedDocument(
@@ -188,6 +171,21 @@ export async function evaluatePurchaseReadiness(
 	}
 
 	return { ready: sections.length === 0, sections };
+}
+
+export const selfIdCardReason = 'Your UO ID (front and back) missing.';
+export const purchaserIdCardReason = 'Purchaser UO ID (front and back) missing.';
+
+function idCardReason(request: Doc<'purchaseRequests'>) {
+	return request.purchaserSource.kind === 'self' ? selfIdCardReason : purchaserIdCardReason;
+}
+
+async function idCardMissing(request: Doc<'purchaseRequests'>, documentExists?: DocumentExists) {
+	for (const id of [request.purchaser.idCardFrontFileId, request.purchaser.idCardBackFileId]) {
+		if (id === null || id.trim() === '') return true;
+		if (documentExists !== undefined && !(await documentExists(id))) return true;
+	}
+	return false;
 }
 
 const eventFacts: MissingFact[] = ['eventName', 'dates', 'time', 'location', 'attendance'];

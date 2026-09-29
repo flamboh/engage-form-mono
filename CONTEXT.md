@@ -52,6 +52,26 @@ _Avoid_: Submitted, approved
 A purchase request the requester has manually marked as approved after Engage review.
 _Avoid_: Complete, accepted
 
+**Sent Back**:
+A filled purchase request the requester reports Engage's reviewer returned. It reopens as a **Draft** and keeps the reviewer's note until it is filled again.
+_Avoid_: Rejected, denied, returned
+
+**Stage**:
+Where a purchase request sits in its lifecycle, derived from its status and facts rather than stored: Reading, After the event, To finish, Ready, Filled, or Approved.
+_Avoid_: Status, state, column
+
+**After the event**:
+The **Stage** of a **Draft** whose receipt facts are in and whose **Activity** is today, later, or undated, with more than a week left in its **Reimbursement Window**. It is only a grouping; nothing waits on the event date.
+_Avoid_: Tracked, pending, blocked
+
+**Reimbursement Window**:
+The 30 days after a **Receipt**'s date in which Engage expects a **Personal Reimbursement**. Its last week moves a **Draft** to To finish whatever its **Activity** dates.
+_Avoid_: Deadline, grace period
+
+**Allocation**:
+The amount a **Student Organization** was given for one **Budget Line Item** in one fiscal year (July 1 to June 30). A **Budget Line Item** without one is untracked.
+_Avoid_: Budget, limit, balance
+
 **Engage**:
 The University of Oregon platform where purchase requests are reviewed and submitted.
 _Avoid_: RTP, form backend
@@ -139,6 +159,7 @@ _Avoid_: ID card image, ID file, card upload
 - A **Purchase Request** has exactly one **Business Purpose**, generated from its facts or customized
 - A **Personal Reimbursement** has exactly one **Reimbursement Reason**
 - A **Purchase Request** charges exactly one **Budget Line Item**
+- A **Budget Line Item** has at most one **Allocation** per fiscal year
 - A **Purchase Request** may have one or more **Recipients**
 - A **Purchase Request** may have one or more **Documents**
 - A **Purchase Request** for an event using **ASUO Funds** requires **Publicity Proof**
@@ -147,7 +168,12 @@ _Avoid_: ID card image, ID file, card upload
 - A **Personal Reimbursement** requires an **ID Card Document** for its **Purchaser**
 - A **Personal Reimbursement** requires one or more **Receipts**
 - A **Purchase Request** is **Draft**, **Ready**, or **Approved**
-- A **Filled** purchase request remains **Ready** until manually marked **Approved**
+- A **Purchase Request** has exactly one **Stage**, derived from its status and facts
+- A **Draft** that meets every requirement is at the **Ready** **Stage** and can be filled, whatever its **Activity** dates
+- A **Draft** being read is at the Reading **Stage** until its **Documents** are read
+- A **Draft** missing requirements is **After the event** or To finish; its **Reimbursement Window**'s last week makes it To finish
+- A **Sent Back** purchase request is a **Draft** at the To finish **Stage** until it is filled again
+- A **Filled** purchase request remains **Ready** until manually marked **Approved** or **Sent Back**
 - An **Approved** purchase request may be reopened as **Filled** or **Ready**
 - Editing an **Approved** purchase request returns it to **Ready**
 
@@ -171,3 +197,5 @@ _Avoid_: ID card image, ID file, card upload
 - "file" describes storage; resolved: use **Document** for evidence attached to a **Purchase Request**.
 - "requester is purchaser" describes the rule mechanically; resolved: use **Self Reimbursement** for that domain case.
 - A purchaser needs two **ID Card Documents**: the front and the back of their UO ID card.
+- "status" was used for both the stored Draft/Ready/Approved value and the board's groups; resolved: status is stored, **Stage** is derived.
+- "after the event" once meant filling was blocked until the event; resolved: **After the event** is only a grouping, and filling waits on requirements alone.
