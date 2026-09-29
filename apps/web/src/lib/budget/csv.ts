@@ -1,16 +1,7 @@
 import type { LedgerRow } from '$convex/authed/budget';
-import type { Stage } from '$convex/lifecycle';
+import { stageLabels } from '../../../../../convex/lifecycle';
 
-export const stageLabels: Record<Stage, string> = {
-	reading: 'Reading',
-	after_event: 'After the event',
-	to_finish: 'To finish',
-	ready: 'Ready',
-	filled: 'Filled',
-	approved: 'Approved'
-};
-
-export const ledgerColumns = [
+const ledgerColumns = [
 	'Bought',
 	'Vendor',
 	'Items',

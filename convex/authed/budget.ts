@@ -16,12 +16,11 @@ import {
 import { todayInEugene } from '../lifecycle';
 import { ownerFromIdentity, requireOwnedDoc } from '../purchaseModel';
 import { authedQuery } from './helpers';
+import { stage } from '../requestView';
 
-export const MAX_REQUESTS_PER_YEAR = 500;
+const MAX_REQUESTS_PER_YEAR = 500;
 const YEARS_BACK = 5;
 const RECEIPT_DATE_INDEX = 'by_owner_and_organizationSourceId_and_receiptDate';
-
-const stage = z.enum(['reading', 'after_event', 'to_finish', 'ready', 'filled', 'approved']);
 
 const fiscalYearShape = z.object({
 	year: z.number(),

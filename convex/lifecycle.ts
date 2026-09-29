@@ -1,5 +1,14 @@
 export type Stage = 'reading' | 'after_event' | 'to_finish' | 'ready' | 'filled' | 'approved';
 
+export const stageLabels: Record<Stage, string> = {
+	reading: 'Reading',
+	after_event: 'After the event',
+	to_finish: 'To finish',
+	ready: 'Ready',
+	filled: 'Filled',
+	approved: 'Approved'
+};
+
 export type StoredStatus = 'draft' | 'ready' | 'approved';
 
 export const REIMBURSEMENT_WINDOW_DAYS = 30;

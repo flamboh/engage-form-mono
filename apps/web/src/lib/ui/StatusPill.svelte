@@ -1,19 +1,10 @@
 <script lang="ts">
-	import type { Stage } from '$convex/lifecycle';
+	import { stageLabels, type Stage } from '$convex/lifecycle';
 
 	let { stage }: { stage: Stage } = $props();
-
-	const labels: Record<Stage, string> = {
-		reading: 'Reading',
-		after_event: 'After the event',
-		to_finish: 'To finish',
-		ready: 'Ready',
-		filled: 'Filled',
-		approved: 'Approved'
-	};
 </script>
 
-<span class="pill {stage}">{labels[stage]}</span>
+<span class="pill {stage}">{stageLabels[stage]}</span>
 
 <style>
 	.pill {
