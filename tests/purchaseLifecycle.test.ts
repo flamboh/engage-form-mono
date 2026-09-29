@@ -88,7 +88,8 @@ test('snapshot saves patch only changed fields and reopen Approved requests as R
 			itemDescription: 'cassette',
 			updatedAt: expect.any(Number),
 			fieldSources: { itemDescription: 'user' },
-			status: 'ready'
+			status: 'ready',
+			approvedAt: null
 		}
 	]);
 });

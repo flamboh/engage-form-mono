@@ -314,7 +314,7 @@ export const saveDraftSnapshot = authedMutation({
 		await ctx.db.patch(args.id, {
 			...patch,
 			...(fieldSources === request.fieldSources ? {} : { fieldSources }),
-			...(request.status === 'approved' ? { status: 'ready' as const } : {})
+			...(request.status === 'approved' ? { status: 'ready' as const, approvedAt: null } : {})
 		});
 		return null;
 	}
@@ -344,7 +344,8 @@ export const markApproved = authedMutation({
 		const owner = ownerFromIdentity(ctx.identity);
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
 		if (request.status !== 'ready') throw new Error('Only ready requests can be approved.');
-		await ctx.db.patch(args.id, { status: 'approved', updatedAt: Date.now() });
+		const now = Date.now();
+		await ctx.db.patch(args.id, { status: 'approved', approvedAt: now, updatedAt: now });
 		return null;
 	}
 });
@@ -357,6 +358,7 @@ export const reopenPurchase = authedMutation({
 		await requireOwnedDoc(ctx, 'purchaseRequests', args.id, owner);
 		await ctx.db.patch(args.id, {
 			status: 'ready',
+			approvedAt: null,
 			...(args.clearFilled ? { lastFilledAt: null } : {}),
 			updatedAt: Date.now()
 		});

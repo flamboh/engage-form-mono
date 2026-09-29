@@ -11,6 +11,7 @@
 import type * as approvalEmail from "../approvalEmail.js";
 import type * as authed_approvers from "../authed/approvers.js";
 import type * as authed_board from "../authed/board.js";
+import type * as authed_budget from "../authed/budget.js";
 import type * as authed_checks from "../authed/checks.js";
 import type * as authed_documents from "../authed/documents.js";
 import type * as authed_events from "../authed/events.js";
@@ -19,6 +20,7 @@ import type * as authed_extensionSessions from "../authed/extensionSessions.js";
 import type * as authed_helpers from "../authed/helpers.js";
 import type * as authed_previews from "../authed/previews.js";
 import type * as authed_purchaseBuilder from "../authed/purchaseBuilder.js";
+import type * as budget from "../budget.js";
 import type * as businessPurpose from "../businessPurpose.js";
 import type * as checks_candidates from "../checks/candidates.js";
 import type * as checks_load from "../checks/load.js";
@@ -37,6 +39,7 @@ import type * as extraction_textract from "../extraction/textract.js";
 import type * as fileSigning from "../fileSigning.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as lifecycle from "../lifecycle.js";
 import type * as purchaseCategories from "../purchaseCategories.js";
 import type * as purchaseModel from "../purchaseModel.js";
 import type * as purchaseReadiness from "../purchaseReadiness.js";
@@ -54,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   approvalEmail: typeof approvalEmail;
   "authed/approvers": typeof authed_approvers;
   "authed/board": typeof authed_board;
+  "authed/budget": typeof authed_budget;
   "authed/checks": typeof authed_checks;
   "authed/documents": typeof authed_documents;
   "authed/events": typeof authed_events;
@@ -62,6 +66,7 @@ declare const fullApi: ApiFromModules<{
   "authed/helpers": typeof authed_helpers;
   "authed/previews": typeof authed_previews;
   "authed/purchaseBuilder": typeof authed_purchaseBuilder;
+  budget: typeof budget;
   businessPurpose: typeof businessPurpose;
   "checks/candidates": typeof checks_candidates;
   "checks/load": typeof checks_load;
@@ -80,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   fileSigning: typeof fileSigning;
   files: typeof files;
   http: typeof http;
+  lifecycle: typeof lifecycle;
   purchaseCategories: typeof purchaseCategories;
   purchaseModel: typeof purchaseModel;
   purchaseReadiness: typeof purchaseReadiness;

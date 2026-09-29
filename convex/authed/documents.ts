@@ -157,7 +157,7 @@ export const resolveReview = authedMutation({
 		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
 		await ctx.db.patch(request._id, {
 			...resolveReviewPatch(request, args.field, args.value),
-			...(request.status === 'approved' ? { status: 'ready' as const } : {}),
+			...(request.status === 'approved' ? { status: 'ready' as const, approvedAt: null } : {}),
 			updatedAt: Date.now()
 		});
 		return null;
