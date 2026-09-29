@@ -8,6 +8,7 @@ import {
 	getUserProfile,
 	ownerFromIdentity,
 	previousRequestDefaults,
+	withSuggestedEvent,
 	purchaserDetails,
 	requireOwnedDoc,
 	requireText,
@@ -258,16 +259,27 @@ export const createDraftForOrganization = authedMutation({
 				: null;
 		const previousEvent =
 			previous?.activity.eventId != null ? await ctx.db.get(previous.activity.eventId) : null;
+		const events = await ctx.db
+			.query('events')
+			.withIndex('by_owner_and_organizationId_and_archived', (q) =>
+				q.eq('owner', owner).eq('organizationId', organization._id).eq('archived', false)
+			)
+			.take(20);
 		return await ctx.db.insert('purchaseRequests', {
 			...draft,
 			organizationSourceId: organization._id,
 			studentOrganization: studentOrganizationDetails(organization),
 			budgetLineItem: organization.budgetLines[0] ?? '',
-			...previousRequestDefaults(
-				previous,
-				organization,
-				previousPurchaser !== null && previousPurchaser.owner === owner ? previousPurchaser : null,
-				previousEvent !== null && previousEvent.owner === owner ? previousEvent : null
+			...withSuggestedEvent(
+				previousRequestDefaults(
+					previous,
+					organization,
+					previousPurchaser !== null && previousPurchaser.owner === owner
+						? previousPurchaser
+						: null,
+					previousEvent !== null && previousEvent.owner === owner ? previousEvent : null
+				),
+				events
 			)
 		});
 	}

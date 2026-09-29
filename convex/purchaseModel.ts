@@ -193,6 +193,30 @@ export function previousRequestDefaults(
 	return { ...defaults, fieldSources: sources };
 }
 
+export function withSuggestedEvent(
+	defaults: Partial<Doc<'purchaseRequests'>>,
+	events: Doc<'events'>[]
+): Partial<Doc<'purchaseRequests'>> {
+	if (defaults.activity !== undefined) return defaults;
+	const event = events
+		.filter((item) => !item.archived)
+		.sort((a, b) => (b.lastUsedAt ?? b._creationTime) - (a.lastUsedAt ?? a._creationTime))[0];
+	if (event === undefined) return defaults;
+	return {
+		...defaults,
+		activity: {
+			eventId: event._id,
+			name: event.name,
+			dates: [],
+			time: event.time,
+			location: event.location,
+			attendance: event.attendance,
+			openToAllStudents: event.openToAllStudents
+		},
+		fieldSources: { ...(defaults.fieldSources ?? {}), activity: 'suggested' }
+	};
+}
+
 export function renderBusinessPurpose(request: Doc<'purchaseRequests'>, now = Date.now()) {
 	return businessPurposeFor(request, todayInOregon(now)).text;
 }

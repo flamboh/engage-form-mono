@@ -15,6 +15,7 @@ import {
 import {
 	changedSnapshotPatch,
 	previousRequestDefaults,
+	withSuggestedEvent,
 	userFieldSources
 } from '../convex/purchaseModel';
 
@@ -464,4 +465,34 @@ test('confirming a store or items clears its removal check', () => {
 		receiptChecks: [{ field: 'vendor', value: 'Corner Records' }]
 	});
 	expect(() => resolveReviewPatch(flagged, 'itemDescription', ' ')).toThrow('Items missing.');
+});
+
+test('new drafts suggest the most recently used saved event when there is no previous one', () => {
+	const event = (id: string, name: string, lastUsedAt: number | null, creation: number) =>
+		({
+			_id: id,
+			_creationTime: creation,
+			owner: 'owner',
+			organizationId: 'org_1',
+			name,
+			weekday: 2,
+			time: '18:30',
+			location: 'McKenzie 240A',
+			attendance: 50,
+			openToAllStudents: true,
+			lastUsedAt,
+			archived: false,
+			updatedAt: creation
+		}) as unknown as Doc<'events'>;
+	const events = [
+		event('event_old', 'Old night', 10, 1),
+		event('event_new', 'Trivia night', 20, 2)
+	];
+	expect(withSuggestedEvent({}, events)).toMatchObject({
+		activity: { eventId: 'event_new', name: 'Trivia night', dates: [], time: '18:30' },
+		fieldSources: { activity: 'suggested' }
+	});
+	const previous = { activity: { name: 'Kept' } } as Partial<Doc<'purchaseRequests'>>;
+	expect(withSuggestedEvent(previous, events)).toBe(previous);
+	expect(withSuggestedEvent({}, [])).toEqual({});
 });
