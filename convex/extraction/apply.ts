@@ -171,17 +171,6 @@ export function receiptFieldsPatch(request: Request, extractions: Extraction[]):
 		}
 	}
 
-	const nextReceiptDate = 'receiptDate' in patch ? (patch.receiptDate ?? '') : previousReceiptDate;
-	const activityDate = request.activityDate ?? '';
-	const followsReceipt =
-		activityDate === '' ||
-		(sources.activityDate === 'receipt' && activityDate === previousReceiptDate);
-	if (sources.activityDate !== 'user' && followsReceipt && activityDate !== nextReceiptDate) {
-		patch.activityDate = nextReceiptDate;
-		if (nextReceiptDate === '') delete sources.activityDate;
-		else sources.activityDate = 'receipt';
-	}
-
 	if (JSON.stringify(sources) !== JSON.stringify(request.fieldSources ?? {})) {
 		patch.fieldSources = sources;
 	}
@@ -284,16 +273,7 @@ export function resolveReviewPatch(
 		return { totalAmount: Math.round(amount * 100) / 100, fieldSources: sources };
 	}
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error('Receipt date must be YYYY-MM-DD.');
-	const patch: Partial<Request> = { receiptDate: text, fieldSources: sources };
-	const activityDate = request.activityDate ?? '';
-	if (
-		sources.activityDate !== 'user' &&
-		(activityDate === '' || activityDate === (request.receiptDate ?? ''))
-	) {
-		patch.activityDate = text;
-		sources.activityDate = 'receipt';
-	}
-	return patch;
+	return { receiptDate: text, fieldSources: sources };
 }
 
 export function isCurrentAttempt(

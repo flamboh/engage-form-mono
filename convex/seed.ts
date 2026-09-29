@@ -36,11 +36,20 @@ export const restoreOwner = internalMutation({
 					v.literal('T')
 				),
 				budgetLines: v.array(v.string()),
-				businessPurposeTemplate: v.string()
+				events: v.array(
+					v.object({
+						name: v.string(),
+						weekday: v.union(v.number(), v.null()),
+						time: v.string(),
+						location: v.string(),
+						attendance: v.union(v.number(), v.null()),
+						openToAllStudents: v.boolean()
+					})
+				)
 			})
 		)
 	},
-	returns: v.object({ organizations: v.number() }),
+	returns: v.object({ organizations: v.number(), events: v.number() }),
 	handler: async (ctx, args) => {
 		const prefix = await ownerKeyPrefix(args.owner);
 		for (const file of [args.idCardFront, args.idCardBack]) {
@@ -64,16 +73,37 @@ export const restoreOwner = internalMutation({
 			.withIndex('by_owner_and_archived', (q) => q.eq('owner', args.owner).eq('archived', false))
 			.take(50);
 		let created = 0;
-		for (const organization of args.organizations) {
-			if (current.some((item) => item.name === organization.name)) continue;
-			await ctx.db.insert('organizations', {
-				...organization,
-				owner: args.owner,
-				archived: false,
-				updatedAt: now
-			});
-			created += 1;
+		let createdEvents = 0;
+		for (const { events, ...organization } of args.organizations) {
+			let organizationId = current.find((item) => item.name === organization.name)?._id;
+			if (organizationId === undefined) {
+				organizationId = await ctx.db.insert('organizations', {
+					...organization,
+					owner: args.owner,
+					archived: false,
+					updatedAt: now
+				});
+				created += 1;
+			}
+			const existingEvents = await ctx.db
+				.query('events')
+				.withIndex('by_owner_and_organizationId_and_archived', (q) =>
+					q.eq('owner', args.owner).eq('organizationId', organizationId).eq('archived', false)
+				)
+				.take(100);
+			for (const event of events) {
+				if (existingEvents.some((item) => item.name === event.name)) continue;
+				await ctx.db.insert('events', {
+					...event,
+					owner: args.owner,
+					organizationId,
+					lastUsedAt: null,
+					archived: false,
+					updatedAt: now
+				});
+				createdEvents += 1;
+			}
 		}
-		return { organizations: created };
+		return { organizations: created, events: createdEvents };
 	}
 });

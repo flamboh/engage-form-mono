@@ -15,7 +15,6 @@ test('final common facts do not require Activity Date', () => {
 	expect(
 		validatePurchaseReadiness({
 			...samplePurchaseRequest,
-			activityDate: '',
 			businessPurposeText: 'Album Listening Club wishes to reimburse Oliver Boorstein.'
 		})
 	).toEqual([]);

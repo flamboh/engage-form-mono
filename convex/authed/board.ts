@@ -133,7 +133,7 @@ function baseItem(request: Doc<'purchaseRequests'>): BoardItem {
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
-		date: request.receiptDate ?? request.activityDate ?? '',
+		date: request.receiptDate ?? request.activity.dates[0] ?? '',
 		receiptCount: request.receiptFileIds.length,
 		reading: false,
 		nextStep: null,

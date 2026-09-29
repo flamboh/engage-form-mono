@@ -14,7 +14,6 @@ import {
 } from '../convex/extraction/apply';
 import {
 	changedSnapshotPatch,
-	parseBusinessPurposeText,
 	previousRequestDefaults,
 	userFieldSources
 } from '../convex/purchaseModel';
@@ -35,8 +34,7 @@ const draft = {
 		name: 'Album Listening Club',
 		indexNumber: 'OS1',
 		fundLetter: 'I',
-		budgetLines: ['Event Expenses', 'Food'],
-		businessPurposeTemplate: ''
+		budgetLines: ['Event Expenses', 'Food']
 	},
 	requester: {
 		id: 'user_1',
@@ -56,14 +54,21 @@ const draft = {
 		idCardFrontFileId: 'file_front',
 		idCardBackFileId: null
 	},
-	activityDate: '',
+	activity: {
+		eventId: null,
+		name: '',
+		dates: [],
+		time: '',
+		location: '',
+		attendance: null,
+		openToAllStudents: true
+	},
 	vendor: '',
 	itemDescription: '',
 	totalAmount: 0,
 	budgetLineItem: 'Event Expenses',
 	reimbursementReason: 'Other processes are too slow.',
-	businessPurposeSource: parseBusinessPurposeText('Snacks from {Vendor}.'),
-	businessPurposeTouched: false,
+	businessPurposeOverride: null,
 	receiptFileIds: [receiptA, receiptB],
 	secondApprovalFileId: null,
 	publicityFileId: null,
@@ -117,13 +122,11 @@ test('multiple receipts fill summed totals, joined vendors, items, and the earli
 		itemDescription: 'KS Trail Mix, KS Cocoa Bites, New LP',
 		totalAmount: 47.48,
 		receiptDate: '2025-10-12',
-		activityDate: '2025-10-12',
 		fieldSources: {
 			vendor: 'receipt',
 			itemDescription: 'receipt',
 			totalAmount: 'receipt',
-			receiptDate: 'receipt',
-			activityDate: 'receipt'
+			receiptDate: 'receipt'
 		}
 	});
 });
@@ -132,14 +135,13 @@ test('receipt extraction never overwrites user-set fields', () => {
 	const touched = {
 		...draft,
 		vendor: 'Typed Vendor',
-		activityDate: '2025-11-01',
-		fieldSources: { vendor: 'user', activityDate: 'user' }
+		fieldSources: { vendor: 'user' }
 	} as Doc<'purchaseRequests'>;
 	const patch = receiptFieldsPatch(touched, [bigbox]);
 	expect(patch).not.toHaveProperty('vendor');
-	expect(patch).not.toHaveProperty('activityDate');
+	expect(patch).not.toHaveProperty('activity');
 	expect(patch.totalAmount).toBe(28.48);
-	expect(patch.fieldSources).toMatchObject({ vendor: 'user', activityDate: 'user' });
+	expect(patch.fieldSources).toMatchObject({ vendor: 'user' });
 });
 
 test('pending extractions and detached receipts do not contribute', () => {
@@ -159,16 +161,14 @@ test('removing a receipt recomputes receipt-sourced fields and clears when none 
 		vendor: 'Bigbox Wholesale',
 		totalAmount: 28.48,
 		itemDescription: 'KS Trail Mix, KS Cocoa Bites',
-		receiptDate: '2025-10-14',
-		activityDate: '2025-10-14'
+		receiptDate: '2025-10-14'
 	});
 	const empty = { ...filled, receiptFileIds: [] } as Doc<'purchaseRequests'>;
 	const cleared = receiptFieldsPatch(empty, [bigbox, corner]);
 	expect(cleared).toMatchObject({
 		vendor: '',
 		itemDescription: '',
-		totalAmount: 0,
-		activityDate: ''
+		totalAmount: 0
 	});
 	expect(cleared).toHaveProperty('receiptDate', undefined);
 	expect(cleared.fieldSources).toEqual({});
@@ -205,17 +205,15 @@ test('a missing value with alternatives still asks, and an empty guess never sho
 	expect(requestReviews(single, [blank])).toEqual([]);
 });
 
-test('resolving the receipt date moves an Activity Date that followed the receipt', () => {
+test('resolving the receipt date leaves the event dates alone', () => {
 	const filled = {
 		...draft,
 		receiptDate: '2025-10-14',
-		activityDate: '2025-10-14',
-		fieldSources: { receiptDate: 'receipt', activityDate: 'receipt' }
+		fieldSources: { receiptDate: 'receipt' }
 	} as Doc<'purchaseRequests'>;
 	expect(resolveReviewPatch(filled, 'receiptDate', '2025-10-15')).toEqual({
 		receiptDate: '2025-10-15',
-		activityDate: '2025-10-15',
-		fieldSources: { receiptDate: 'user', activityDate: 'receipt' }
+		fieldSources: { receiptDate: 'user' }
 	});
 	expect(() => resolveReviewPatch(filled, 'totalAmount', 'abc')).toThrow();
 });
@@ -257,7 +255,15 @@ test('new drafts copy defaults from the previous request in the organization', (
 		purchaserSource: { kind: 'purchaser', purchaserId: purchaser._id },
 		budgetLineItem: 'Food',
 		documentationCategories: ['food'],
-		businessPurposeTouched: true
+		activity: {
+			eventId: null,
+			name: 'Weekly event',
+			dates: ['2025-10-14'],
+			time: '18:00',
+			location: 'Room 1',
+			attendance: 30,
+			openToAllStudents: true
+		}
 	} as Doc<'purchaseRequests'>;
 	const organization = { _id: 'org_1', budgetLines: ['Event Expenses', 'Food'] } as never;
 	expect(previousRequestDefaults(previous, organization, purchaser)).toEqual({
@@ -270,14 +276,13 @@ test('new drafts copy defaults from the previous request in the organization', (
 			idCardFrontFileId: 'file_pat',
 			idCardBackFileId: null
 		},
-		businessPurposeSource: previous.businessPurposeSource,
-		businessPurposeTouched: true,
+		activity: { ...previous.activity, dates: [] },
 		budgetLineItem: 'Food',
 		documentationCategories: ['food'],
 		reimbursementReason: 'Other processes are too slow.',
 		fieldSources: {
 			purchaserSource: 'previous',
-			businessPurposeSource: 'previous',
+			activity: 'previous',
 			budgetLineItem: 'previous',
 			documentationCategories: 'previous',
 			reimbursementReason: 'previous'
@@ -321,7 +326,7 @@ test('snapshot saves with changedFields only apply and mark the edited fields', 
 		vendor: '',
 		totalAmount: 0,
 		budgetLineItem: 'Food',
-		businessPurposeSource: parseBusinessPurposeText('For {Vendor}'),
+		businessPurposeOverride: 'For the vendor',
 		purchaserSource: { kind: 'self' as const },
 		purchaser: filled.purchaser,
 		updatedAt: 5
@@ -333,8 +338,8 @@ test('snapshot saves with changedFields only apply and mark the edited fields', 
 		totalAmount: 'receipt',
 		budgetLineItem: 'user'
 	});
-	expect(Object.keys(changedSnapshotPatch(staleSnapshot, ['businessPurposeText']))).toEqual([
-		'businessPurposeSource',
+	expect(Object.keys(changedSnapshotPatch(staleSnapshot, ['businessPurposeOverride']))).toEqual([
+		'businessPurposeOverride',
 		'updatedAt'
 	]);
 	expect(Object.keys(changedSnapshotPatch(staleSnapshot, ['typeOfPurchase']))).toEqual([

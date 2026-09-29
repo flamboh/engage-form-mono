@@ -8,10 +8,11 @@ import {
 	demoteIfNotReady,
 	ownerFromIdentity,
 	purchaseReadiness,
-	renderBusinessPurpose,
 	requireOwnedDoc,
 	requireText
 } from '../purchaseModel';
+import { businessPurposeFor, missingFactLabel } from '../businessPurpose';
+import { todayInOregon } from '../events';
 import { nullReturn } from '../purchaseZod';
 import { documentSlot, requestView, reviewField } from '../requestView';
 import {
@@ -57,13 +58,19 @@ export const getRequestView = authedQuery({
 					(slot === 'receipt' && url === null && extraction?.status !== 'done')
 			});
 		}
+		const businessPurpose = businessPurposeFor(request, todayInOregon());
 		return {
 			purchase: request,
 			documents,
 			reading: documents.some((document) => document.reading),
 			reviews: requestReviews(request, extractions),
 			readiness: await purchaseReadiness(ctx, request),
-			businessPurposeText: renderBusinessPurpose(request)
+			businessPurposeText: businessPurpose.text,
+			businessPurposeMissing: businessPurpose.missing.map((fact) => ({
+				fact,
+				label: missingFactLabel(fact)
+			})),
+			checks: []
 		};
 	}
 });
