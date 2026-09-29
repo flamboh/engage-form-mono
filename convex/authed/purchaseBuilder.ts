@@ -20,6 +20,7 @@ import {
 } from '../purchaseModel';
 import { normalizeActivity } from './events';
 import {
+	budgetLine,
 	fileKind,
 	fundLetter,
 	nullReturn,
@@ -33,7 +34,7 @@ const createOrganizationArgs = {
 	name: z.string(),
 	indexNumber: z.string(),
 	fundLetter,
-	budgetLines: z.array(z.string())
+	budgetLines: z.array(budgetLine)
 };
 
 const purchaserArgs = {
@@ -82,7 +83,7 @@ export const upsertUserProfile = authedMutation({
 		permanentAddress: z.string(),
 		studentEmail: z.string(),
 		phone: z.string(),
-		idCardFrontFileId: zid('files'),
+		idCardFrontFileId: zid('files').nullable(),
 		idCardBackFileId: zid('files').nullable()
 	},
 	returns: zid('users'),
@@ -93,9 +94,9 @@ export const upsertUserProfile = authedMutation({
 		requireText(args.permanentAddress, 'Permanent address missing.');
 		requireText(args.studentEmail, 'Student email missing.');
 		requireText(args.phone, 'Phone missing.');
-		await requireOwnedDoc(ctx, 'files', args.idCardFrontFileId, owner);
-		if (args.idCardBackFileId === null) throw new Error('Back of ID card missing.');
-		await requireOwnedDoc(ctx, 'files', args.idCardBackFileId, owner);
+		for (const fileId of [args.idCardFrontFileId, args.idCardBackFileId]) {
+			if (fileId !== null) await requireOwnedDoc(ctx, 'files', fileId, owner);
+		}
 		const fields = {
 			owner,
 			name: args.name,
@@ -174,7 +175,7 @@ export const upsertOrganization = authedMutation({
 		const owner = ownerFromIdentity(ctx.identity);
 		requireText(args.name, 'Organization name missing.');
 		requireText(args.indexNumber, 'Index number missing.');
-		const budgetLines = args.budgetLines.map((line) => line.trim()).filter((line) => line !== '');
+		const budgetLines = normalizeBudgetLines(args.budgetLines);
 		if (budgetLines.length === 0) throw new Error('Add at least one budget line.');
 		const fields = {
 			owner,
@@ -269,7 +270,7 @@ export const createDraftForOrganization = authedMutation({
 			...draft,
 			organizationSourceId: organization._id,
 			studentOrganization: studentOrganizationDetails(organization),
-			budgetLineItem: organization.budgetLines[0] ?? '',
+			budgetLineItem: organization.budgetLines[0]?.name ?? '',
 			...withSuggestedEvent(
 				previousRequestDefaults(
 					previous,
@@ -445,8 +446,35 @@ function emptyDraft(
 		recipients: [],
 		createdAt: now,
 		updatedAt: now,
-		lastFilledAt: null
+		lastFilledAt: null,
+		approvedAt: null,
+		reviewerNote: null
 	};
+}
+
+function normalizeBudgetLines(lines: z.infer<typeof budgetLine>[]) {
+	const result: z.infer<typeof budgetLine>[] = [];
+	for (const line of lines) {
+		const name = line.name.trim();
+		if (name === '' || result.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
+			continue;
+		}
+		const allocations = new Map<number, number>();
+		for (const allocation of line.allocations) {
+			if (!Number.isInteger(allocation.fiscalYear)) throw new Error('Fiscal year is invalid.');
+			if (!Number.isFinite(allocation.amount) || allocation.amount < 0) {
+				throw new Error(`Allocation for ${name} must be zero or more.`);
+			}
+			allocations.set(allocation.fiscalYear, Math.round(allocation.amount * 100) / 100);
+		}
+		result.push({
+			name,
+			allocations: [...allocations]
+				.sort(([a], [b]) => a - b)
+				.map(([fiscalYear, amount]) => ({ fiscalYear, amount }))
+		});
+	}
+	return result;
 }
 
 function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {

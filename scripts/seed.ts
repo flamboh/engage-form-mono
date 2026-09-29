@@ -2,12 +2,13 @@ import path from 'node:path';
 import { ownerKeyPrefix, signedFileUrl } from '../convex/fileSigning';
 
 type SeedImage = { kind: 'id_front' | 'id_back'; filename: string; contentType: string };
+type SeedBudgetLine = { name: string; allocations: { fiscalYear: number; amount: number }[] };
 type Seed = {
 	owner: string;
 	profile: Record<string, string>;
 	idCardFront: SeedImage;
 	idCardBack: SeedImage;
-	organizations: unknown[];
+	organizations: (Record<string, unknown> & { budgetLines: SeedBudgetLine[] })[];
 };
 
 const root = path.resolve(import.meta.dirname, '..');

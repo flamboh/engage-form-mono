@@ -35,7 +35,7 @@
 	let name = $state(start?.name ?? '');
 	let indexNumber = $state(start?.indexNumber ?? '');
 	let fundLetter = $state<FundLetter>(start?.fundLetter ?? 'I');
-	let budgetLines = $state<string[]>(start ? [...start.budgetLines] : []);
+	let budgetLines = $state<string[]>(start ? start.budgetLines.map((line) => line.name) : []);
 	let newLine = $state('');
 	let saving = $state(false);
 	let error = $state('');
@@ -77,7 +77,10 @@
 				name: name.trim(),
 				indexNumber: indexNumber.trim(),
 				fundLetter,
-				budgetLines: lines
+				budgetLines: lines.map((line) => ({
+					name: line,
+					allocations: start?.budgetLines.find((item) => item.name === line)?.allocations ?? []
+				}))
 			});
 			newLine = '';
 			budgetLines = lines;

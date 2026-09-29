@@ -73,6 +73,13 @@ export const activity = z.object({
 	openToAllStudents: z.boolean()
 });
 
+export const budgetAllocation = z.object({ fiscalYear: z.number(), amount: z.number() });
+
+export const budgetLine = z.object({
+	name: z.string(),
+	allocations: z.array(budgetAllocation)
+});
+
 export const studentOrganizationDetails = z.object({
 	name: z.string(),
 	indexNumber: z.string(),
@@ -87,7 +94,7 @@ export const requesterDetails = z.object({
 	phone: z.string(),
 	uo95: z.string(),
 	permanentAddress: z.string(),
-	idCardFrontFileId: zid('files'),
+	idCardFrontFileId: zid('files').nullable(),
 	idCardBackFileId: zid('files').nullable()
 });
 
@@ -96,7 +103,7 @@ export const purchaserDetails = z.object({
 	name: z.string(),
 	uo95: z.string(),
 	permanentAddress: z.string(),
-	idCardFrontFileId: zid('files'),
+	idCardFrontFileId: zid('files').nullable(),
 	idCardBackFileId: zid('files').nullable()
 });
 
@@ -114,7 +121,7 @@ export const userDoc = z.object({
 	permanentAddress: z.string(),
 	studentEmail: z.string(),
 	phone: z.string(),
-	idCardFrontFileId: zid('files'),
+	idCardFrontFileId: zid('files').nullable(),
 	idCardBackFileId: zid('files').nullable(),
 	pendingFill: z
 		.object({ purchaseRequestId: zid('purchaseRequests'), requestedAt: z.number() })
@@ -130,7 +137,7 @@ export const organizationDoc = z.object({
 	name: z.string(),
 	indexNumber: z.string(),
 	fundLetter,
-	budgetLines: z.array(z.string()),
+	budgetLines: z.array(budgetLine),
 	archived: z.boolean(),
 	updatedAt: z.number()
 });
@@ -196,6 +203,8 @@ export const purchaseRequestDoc = z.object({
 	createdAt: z.number(),
 	updatedAt: z.number(),
 	lastFilledAt: z.number().nullable(),
+	approvedAt: z.number().nullable(),
+	reviewerNote: z.string().nullable(),
 	fieldSources: z
 		.record(z.string(), z.enum(['user', 'receipt', 'previous', 'suggested']))
 		.optional(),
