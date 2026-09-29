@@ -29,8 +29,8 @@
 {#if !clerkContext.currentSession}
 	<SignInScreen />
 {:else if waiting && !welcomeState.error}
-	<div class="flex min-h-screen items-center justify-center bg-white">
-		<p class="text-sm text-stone-500">Loading…</p>
+	<div class="flex min-h-screen items-center justify-center bg-surface">
+		<p class="text-sm text-quiet">Loading…</p>
 	</div>
 {:else}
 	{@render children()}

@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { api } from '$convex/_generated/api';
-	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import DocumentPicker from '$lib/app/DocumentPicker.svelte';
-	import { errorMessage, inputClass, labelClass, primaryButtonClass } from '$lib/app/styles';
+	import type { Doc } from '$convex/_generated/dataModel';
+	import { errorMessage } from '$lib/app/styles';
 	import { getClerkContext } from '$lib/stores/clerk.svelte';
+	import Button from '$lib/ui/Button.svelte';
+	import InlineError from '$lib/ui/InlineError.svelte';
 	import { useConvexClient } from 'convex-svelte';
 
 	let {
@@ -32,17 +33,11 @@
 	let phone = $state(start?.phone ?? '');
 	let uo95 = $state(start?.uo95 ?? '');
 	let permanentAddress = $state(start?.permanentAddress ?? '');
-	let idCardFrontFileId = $state<Id<'files'> | null>(start?.idCardFrontFileId ?? null);
-	let idCardBackFileId = $state<Id<'files'> | null>(start?.idCardBackFileId ?? null);
 	let saving = $state(false);
 	let error = $state('');
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
-		if (idCardFrontFileId === null || idCardBackFileId === null) {
-			error = 'Add photos of the front and back of your UO ID card to continue.';
-			return;
-		}
 		error = '';
 		saving = true;
 		try {
@@ -52,8 +47,8 @@
 				permanentAddress: permanentAddress.trim(),
 				studentEmail: studentEmail.trim(),
 				phone: phone.trim(),
-				idCardFrontFileId,
-				idCardBackFileId
+				idCardFrontFileId: start?.idCardFrontFileId ?? null,
+				idCardBackFileId: start?.idCardBackFileId ?? null
 			});
 			await onSaved();
 		} catch (err) {
@@ -65,15 +60,15 @@
 </script>
 
 <form class="flex flex-col gap-5" onsubmit={save}>
-	<label class={labelClass}>
+	<label class="flex flex-col gap-1.5 text-sm font-medium">
 		Full name
-		<input class={inputClass} required autocomplete="name" bind:value={name} />
+		<input class="input" required autocomplete="name" bind:value={name} />
 	</label>
 	<div class="grid gap-5 sm:grid-cols-2">
-		<label class={labelClass}>
+		<label class="flex flex-col gap-1.5 text-sm font-medium">
 			UO email
 			<input
-				class={inputClass}
+				class="input"
 				type="email"
 				required
 				autocomplete="email"
@@ -81,39 +76,32 @@
 				bind:value={studentEmail}
 			/>
 		</label>
-		<label class={labelClass}>
+		<label class="flex flex-col gap-1.5 text-sm font-medium">
 			Phone
-			<input class={inputClass} type="tel" required autocomplete="tel" bind:value={phone} />
+			<input class="input" type="tel" required autocomplete="tel" bind:value={phone} />
 		</label>
 	</div>
-	<label class={labelClass}>
+	<label class="flex flex-col gap-1.5 text-sm font-medium">
 		UO ID number
-		<input class={inputClass} required inputmode="numeric" placeholder="95…" bind:value={uo95} />
+		<input class="input" required inputmode="numeric" placeholder="95…" bind:value={uo95} />
 	</label>
-	<label class={labelClass}>
+	<label class="flex flex-col gap-1.5 text-sm font-medium">
 		Permanent address
 		<input
-			class={inputClass}
+			class="input"
 			required
 			autocomplete="street-address"
 			placeholder="Where reimbursement checks can reach you"
 			bind:value={permanentAddress}
 		/>
 	</label>
-	<div class="flex flex-col gap-2">
-		<p class="text-xs text-stone-500">
-			Engage asks for both sides of your UO ID card on every reimbursement. We keep them so you only
-			add them once.
-		</p>
-		<div class="grid gap-5 sm:grid-cols-2">
-			<DocumentPicker bind:fileId={idCardFrontFileId} kind="id_front" label="UO ID card, front" />
-			<DocumentPicker bind:fileId={idCardBackFileId} kind="id_back" label="UO ID card, back" />
-		</div>
-	</div>
-	{#if error}<p class="text-sm text-red-700" role="alert">{error}</p>{/if}
+	<p class="text-sm text-quiet">
+		We’ll ask for photos of your UO ID card the first time you get paid back.
+	</p>
+	{#if error}<InlineError message={error} />{/if}
 	<div>
-		<button class={primaryButtonClass} type="submit" disabled={saving}>
+		<Button variant="primary" type="submit" busy={saving}>
 			{saving ? 'Saving…' : submitLabel}
-		</button>
+		</Button>
 	</div>
 </form>

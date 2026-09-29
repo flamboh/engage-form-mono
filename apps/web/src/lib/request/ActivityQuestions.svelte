@@ -124,7 +124,6 @@
 		{#if creating}
 			<div class="border border-(--line) bg-white p-4">
 				<EventForm
-					tone="request"
 					autofocus
 					submitLabel="Save and use"
 					initial={activity?.eventId === null ? activity : null}

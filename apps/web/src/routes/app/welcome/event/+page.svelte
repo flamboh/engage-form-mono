@@ -21,9 +21,9 @@
 
 <div class="flex flex-col gap-2">
 	<h1 class="text-2xl font-semibold tracking-tight">Do you have a regular event?</h1>
-	<p class="text-sm text-stone-600">
-		Like a weekly meeting in the same room. Engage wants the date, time, place, and turnout on every
-		request. Save them once and each request fills them in.
+	<p class="text-sm text-quiet">
+		Something you hold every week in the same room. Engage wants the date, time, place, and turnout
+		on every request. Save them once and each request fills them in.
 	</p>
 </div>
 

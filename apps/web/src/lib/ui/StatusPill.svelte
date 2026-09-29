@@ -11,31 +11,82 @@
 		filled: 'Filled',
 		approved: 'Approved'
 	};
-
-	const tone: Record<Stage, string> = {
-		reading: 'border-line text-quiet',
-		after_event: 'border-line text-ink',
-		to_finish: 'border-marker-deep bg-marker-soft text-ink',
-		ready: 'border-pine bg-pine-soft text-pine-deep',
-		filled: 'border-pine text-pine-deep',
-		approved: 'border-pine bg-pine text-white'
-	};
-
-	const mark: Record<Stage, string> = {
-		reading: 'border border-current',
-		after_event: 'border border-current',
-		to_finish: 'bg-marker-deep',
-		ready: 'bg-pine',
-		filled: 'border border-current',
-		approved: 'bg-white'
-	};
 </script>
 
-<span
-	class="inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs font-medium whitespace-nowrap {tone[
-		stage
-	]}"
->
-	<span class="h-2 w-2 shrink-0 {mark[stage]}" aria-hidden="true"></span>
-	{labels[stage]}
-</span>
+<span class="pill {stage}">{labels[stage]}</span>
+
+<style>
+	.pill {
+		display: inline-flex;
+		height: 24px;
+		align-items: center;
+		gap: 6px;
+		border: 1px solid var(--line);
+		background: var(--surface);
+		padding: 0 8px;
+		font-size: 12.5px;
+		font-weight: 550;
+		white-space: nowrap;
+		color: var(--ink);
+	}
+
+	.pill::before {
+		content: '';
+		width: 7px;
+		height: 7px;
+		background: currentColor;
+	}
+
+	.reading {
+		border-color: var(--marker-deep);
+		background: var(--marker-soft);
+	}
+
+	.reading::before {
+		background: var(--marker-deep);
+		animation: blink 1.4s ease-in-out infinite;
+	}
+
+	.after_event {
+		color: var(--quiet);
+	}
+
+	.after_event::before,
+	.filled::before {
+		width: 5px;
+		height: 5px;
+		border: 1.5px solid currentColor;
+		background: transparent;
+	}
+
+	.to_finish {
+		border-color: var(--marker-deep);
+	}
+
+	.to_finish::before {
+		background: var(--marker-deep);
+	}
+
+	.ready {
+		border-color: var(--pine);
+		background: var(--pine-soft);
+		color: var(--pine-deep);
+	}
+
+	.filled {
+		border-color: var(--pine);
+		color: var(--pine-deep);
+	}
+
+	.approved {
+		border-color: var(--pine);
+		background: var(--pine);
+		color: white;
+	}
+
+	@keyframes blink {
+		50% {
+			opacity: 0.25;
+		}
+	}
+</style>

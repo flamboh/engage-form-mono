@@ -137,6 +137,7 @@ test('extension lists only Ready Purchase Requests', async () => {
 			status: 'ready',
 			organization: 'Album Listening Club',
 			purchaser: 'Oliver Boorstein',
+			vendor: 'Amazon',
 			itemDescription: 'record',
 			totalAmount: 22.98,
 			updatedAt: 1,

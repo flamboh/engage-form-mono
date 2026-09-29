@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { api } from '$convex/_generated/api';
+	import Button from '$lib/ui/Button.svelte';
+	import FieldRow from '$lib/ui/FieldRow.svelte';
+	import InlineError from '$lib/ui/InlineError.svelte';
 	import { useQuery } from 'convex-svelte';
 	import { getExtensionConnection } from './connection.svelte';
 
@@ -17,78 +20,90 @@
 	const cameFromEngage = $derived(page.url.searchParams.get('connect') === '1');
 
 	function lastUsed(timestamp: number) {
+		const day = (value: number) => new Date(value).toDateString();
+		if (day(timestamp) === day(Date.now())) return 'today';
 		return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(timestamp);
 	}
 </script>
 
 <div class="flex flex-col gap-2 text-sm" data-testid="extension-status">
 	{#if extensionState === 'checking'}
-		<p class="text-stone-500">Looking for the extension…</p>
+		<p class="text-quiet">Looking for the extension…</p>
 	{:else if extensionState === 'missing'}
-		<p class="text-stone-600">
+		<p class="text-quiet">
 			The extension isn’t in this browser yet. Add it, then reload this page and it connects on its
 			own.
 		</p>
-		<button
-			class="self-start font-medium text-[#154733] underline underline-offset-4"
-			type="button"
-			onclick={() => connection.refresh()}
-		>
-			Check again
-		</button>
+		<div><Button variant="quiet" onclick={() => connection.refresh()}>Check again</Button></div>
 	{:else if extensionState === 'connected' && current}
-		<p class="flex flex-wrap items-center gap-x-2 text-stone-900">
-			<span class="inline-flex items-center gap-1.5 font-medium">
-				<span class="h-2 w-2 rounded-full bg-green-600" aria-hidden="true"></span>
-				Extension connected
-			</span>
-			<span class="text-stone-400" aria-hidden="true">·</span>
-			<button
-				class="font-medium text-stone-600 underline underline-offset-4 hover:text-stone-900 disabled:opacity-60"
-				type="button"
-				disabled={connection.busy}
-				onclick={() => connection.disconnect(current.id)}
-			>
-				Disconnect
-			</button>
-		</p>
 		{#if cameFromEngage}
-			<p class="text-stone-600">
+			<p class="border-l-3 border-marker bg-surface py-2 pl-3 text-ink">
 				You’re set. Go back to your Engage tab and it picks up from there.
 			</p>
 		{/if}
-	{:else}
-		<p class="text-stone-600">The extension is installed but not connected to your account.</p>
-		<button
-			class="inline-flex h-10 items-center self-start rounded-full bg-[#154733] px-4 font-medium text-white hover:bg-[#0f3526] disabled:opacity-60"
-			type="button"
-			disabled={connection.busy}
-			onclick={() => connection.connect()}
-		>
-			{connection.busy ? 'Connecting…' : 'Connect extension'}
-		</button>
-	{/if}
-
-	{#if connection.error}
-		<p class="text-red-700" role="alert">{connection.error}</p>
-	{/if}
-
-	{#if others.length > 0}
-		<ul class="mt-2 flex flex-col gap-1 border-t border-stone-200 pt-3 text-stone-600">
+		<dl class="border-t border-line">
+			<FieldRow
+				label="This browser"
+				value={`last used ${lastUsed(current.lastUsedAt)}`}
+				actionLabel="Disconnect"
+				onaction={() => connection.disconnect(current.id)}
+			>
+				<span class="ok">Connected</span>
+			</FieldRow>
 			{#each others as session (session.id)}
-				<li class="flex flex-wrap items-center gap-x-2">
-					<span>Another browser, last used {lastUsed(session.lastUsedAt)}</span>
-					<span class="text-stone-400" aria-hidden="true">·</span>
-					<button
-						class="underline underline-offset-4 hover:text-stone-900 disabled:opacity-60"
-						type="button"
-						disabled={connection.busy}
-						onclick={() => connection.disconnect(session.id)}
-					>
-						Disconnect
-					</button>
-				</li>
+				<FieldRow
+					label="Other browser"
+					value={`last used ${lastUsed(session.lastUsedAt)}`}
+					actionLabel="Disconnect"
+					onaction={() => connection.disconnect(session.id)}
+				/>
 			{/each}
-		</ul>
+			<FieldRow
+				label="Install again"
+				value="engage-form-extension.zip"
+				actionLabel="Download"
+				onaction={() => window.location.assign('/engage-form-extension.zip')}
+			/>
+		</dl>
+	{:else}
+		<p class="text-quiet">The extension is installed but not connected to your account.</p>
+		<div>
+			<Button variant="primary" busy={connection.busy} onclick={() => connection.connect()}>
+				{connection.busy ? 'Connecting…' : 'Connect extension'}
+			</Button>
+		</div>
+		{#if others.length > 0}
+			<dl class="mt-2 border-t border-line">
+				{#each others as session (session.id)}
+					<FieldRow
+						label="Other browser"
+						value={`last used ${lastUsed(session.lastUsedAt)}`}
+						actionLabel="Disconnect"
+						onaction={() => connection.disconnect(session.id)}
+					/>
+				{/each}
+			</dl>
+		{/if}
 	{/if}
+
+	{#if connection.error}<InlineError message={connection.error} />{/if}
 </div>
+
+<style>
+	.ok {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		margin-left: 10px;
+		font-size: 13px;
+		color: var(--pine);
+	}
+
+	.ok::before {
+		content: '';
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--ok);
+	}
+</style>

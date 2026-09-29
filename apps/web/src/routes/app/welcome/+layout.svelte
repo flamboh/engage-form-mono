@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { getClerkContext } from '$lib/stores/clerk.svelte';
-	import { STEP_LABELS, WELCOME_STEPS, type WelcomeStep } from '$lib/welcome/steps';
+	import AccountMenu from '$lib/app/AccountMenu.svelte';
+	import { STEP_LABELS, WELCOME_STEPS } from '$lib/welcome/steps';
 
 	const { children } = $props();
-	const clerkContext = getClerkContext();
 
 	const currentStep = $derived(
 		WELCOME_STEPS.find((step) => page.url.pathname === `/app/welcome/${step}`) ?? null
@@ -16,17 +15,11 @@
 	<title>Get set up · Engage Form</title>
 </svelte:head>
 
-<div class="min-h-screen bg-white text-stone-900">
-	<header class="border-b border-stone-200">
+<div class="min-h-screen bg-surface text-ink">
+	<header class="border-b border-line">
 		<div class="mx-auto flex h-14 max-w-xl items-center justify-between px-4 sm:px-6">
-			<span class="font-semibold tracking-tight text-[#154733]">Engage Form</span>
-			<div
-				class="h-7 w-7"
-				{@attach (el) => {
-					clerkContext.clerk.mountUserButton(el);
-					return () => clerkContext.clerk.unmountUserButton(el);
-				}}
-			></div>
+			<span class="font-[650] tracking-tight text-pine">Engage Form</span>
+			<AccountMenu />
 		</div>
 	</header>
 
@@ -35,12 +28,15 @@
 			<ol class="grid grid-cols-4 gap-2" aria-label="Setup steps">
 				{#each WELCOME_STEPS as step, i (step)}
 					<li class="flex flex-col gap-2">
-						<span class="h-1 rounded-full {i <= currentIndex ? 'bg-[#154733]' : 'bg-stone-200'}"
+						<span
+							class="h-1 {i < currentIndex
+								? 'bg-pine'
+								: i === currentIndex
+									? 'bg-marker-deep'
+									: 'bg-line'}"
 						></span>
 						<span
-							class="text-xs {step === currentStep
-								? 'font-medium text-stone-900'
-								: 'text-stone-500'}"
+							class="text-xs {step === currentStep ? 'font-medium text-ink' : 'text-quiet'}"
 							aria-current={step === currentStep ? 'step' : undefined}
 						>
 							{STEP_LABELS[step]}

@@ -17,11 +17,9 @@
 </script>
 
 <button
-	class="inline-flex min-h-9 shrink-0 items-center gap-1.5 border px-3 py-1.5 text-left text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine disabled:cursor-not-allowed disabled:opacity-60 {selected
-		? 'border-pine bg-pine text-white'
-		: variant === 'add'
-			? 'border-dashed border-line bg-surface text-quiet hover:border-pine hover:text-ink'
-			: 'border-line bg-surface text-ink hover:border-pine'}"
+	class="chip"
+	class:add={variant === 'add'}
+	class:is-selected={selected}
 	type="button"
 	aria-pressed={variant === 'choice' ? selected : undefined}
 	{disabled}
@@ -29,3 +27,40 @@
 >
 	{@render children()}
 </button>
+
+<style>
+	.chip {
+		display: inline-flex;
+		min-height: 36px;
+		align-items: center;
+		gap: 6px;
+		border: 1px solid var(--line);
+		background: var(--surface);
+		padding: 6px 12px;
+		text-align: left;
+		font-size: 14px;
+		color: var(--ink);
+		cursor: pointer;
+	}
+
+	.chip:hover:not(:disabled) {
+		border-color: var(--pine);
+	}
+
+	.chip:disabled {
+		cursor: not-allowed;
+		opacity: 0.6;
+	}
+
+	.chip.is-selected {
+		border-color: var(--pine);
+		background: var(--pine);
+		color: white;
+	}
+
+	.chip.add {
+		border-style: dashed;
+		border-color: var(--faint);
+		color: var(--quiet);
+	}
+</style>
