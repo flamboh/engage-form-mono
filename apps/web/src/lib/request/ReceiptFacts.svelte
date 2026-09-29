@@ -181,7 +181,11 @@
 				display={editor.receiptDate ? shortDate(editor.receiptDate) : ''}
 				type="date"
 				placeholder="The date on the receipt"
-				cue={reviewFor.receiptDate || !editor.receiptDate ? undefined : 'receipt'}
+				cue={reviewFor.receiptDate ||
+				!editor.receiptDate ||
+				editor.sourceOf('receiptDate') === 'user'
+					? undefined
+					: 'receipt'}
 				readonly={locked}
 				oncommit={(value) => void editor.resolveReview('receiptDate', value)}
 			/>
