@@ -4,10 +4,10 @@
 		approvalRequestBody,
 		mailtoUrl,
 		resolveApprovalEmail,
+		type ApprovalEmailField,
 		type ApprovalEmailPart,
 		type Approver
 	} from '$convex/approvalEmail';
-	import type { BusinessPurposeVariable } from '$convex/businessPurpose';
 	import type { RequestEditor } from './editor.svelte';
 	import type { LeftField } from './whatsLeft';
 
@@ -32,12 +32,13 @@
 	} = $props();
 
 	const missingCopy: Partial<
-		Record<BusinessPurposeVariable, { blank: string; ask: string; field: LeftField | null }>
+		Record<ApprovalEmailField, { blank: string; ask: string; field: LeftField | null }>
 	> = {
 		itemDescription: { blank: 'items', ask: 'what was bought', field: 'itemDescription' },
 		vendor: { blank: 'store', ask: 'the store', field: 'vendor' },
 		totalAmount: { blank: 'total', ask: 'the total', field: 'totalAmount' },
-		purpose: { blank: 'purpose', ask: 'what it was for', field: 'why' },
+		eventName: { blank: 'event', ask: 'which event', field: 'why' },
+		dates: { blank: 'date', ask: 'the event date', field: 'why' },
 		purchaser: { blank: 'purchaser', ask: 'who paid', field: 'purchaser' },
 		studentOrganization: { blank: 'organization', ask: 'your organization’s name', field: null }
 	};
@@ -64,7 +65,8 @@
 			vendor: form.vendor,
 			itemDescription: form.itemDescription,
 			totalAmount: form.totalAmount ?? 0,
-			purpose: form.purpose
+			purpose: form.purpose,
+			activity: form.activity
 		};
 	});
 	const email = $derived(request === null ? null : resolveApprovalEmail(request, approver));

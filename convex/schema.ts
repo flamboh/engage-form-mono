@@ -55,36 +55,21 @@ const purchaserRef = v.union(
 	v.object({ kind: v.literal('purchaser'), purchaserId: v.id('purchasers') })
 );
 
-const businessPurposeVariable = v.union(
-	v.literal('studentOrganization'),
-	v.literal('purchaser'),
-	v.literal('vendor'),
-	v.literal('itemDescription'),
-	v.literal('totalAmount'),
-	v.literal('recipients'),
-	v.literal('recipientUo95Ids'),
-	v.literal('activityDate'),
-	v.literal('activityTime'),
-	v.literal('activityLocation'),
-	v.literal('officeLocation'),
-	v.literal('purpose')
-);
-
-const businessPurposeSource = v.object({
-	parts: v.array(
-		v.union(
-			v.object({ kind: v.literal('text'), text: v.string() }),
-			v.object({ kind: v.literal('variable'), variable: businessPurposeVariable })
-		)
-	)
+const activity = v.object({
+	eventId: v.union(v.id('events'), v.null()),
+	name: v.string(),
+	dates: v.array(v.string()),
+	time: v.string(),
+	location: v.string(),
+	attendance: v.union(v.number(), v.null()),
+	openToAllStudents: v.boolean()
 });
 
 const studentOrganizationDetails = v.object({
 	name: v.string(),
 	indexNumber: v.string(),
 	fundLetter,
-	budgetLines: v.array(v.string()),
-	businessPurposeTemplate: v.string()
+	budgetLines: v.array(v.string())
 });
 
 const requesterDetails = v.object({
@@ -144,7 +129,6 @@ export default defineSchema({
 		indexNumber: v.string(),
 		fundLetter,
 		budgetLines: v.array(v.string()),
-		businessPurposeTemplate: v.string(),
 		archived: v.boolean(),
 		updatedAt: v.number()
 	})
@@ -180,23 +164,19 @@ export default defineSchema({
 		email: v.string(),
 		usedAt: v.number()
 	}).index('by_owner_and_organizationId_and_usedAt', ['owner', 'organizationId', 'usedAt']),
-	businessPurposeTemplates: defineTable({
+	events: defineTable({
 		owner: v.string(),
 		organizationId: v.id('organizations'),
-		title: v.string(),
-		businessPurposeTemplate: v.string(),
-		searchText: v.string(),
+		name: v.string(),
+		weekday: v.union(v.number(), v.null()),
+		time: v.string(),
+		location: v.string(),
+		attendance: v.union(v.number(), v.null()),
+		openToAllStudents: v.boolean(),
+		lastUsedAt: v.union(v.number(), v.null()),
 		archived: v.boolean(),
 		updatedAt: v.number()
-	})
-		.index('by_owner_and_organizationId_and_archived', ['owner', 'organizationId', 'archived'])
-		.index('by_owner_and_organizationId', ['owner', 'organizationId'])
-		.index('by_owner_and_archived', ['owner', 'archived'])
-		.index('by_owner', ['owner'])
-		.searchIndex('search_text', {
-			searchField: 'searchText',
-			filterFields: ['owner', 'organizationId', 'archived']
-		}),
+	}).index('by_owner_and_organizationId_and_archived', ['owner', 'organizationId', 'archived']),
 	purchaseRequests: defineTable({
 		owner: v.string(),
 		status: v.union(v.literal('draft'), v.literal('ready'), v.literal('approved')),
@@ -207,14 +187,13 @@ export default defineSchema({
 		studentOrganization: studentOrganizationDetails,
 		requester: requesterDetails,
 		purchaser: purchaserDetails,
-		activityDate: v.string(),
+		activity,
 		vendor: v.string(),
 		itemDescription: v.string(),
 		totalAmount: v.number(),
 		budgetLineItem: v.string(),
 		reimbursementReason: v.string(),
-		businessPurposeSource,
-		businessPurposeTouched: v.boolean(),
+		businessPurposeOverride: v.union(v.string(), v.null()),
 		receiptFileIds: v.array(v.id('files')),
 		secondApprovalFileId: v.union(v.id('files'), v.null()),
 		publicityFileId: v.union(v.id('files'), v.null()),
@@ -238,9 +217,7 @@ export default defineSchema({
 		lastFilledAt: v.union(v.number(), v.null()),
 		fieldSources: v.optional(v.record(v.string(), fieldSource)),
 		receiptDate: v.optional(v.string()),
-		purpose: v.optional(v.string()),
-		activityTime: v.optional(v.string()),
-		activityLocation: v.optional(v.string())
+		purpose: v.optional(v.string())
 	})
 		.index('by_owner_and_organizationSourceId_and_status_and_updatedAt', [
 			'owner',

@@ -4,7 +4,6 @@ export type Recipient = { name: string; uo95: string; reason: string; value: num
 export type SavedData = {
 	organizations: Doc<'organizations'>[];
 	purchasers: Doc<'purchasers'>[];
-	businessPurposeTemplates: Doc<'businessPurposeTemplates'>[];
 };
 export type DocumentationCategory = Doc<'purchaseRequests'>['documentationCategories'][number];
 export type FundLetter = Doc<'organizations'>['fundLetter'];

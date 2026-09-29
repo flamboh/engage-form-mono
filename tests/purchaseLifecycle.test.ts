@@ -2,7 +2,6 @@ import { expect, test, vi } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
 import { getReadyPurchaseForFill, listReadyPurchases } from '../convex/authed/extension';
 import { saveDraftSnapshot } from '../convex/authed/purchaseBuilder';
-import { parseBusinessPurposeText } from '../convex/purchaseModel';
 
 vi.stubEnv('FILES_BASE_URL', 'https://files.example');
 vi.stubEnv('FILES_SIGNING_SECRET', 'test-secret');
@@ -20,8 +19,7 @@ const readyRequest = {
 		name: 'Album Listening Club',
 		indexNumber: 'OS353i',
 		fundLetter: 'I',
-		budgetLines: ['Event Expenses'],
-		businessPurposeTemplate: ''
+		budgetLines: ['Event Expenses']
 	},
 	requester: {
 		id: 'user_1',
@@ -41,14 +39,21 @@ const readyRequest = {
 		idCardFrontFileId: 'file_front',
 		idCardBackFileId: 'file_back'
 	},
-	activityDate: '2026-05-22',
+	activity: {
+		eventId: null,
+		name: 'Weekly listening event',
+		dates: ['2026-05-19'],
+		time: '18:30',
+		location: 'McKenzie 240A',
+		attendance: 50,
+		openToAllStudents: true
+	},
 	vendor: 'Amazon',
 	itemDescription: 'record',
 	totalAmount: 22.98,
 	budgetLineItem: 'Event Expenses',
 	reimbursementReason: 'Other processes are too slow.',
-	businessPurposeSource: parseBusinessPurposeText('Reimburse {Purchaser} for {Item Description}.'),
-	businessPurposeTouched: true,
+	businessPurposeOverride: 'Reimburse Oliver Boorstein for record.',
 	receiptFileIds: ['file_receipt'],
 	secondApprovalFileId: 'file_approval',
 	publicityFileId: 'file_publicity',
@@ -83,6 +88,35 @@ test('snapshot saves patch only changed fields and reopen Approved requests as R
 			fieldSources: { itemDescription: 'user' },
 			status: 'ready'
 		}
+	]);
+});
+
+test('choosing a saved event on a request bumps its lastUsedAt once', async () => {
+	const draft = {
+		...readyRequest,
+		status: 'draft',
+		organizationSourceId: 'org_1'
+	} as Doc<'purchaseRequests'>;
+	const event = { _id: 'event_1', owner: 'owner', organizationId: 'org_1' };
+	const writes: [string, Record<string, unknown>][] = [];
+	const ctx = {
+		auth: { getUserIdentity: async () => ({ tokenIdentifier: 'owner' }) },
+		db: {
+			get: async (id: string) => (id === event._id ? event : draft),
+			patch: async (id: string, patch: Record<string, unknown>) => {
+				writes.push([id, patch]);
+			}
+		}
+	};
+	const activity = { ...draft.activity, eventId: 'event_1' };
+	await saveDraftSnapshot._handler(ctx as never, {
+		id: draft._id,
+		snapshot: { ...snapshotOf(draft), activity } as never,
+		changedFields: ['activity']
+	});
+	expect(writes).toEqual([
+		['event_1', { lastUsedAt: expect.any(Number) }],
+		['purchase_1', { activity, updatedAt: expect.any(Number), fieldSources: { activity: 'user' } }]
 	]);
 });
 
@@ -210,15 +244,12 @@ function snapshotOf(request: Doc<'purchaseRequests'>) {
 		documentationCategories: request.documentationCategories,
 		purchaserSource: request.purchaserSource,
 		purchaser: request.purchaser,
-		activityDate: request.activityDate,
-		activityTime: '',
-		activityLocation: '',
+		activity: request.activity,
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
 		budgetLineItem: request.budgetLineItem,
-		businessPurposeText: 'Reimburse {Purchaser} for {Item Description}.',
-		businessPurposeTouched: request.businessPurposeTouched,
+		businessPurposeOverride: request.businessPurposeOverride,
 		purpose: '',
 		receiptFileIds: request.receiptFileIds,
 		secondApprovalFileId: request.secondApprovalFileId,

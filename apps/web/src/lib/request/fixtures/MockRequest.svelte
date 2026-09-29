@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Id } from '$convex/_generated/dataModel';
-	import { parseBusinessPurposeText } from '$convex/businessPurpose';
 	import type { DocumentSlot, RequestView } from '$convex/requestView';
 	import { startUploads, uploadsFor, type UploadTransport } from '$lib/uploads.svelte';
 	import type { RequestBackend } from '../editor.svelte';
@@ -98,26 +97,9 @@
 	const backend: RequestBackend = {
 		saveSnapshot: async (snapshot) => {
 			await wait(120);
-			const { businessPurposeText, totalAmount, ...rest } = snapshot;
-			Object.assign(view.purchase, rest, {
-				totalAmount: totalAmount ?? 0,
-				businessPurposeSource: parseBusinessPurposeText(businessPurposeText)
-			});
+			const { totalAmount, ...rest } = snapshot;
+			Object.assign(view.purchase, rest, { totalAmount: totalAmount ?? 0 });
 			await refresh();
-		},
-		applyTemplate: async (templateId) => {
-			await wait(150);
-			const template = mockSaved.businessPurposeTemplates.find((item) => item._id === templateId);
-			if (template === undefined) throw new Error('Template not found.');
-			view.purchase.businessPurposeSource = parseBusinessPurposeText(
-				template.businessPurposeTemplate
-			);
-			view.purchase.businessPurposeTouched = true;
-			await refresh();
-		},
-		saveOrganizationTemplate: async (businessPurposeTemplate) => {
-			await wait(150);
-			mockSaved.organizations[0].businessPurposeTemplate = businessPurposeTemplate;
 		},
 		resolveReview: async (field, value) => {
 			await wait(150);

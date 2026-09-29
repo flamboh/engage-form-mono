@@ -77,7 +77,6 @@ export type PurchaseRequest = {
 	organization: StudentOrganization;
 	requester: Requester;
 	purchaser: Purchaser;
-	activityDate: string;
 	vendor: string;
 	itemDescription: string;
 	totalAmount: number;
@@ -135,7 +134,6 @@ export const samplePurchaseRequest: PurchaseRequest = {
 		idCardFrontFileId: 'file_id_front',
 		idCardBackFileId: 'file_id_back'
 	},
-	activityDate: '2026-04-21',
 	vendor: 'Amazon',
 	itemDescription: 'Mort Garson music vinyl',
 	totalAmount: 22.98,

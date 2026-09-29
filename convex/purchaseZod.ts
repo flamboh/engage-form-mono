@@ -63,36 +63,21 @@ export const purchaserRef = z.union([
 	z.object({ kind: z.literal('purchaser'), purchaserId: zid('purchasers') })
 ]);
 
-export const businessPurposeVariable = z.union([
-	z.literal('studentOrganization'),
-	z.literal('purchaser'),
-	z.literal('vendor'),
-	z.literal('itemDescription'),
-	z.literal('totalAmount'),
-	z.literal('recipients'),
-	z.literal('recipientUo95Ids'),
-	z.literal('activityDate'),
-	z.literal('activityTime'),
-	z.literal('activityLocation'),
-	z.literal('officeLocation'),
-	z.literal('purpose')
-]);
-
-export const businessPurposeSource = z.object({
-	parts: z.array(
-		z.union([
-			z.object({ kind: z.literal('text'), text: z.string() }),
-			z.object({ kind: z.literal('variable'), variable: businessPurposeVariable })
-		])
-	)
+export const activity = z.object({
+	eventId: zid('events').nullable(),
+	name: z.string(),
+	dates: z.array(z.string()),
+	time: z.string(),
+	location: z.string(),
+	attendance: z.number().nullable(),
+	openToAllStudents: z.boolean()
 });
 
 export const studentOrganizationDetails = z.object({
 	name: z.string(),
 	indexNumber: z.string(),
 	fundLetter,
-	budgetLines: z.array(z.string()),
-	businessPurposeTemplate: z.string()
+	budgetLines: z.array(z.string())
 });
 
 export const requesterDetails = z.object({
@@ -146,7 +131,6 @@ export const organizationDoc = z.object({
 	indexNumber: z.string(),
 	fundLetter,
 	budgetLines: z.array(z.string()),
-	businessPurposeTemplate: z.string(),
 	archived: z.boolean(),
 	updatedAt: z.number()
 });
@@ -165,14 +149,18 @@ export const purchaserDoc = z.object({
 	updatedAt: z.number()
 });
 
-export const businessPurposeTemplateDoc = z.object({
-	_id: zid('businessPurposeTemplates'),
+export const eventDoc = z.object({
+	_id: zid('events'),
 	_creationTime: z.number(),
 	owner: z.string(),
 	organizationId: zid('organizations'),
-	title: z.string(),
-	businessPurposeTemplate: z.string(),
-	searchText: z.string(),
+	name: z.string(),
+	weekday: z.number().nullable(),
+	time: z.string(),
+	location: z.string(),
+	attendance: z.number().nullable(),
+	openToAllStudents: z.boolean(),
+	lastUsedAt: z.number().nullable(),
 	archived: z.boolean(),
 	updatedAt: z.number()
 });
@@ -188,14 +176,13 @@ export const purchaseRequestDoc = z.object({
 	studentOrganization: studentOrganizationDetails,
 	requester: requesterDetails,
 	purchaser: purchaserDetails,
-	activityDate: z.string(),
+	activity,
 	vendor: z.string(),
 	itemDescription: z.string(),
 	totalAmount: z.number(),
 	budgetLineItem: z.string(),
 	reimbursementReason: z.string(),
-	businessPurposeSource,
-	businessPurposeTouched: z.boolean(),
+	businessPurposeOverride: z.string().nullable(),
 	receiptFileIds: z.array(zid('files')),
 	secondApprovalFileId: zid('files').nullable(),
 	publicityFileId: zid('files').nullable(),
@@ -213,15 +200,12 @@ export const purchaseRequestDoc = z.object({
 		.record(z.string(), z.enum(['user', 'receipt', 'previous', 'suggested']))
 		.optional(),
 	receiptDate: z.string().optional(),
-	purpose: z.string().optional(),
-	activityTime: z.string().optional(),
-	activityLocation: z.string().optional()
+	purpose: z.string().optional()
 });
 
 export const savedData = z.object({
 	organizations: z.array(organizationDoc),
-	purchasers: z.array(purchaserDoc),
-	businessPurposeTemplates: z.array(businessPurposeTemplateDoc)
+	purchasers: z.array(purchaserDoc)
 });
 
 export const wizardSnapshot = z.object({
@@ -229,16 +213,13 @@ export const wizardSnapshot = z.object({
 	documentationCategories: z.array(documentationCategory),
 	purchaserSource: purchaserRef,
 	purchaser: purchaserDetails,
-	activityDate: z.string(),
+	activity,
 	vendor: z.string(),
 	itemDescription: z.string(),
 	totalAmount: z.number().nullable(),
 	budgetLineItem: z.string(),
-	businessPurposeText: z.string(),
-	businessPurposeTouched: z.boolean(),
+	businessPurposeOverride: z.string().nullable(),
 	purpose: z.string(),
-	activityTime: z.string(),
-	activityLocation: z.string(),
 	receiptFileIds: z.array(zid('files')),
 	secondApprovalFileId: zid('files').nullable(),
 	publicityFileId: zid('files').nullable(),
@@ -274,7 +255,6 @@ export const assembledPurchase = z.object({
 	}),
 	requester: requesterDetails,
 	purchaser: purchaserDetails,
-	activityDate: z.string(),
 	vendor: z.string(),
 	itemDescription: z.string(),
 	totalAmount: z.number(),

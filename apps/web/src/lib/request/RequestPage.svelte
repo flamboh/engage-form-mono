@@ -63,11 +63,6 @@
 	const purchasers = $derived(
 		(saved?.purchasers ?? []).filter((purchaser) => purchaser.organizationId === organizationId)
 	);
-	const templates = $derived(
-		(saved?.businessPurposeTemplates ?? []).filter(
-			(template) => template.organizationId === organizationId
-		)
-	);
 	const inFlight = $derived(
 		pending.filter((upload) => upload.status === 'uploading' || upload.status === 'attaching')
 	);
@@ -100,21 +95,13 @@
 			.map(panelSlot)
 			.filter((slot): slot is DocumentSlot => slot !== null && !hasDocument(slot))
 	);
-	const unresolvedVariables = $derived(
-		[...(view?.businessPurposeText ?? '').matchAll(/\{([^{}]+)\}/g)].map((match) => match[1])
-	);
-	const purposeMissing = $derived(
-		form !== null && form.businessPurposeText.includes('{Purpose}') && form.purpose.trim() === ''
-	);
 	const items = $derived(
 		view === undefined
 			? []
 			: whatsLeft({
 					readiness: view.readiness,
 					reviews: editor.reviews,
-					reading,
-					purposeMissing,
-					onlyPurposeUnresolved: unresolvedVariables.every((name) => name === 'Purpose')
+					reading
 				}).filter((item) => item.target.kind !== 'slot' || !uploadingSlots.has(item.target.slot))
 	);
 	const deferReceiptFields = $derived(reading || missingSlots.includes('receipt'));
@@ -281,20 +268,21 @@
 						{fundLetter}
 						{budgetLines}
 						{purchasers}
-						{templates}
 						{recentPurposes}
-						organizationTemplate={organization?.businessPurposeTemplate ?? null}
 						userName={user?.name ?? purchase.requester.name}
 						section="why"
 					/>
 					<PurchaseSummary {editor} {reading} />
-					<BusinessPurposeCard {editor} resolvedText={view.businessPurposeText} />
+					<BusinessPurposeCard
+						{editor}
+						resolvedText={view.businessPurposeText}
+						missing={view.businessPurposeMissing}
+					/>
 					<RequestQuestions
 						{editor}
 						{fundLetter}
 						{budgetLines}
 						{purchasers}
-						{templates}
 						{recentPurposes}
 						userName={user?.name ?? purchase.requester.name}
 						section="funding"
