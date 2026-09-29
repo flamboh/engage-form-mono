@@ -19,6 +19,7 @@
 
 	let creating = $state(false);
 	let addingDate = $state(false);
+	let savingBack = $state(false);
 	let editing = $state({ time: false, location: false, attendance: false });
 
 	const activity = $derived(editor.form?.activity);
@@ -57,22 +58,27 @@
 
 	async function create(details: EventDetails) {
 		const id = await editor.saveEvent(details);
-		if (id === null) return;
 		editor.chooseEvent({ _id: id, ...details });
 		creating = false;
 	}
 
 	async function saveBack() {
 		if (chosen === null || activity === undefined) return;
-		await editor.saveEvent({
-			id: chosen._id,
-			name: chosen.name,
-			weekday: chosen.weekday,
-			time: activity.time,
-			location: activity.location,
-			attendance: activity.attendance,
-			openToAllStudents: activity.openToAllStudents
-		});
+		const name = chosen.name;
+		savingBack = true;
+		editor.error = '';
+		await editor
+			.saveEvent({
+				id: chosen._id,
+				name: chosen.name,
+				weekday: chosen.weekday,
+				time: activity.time,
+				location: activity.location,
+				attendance: activity.attendance,
+				openToAllStudents: activity.openToAllStudents
+			})
+			.catch(() => (editor.error = `Couldn’t update ${name}. Try again.`))
+			.finally(() => (savingBack = false));
 	}
 
 	function commitAttendance(value: string) {
@@ -246,7 +252,7 @@
 							<button
 								class="text-(--pine) underline disabled:opacity-60"
 								type="button"
-								disabled={editor.busy}
+								disabled={savingBack}
 								onclick={saveBack}>Save to {chosen.name}</button
 							>
 						{/if}

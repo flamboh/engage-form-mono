@@ -208,9 +208,9 @@ export class RequestEditor {
 	}
 
 	updateActivity(patch: Partial<Activity>, options: { debounce?: boolean } = {}) {
-		const activity = this.form?.activity;
-		if (activity === undefined) return;
-		this.update({ activity: { ...activity, ...patch } }, options);
+		const current = this.form?.activity;
+		if (current === undefined) return;
+		this.update({ activity: { ...current, ...patch } }, options);
 	}
 
 	chooseEvent(event: EventDetails & { _id: Id<'events'> }) {
@@ -236,12 +236,8 @@ export class RequestEditor {
 		});
 	}
 
-	async saveEvent(event: EventDetails & { id?: Id<'events'> }) {
-		let id: Id<'events'> | null = null;
-		await this.#run(async () => {
-			id = await this.#backend().saveEvent(event);
-		});
-		return id as Id<'events'> | null;
+	saveEvent(event: EventDetails & { id?: Id<'events'> }) {
+		return this.#backend().saveEvent(event);
 	}
 
 	async resolveReview(field: ReviewField, value: string) {
