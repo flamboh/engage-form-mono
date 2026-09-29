@@ -1,13 +1,16 @@
 <script lang="ts">
 	import { isAcceptableUpload } from '$lib/imageConvert';
+	import Button from '$lib/ui/Button.svelte';
 
 	let {
 		onFiles,
+		onEmpty,
 		busy = false,
-		title = 'Drop a receipt to start a request',
-		hint = 'A PDF or a photo works. We read the vendor, total, and date for you.'
+		title = 'Drop a receipt',
+		hint = 'It’s tracked right away. Finish it now or after the event.'
 	}: {
 		onFiles: (files: File[]) => void;
+		onEmpty?: () => void;
 		busy?: boolean;
 		title?: string;
 		hint?: string;
@@ -65,52 +68,53 @@
 	ondrop={handleDrop}
 />
 
-<div class="receipt-frame">
-	<div class="receipt" class:dragging aria-busy={busy}>
-		<button
-			class="flex w-full flex-col items-start gap-4 px-6 pt-7 pb-10 text-left sm:flex-row sm:items-center sm:gap-6 sm:px-8"
-			type="button"
-			disabled={busy}
-			onclick={() => pickerInput?.click()}
+<div class="slipbox">
+	<div
+		class="slip flex flex-wrap items-center gap-3 px-4 pt-4 pb-[22px] sm:flex-nowrap sm:gap-[18px] sm:px-[22px] sm:pt-[18px] sm:pb-6"
+		class:dragging
+		aria-busy={busy}
+	>
+		<span class="glyph" aria-hidden="true">
+			<svg viewBox="0 0 32 40" width="20" height="25" fill="none">
+				<path
+					d="M3 2h26v34l-3.25-2.5L22.5 36l-3.25-2.5L16 36l-3.25-2.5L9.5 36l-3.25-2.5L3 36V2Z"
+					stroke="currentColor"
+					stroke-width="2.4"
+					stroke-linejoin="round"
+				/>
+				<path
+					d="M9 11h14M9 17h10M9 23h14"
+					stroke="currentColor"
+					stroke-width="2.4"
+					stroke-linecap="round"
+				/>
+			</svg>
+		</span>
+		<span class="flex min-w-0 flex-col">
+			<span class="text-[17px] font-[620] tracking-tight sm:text-[19px]">
+				{busy ? 'Starting your request…' : dragging ? 'Let go to start' : title}
+			</span>
+			<span class="text-[13.5px] text-quiet">{hint}</span>
+		</span>
+		<span
+			class="flex w-full flex-col items-stretch gap-2.5 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-3.5"
 		>
-			<span class="glyph" aria-hidden="true">
-				<svg viewBox="0 0 32 40" width="32" height="40" fill="none">
-					<path
-						d="M3 2h26v34l-3.25-2.5L22.5 36l-3.25-2.5L16 36l-3.25-2.5L9.5 36l-3.25-2.5L3 36V2Z"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linejoin="round"
-					/>
-					<path
-						d="M9 11h14M9 17h10M9 23h14"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-					/>
-				</svg>
+			<span class="flex flex-col sm:hidden">
+				<Button variant="primary" disabled={busy} onclick={() => cameraInput?.click()}>
+					Take a photo
+				</Button>
 			</span>
-			<span class="flex flex-col gap-1.5">
-				<span class="text-xl leading-tight font-semibold tracking-tight sm:text-2xl">
-					{busy ? 'Starting your request…' : dragging ? 'Let go to start' : title}
+			<span class="hidden sm:flex">
+				<Button disabled={busy} onclick={() => pickerInput?.click()}>Choose files</Button>
+			</span>
+			{#if onEmpty}
+				<span class="text-center">
+					<Button variant="quiet" disabled={busy} onclick={onEmpty}>
+						No receipt yet? Start empty
+					</Button>
 				</span>
-				<span class="max-w-md text-sm text-stone-600">{hint}</span>
-			</span>
-			<span
-				class="mt-1 inline-flex h-10 shrink-0 items-center rounded-full border border-stone-900 px-4 text-sm font-medium sm:mt-0 sm:ml-auto"
-			>
-				Choose files
-			</span>
-		</button>
-		<div class="px-6 pb-10 sm:hidden">
-			<button
-				class="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#154733] text-sm font-medium text-white"
-				type="button"
-				disabled={busy}
-				onclick={() => cameraInput?.click()}
-			>
-				Take a photo of a receipt
-			</button>
-		</div>
+			{/if}
+		</span>
 		<input
 			bind:this={pickerInput}
 			class="hidden"
@@ -132,7 +136,7 @@
 
 {#if dragging}
 	<div
-		class="pointer-events-none fixed inset-0 z-50 grid place-items-center bg-[#154733]/85 p-6 text-center text-white"
+		class="pointer-events-none fixed inset-0 z-50 grid place-items-center bg-pine/85 p-6 text-center text-white"
 	>
 		<div class="flex flex-col items-center gap-2">
 			<p class="text-3xl font-semibold tracking-tight">Drop to start a request</p>
@@ -142,46 +146,37 @@
 {/if}
 
 <style>
-	.receipt {
-		position: relative;
+	.slipbox {
+		filter: drop-shadow(0 0 0.75px rgb(23 33 28 / 0.45)) drop-shadow(0 4px 5px rgb(23 33 28 / 0.07));
+	}
+
+	.slip {
 		background: #fffef9;
-		color: #1c1917;
 		mask:
-			linear-gradient(#000 0 0) top / 100% calc(100% - 8px) no-repeat,
-			conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 16px 8px
+			linear-gradient(#000 0 0) top / 100% calc(100% - 6px) no-repeat,
+			conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 12px 6px
 				repeat-x;
-		transition:
-			background-color 120ms ease,
-			border-color 120ms ease;
+		transition: background-color 120ms ease;
 	}
 
-	.receipt-frame {
-		filter: drop-shadow(0 0 1px rgb(120 113 108 / 0.9)) drop-shadow(0 3px 4px rgb(0 0 0 / 0.06));
-	}
-
-	.receipt:has(button:hover:not(:disabled)),
-	.receipt.dragging {
-		background: #fef9d7;
-	}
-
-	.receipt button:focus-visible {
-		outline: 2px solid #154733;
-		outline-offset: -4px;
+	.slip:hover,
+	.slip.dragging {
+		background: var(--marker-soft);
 	}
 
 	.glyph {
 		display: grid;
 		place-items: center;
-		width: 3.5rem;
-		height: 3.5rem;
+		width: 44px;
+		height: 44px;
 		flex-shrink: 0;
 		border-radius: 9999px;
-		background: #fee123;
-		color: #154733;
+		background: var(--marker);
+		color: var(--pine);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.receipt {
+		.slip {
 			transition: none;
 		}
 	}
