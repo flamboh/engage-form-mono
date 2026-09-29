@@ -61,7 +61,9 @@
 		purchase?.studentOrganization.fundLetter ?? organization?.fundLetter ?? 'I'
 	);
 	const budgetLines = $derived(
-		organization?.budgetLines ?? purchase?.studentOrganization.budgetLines ?? []
+		organization?.budgetLines.map((line) => line.name) ??
+			purchase?.studentOrganization.budgetLines ??
+			[]
 	);
 	const purchasers = $derived(
 		(saved?.purchasers ?? []).filter((purchaser) => purchaser.organizationId === organizationId)

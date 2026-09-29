@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
 import { internalMutation } from './_generated/server';
 import { ownerKeyPrefix, ownsKey } from './fileSigning';
+import { budgetLine } from './schema';
 
 const seedFile = v.object({
 	kind: v.union(v.literal('id_front'), v.literal('id_back')),
@@ -35,7 +36,7 @@ export const restoreOwner = internalMutation({
 					v.literal('D'),
 					v.literal('T')
 				),
-				budgetLines: v.array(v.string()),
+				budgetLines: v.array(budgetLine),
 				events: v.array(
 					v.object({
 						name: v.string(),

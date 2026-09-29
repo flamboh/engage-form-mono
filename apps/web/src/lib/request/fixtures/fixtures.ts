@@ -36,7 +36,11 @@ const organization: Doc<'organizations'> = {
 	name: 'Climbing Club',
 	indexNumber: '123456',
 	fundLetter: 'I',
-	budgetLines: ['Event Expenses', 'Equipment', 'Travel'],
+	budgetLines: [
+		{ name: 'Event Expenses', allocations: [] },
+		{ name: 'Equipment', allocations: [] },
+		{ name: 'Travel', allocations: [] }
+	],
 	archived: false,
 	updatedAt: now
 };
@@ -180,7 +184,7 @@ function basePurchase(): Purchase {
 			name: organization.name,
 			indexNumber: organization.indexNumber,
 			fundLetter: organization.fundLetter,
-			budgetLines: organization.budgetLines
+			budgetLines: organization.budgetLines.map((line) => line.name)
 		},
 		requester: {
 			id: mockUser._id,
@@ -221,6 +225,8 @@ function basePurchase(): Purchase {
 		createdAt: now,
 		updatedAt: now,
 		lastFilledAt: null,
+		approvedAt: null,
+		reviewerNote: null,
 		fieldSources: {
 			purchaserSource: 'previous',
 			budgetLineItem: 'previous',
@@ -375,7 +381,7 @@ const scenarios: Record<string, () => Scenario> = {
 		documents: completeDocs()
 	}),
 	approved: () => ({
-		purchase: { ...complete, status: 'approved', lastFilledAt: now },
+		purchase: { ...complete, status: 'approved', lastFilledAt: now, approvedAt: now },
 		documents: completeDocs()
 	}),
 	checks: () => ({

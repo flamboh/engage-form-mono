@@ -82,7 +82,9 @@ const draft = {
 	recipients: [],
 	createdAt: 1,
 	updatedAt: 1,
-	lastFilledAt: null
+	lastFilledAt: null,
+	approvedAt: null,
+	reviewerNote: null
 } as unknown as Doc<'purchaseRequests'>;
 
 function extraction(
@@ -266,7 +268,13 @@ test('new drafts copy defaults from the previous request in the organization', (
 			openToAllStudents: true
 		}
 	} as Doc<'purchaseRequests'>;
-	const organization = { _id: 'org_1', budgetLines: ['Event Expenses', 'Food'] } as never;
+	const organization = {
+		_id: 'org_1',
+		budgetLines: [
+			{ name: 'Event Expenses', allocations: [] },
+			{ name: 'Food', allocations: [] }
+		]
+	} as never;
 	expect(previousRequestDefaults(previous, organization, purchaser)).toEqual({
 		purchaserSource: previous.purchaserSource,
 		purchaser: {

@@ -66,7 +66,9 @@ const readyRequest = {
 	recipients: [],
 	createdAt: 1,
 	updatedAt: 1,
-	lastFilledAt: null
+	lastFilledAt: null,
+	approvedAt: null,
+	reviewerNote: null
 } as Doc<'purchaseRequests'>;
 
 test('snapshot saves patch only changed fields and reopen Approved requests as Ready', async () => {
@@ -86,7 +88,8 @@ test('snapshot saves patch only changed fields and reopen Approved requests as R
 			itemDescription: 'cassette',
 			updatedAt: expect.any(Number),
 			fieldSources: { itemDescription: 'user' },
-			status: 'ready'
+			status: 'ready',
+			approvedAt: null
 		}
 	]);
 });

@@ -72,7 +72,9 @@ const request = {
 	recipients: [{ name: 'Aidan', uo95: '951951840', reason: 'winning trivia', value: 22.98 }],
 	createdAt: 1,
 	updatedAt: 1,
-	lastFilledAt: null
+	lastFilledAt: null,
+	approvedAt: null,
+	reviewerNote: null
 } as Doc<'purchaseRequests'>;
 
 test('renders the generated Business Purpose from recorded facts', () => {
@@ -148,7 +150,7 @@ test('new drafts copy the previous event facts without its dates', () => {
 	};
 	const defaults = previousRequestDefaults(
 		previous,
-		{ _id: 'org_1' as never, budgetLines: ['Event Expenses'] },
+		{ _id: 'org_1' as never, budgetLines: [{ name: 'Event Expenses', allocations: [] }] },
 		null,
 		event
 	);
@@ -157,7 +159,7 @@ test('new drafts copy the previous event facts without its dates', () => {
 	expect(
 		previousRequestDefaults(
 			previous,
-			{ _id: 'org_1' as never, budgetLines: ['Event Expenses'] },
+			{ _id: 'org_1' as never, budgetLines: [{ name: 'Event Expenses', allocations: [] }] },
 			null,
 			{ ...event, archived: true }
 		).activity?.eventId
@@ -505,7 +507,7 @@ test('reports blocked Draft reasons grouped by section', async () => {
 				name: '',
 				uo95: '',
 				permanentAddress: '',
-				idCardFrontFileId: '' as never,
+				idCardFrontFileId: null,
 				idCardBackFileId: '' as never
 			},
 			activity: { ...request.activity, dates: [] },

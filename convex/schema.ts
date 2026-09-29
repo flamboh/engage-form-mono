@@ -66,6 +66,11 @@ const activity = v.object({
 	openToAllStudents: v.boolean()
 });
 
+export const budgetLine = v.object({
+	name: v.string(),
+	allocations: v.array(v.object({ fiscalYear: v.number(), amount: v.number() }))
+});
+
 const studentOrganizationDetails = v.object({
 	name: v.string(),
 	indexNumber: v.string(),
@@ -80,7 +85,7 @@ const requesterDetails = v.object({
 	phone: v.string(),
 	uo95: v.string(),
 	permanentAddress: v.string(),
-	idCardFrontFileId: v.id('files'),
+	idCardFrontFileId: v.union(v.id('files'), v.null()),
 	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
@@ -89,7 +94,7 @@ const purchaserDetails = v.object({
 	name: v.string(),
 	uo95: v.string(),
 	permanentAddress: v.string(),
-	idCardFrontFileId: v.id('files'),
+	idCardFrontFileId: v.union(v.id('files'), v.null()),
 	idCardBackFileId: v.union(v.id('files'), v.null())
 });
 
@@ -114,7 +119,7 @@ export default defineSchema({
 		permanentAddress: v.string(),
 		studentEmail: v.string(),
 		phone: v.string(),
-		idCardFrontFileId: v.id('files'),
+		idCardFrontFileId: v.union(v.id('files'), v.null()),
 		idCardBackFileId: v.union(v.id('files'), v.null()),
 		pendingFill: v.optional(
 			v.union(
@@ -129,7 +134,7 @@ export default defineSchema({
 		name: v.string(),
 		indexNumber: v.string(),
 		fundLetter,
-		budgetLines: v.array(v.string()),
+		budgetLines: v.array(budgetLine),
 		archived: v.boolean(),
 		updatedAt: v.number()
 	})
@@ -216,6 +221,8 @@ export default defineSchema({
 		createdAt: v.number(),
 		updatedAt: v.number(),
 		lastFilledAt: v.union(v.number(), v.null()),
+		approvedAt: v.union(v.number(), v.null()),
+		reviewerNote: v.union(v.string(), v.null()),
 		fieldSources: v.optional(v.record(v.string(), fieldSource)),
 		receiptDate: v.optional(v.string()),
 		purpose: v.optional(v.string()),
@@ -232,6 +239,11 @@ export default defineSchema({
 			'owner',
 			'organizationSourceId',
 			'updatedAt'
+		])
+		.index('by_owner_and_organizationSourceId_and_receiptDate', [
+			'owner',
+			'organizationSourceId',
+			'receiptDate'
 		])
 		.index('by_owner_and_status_and_updatedAt', ['owner', 'status', 'updatedAt'])
 		.index('by_owner_and_status', ['owner', 'status'])

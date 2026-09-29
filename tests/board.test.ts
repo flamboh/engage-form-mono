@@ -183,5 +183,7 @@ const readyRequest = {
 	recipients: [],
 	createdAt: 1,
 	updatedAt: 1,
-	lastFilledAt: null
+	lastFilledAt: null,
+	approvedAt: null,
+	reviewerNote: null
 } as unknown as Doc<'purchaseRequests'>;
