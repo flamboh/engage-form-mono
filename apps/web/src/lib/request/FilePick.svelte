@@ -19,7 +19,7 @@
 </script>
 
 <label
-	class="cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-(--pine) {className}"
+	class="relative cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-(--pine) {className}"
 >
 	<input
 		class="sr-only"
