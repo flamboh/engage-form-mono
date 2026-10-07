@@ -1,7 +1,7 @@
 import type { FieldSource, FormState } from './editor.svelte';
 import {
-	categoriesStep,
 	checkStep,
+	checkStepTitles,
 	idCardTitle,
 	reasonStep,
 	sentBackStep,
@@ -243,19 +243,16 @@ export function requestSteps(
 		.map((id) => {
 			const reasons = blocking.get(id) ?? [];
 			const checks = checksFor.get(id) ?? [];
-			const confirmable = checks.some(
+			const confirm = checks.find(
 				(check) => check.severity === 'warning' && check.action === 'confirm'
 			);
+			const prompt = needsCheck[id] ? checkStepTitles[id] : confirm?.title;
 			const state: StepState =
-				id === 'review' || reasons.length > 0
-					? 'todo'
-					: needsCheck[id] || confirmable
-						? 'check'
-						: 'done';
+				id === 'review' || reasons.length > 0 ? 'todo' : prompt !== undefined ? 'check' : 'done';
 			return {
 				id,
 				state,
-				title: state === 'done' ? doneTitles[id] : titleFor(id, reasons, packaged, self),
+				title: state === 'done' ? doneTitles[id] : titleFor(id, reasons, prompt, packaged, self),
 				summary: summaries[id](),
 				blockingReasons: reasons,
 				checks
@@ -271,15 +268,17 @@ export function requestSteps(
 	return steps;
 }
 
-function titleFor(id: StepId, reasons: string[], packaged: boolean | null, self: boolean) {
+function titleFor(
+	id: StepId,
+	reasons: string[],
+	prompt: string | undefined,
+	packaged: boolean | null,
+	self: boolean
+) {
 	if (reasons[0] !== undefined) return reasons[0];
 	if (id === 'idCard') return idCardTitle(self);
 	if (id === 'packaging' && packaged === null) return 'Were all the snacks individually packaged?';
-	if (id === 'event') return 'Check the event';
-	if (id === 'purchaser') return 'Check who paid';
-	if (id === 'receipt') return 'Check the receipt';
-	if (id === 'categories') return categoriesStep;
-	return doneTitles[id];
+	return prompt ?? doneTitles[id];
 }
 
 function isDefault(source: FieldSource | undefined) {

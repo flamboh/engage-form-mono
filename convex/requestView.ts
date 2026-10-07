@@ -117,6 +117,13 @@ export const sentBackStep = 'Fix what Engage sent back';
 
 export const categoriesStep = 'Check what it includes';
 
+export const checkStepTitles: Partial<Record<StepId, string>> = {
+	receipt: 'Check the receipt',
+	categories: categoriesStep,
+	event: 'Check the event',
+	purchaser: 'Check who paid'
+};
+
 const reasonSteps: [RegExp, StepId, string][] = [
 	[/^Your UO ID/, 'idCard', 'Add your UO ID (front and back)'],
 	[/^Purchaser UO ID/, 'idCard', 'Add their UO ID (front and back)'],

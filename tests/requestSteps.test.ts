@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { requestMode, requestSteps, type StepContext } from '../apps/web/src/lib/request/steps';
-import { plainNextStep } from '../convex/authed/board';
+import { plainNextStep, unconfirmedSteps } from '../convex/authed/board';
 import type { Id } from '../convex/_generated/dataModel';
 import { categoriesStep, sentBackStep, type RequestCheck } from '../convex/requestView';
 
@@ -257,7 +257,7 @@ test.each([
 		confirmed
 	);
 	expect(steps.find((step) => step.state === 'current')?.title).toBe(
-		plainNextStep({ sections: [section] }, [], true)
+		plainNextStep({ sections: [section] }, [], [])
 	);
 });
 
@@ -279,7 +279,7 @@ test('publicity missing matches the board with ASUO funds', () => {
 		confirmed
 	);
 	expect(steps.find((step) => step.state === 'current')?.title).toBe(
-		plainNextStep({ sections: [section] }, [], true)
+		plainNextStep({ sections: [section] }, [], [])
 	);
 });
 
@@ -301,7 +301,7 @@ test('unconfirmed categories are one tap right after the receipt, and the board 
 		title: categoriesStep,
 		summary: 'Nothing special'
 	});
-	expect(plainNextStep({ sections: [section] }, [], false)).toBe(categoriesStep);
+	expect(plainNextStep({ sections: [section] }, [], ['categories'])).toBe(categoriesStep);
 });
 
 test('a receipt still missing facts comes before the categories, on the board too', () => {
@@ -309,7 +309,91 @@ test('a receipt still missing facts comes before the categories, on the board to
 	const steps = requestSteps(view({ sections: [section] }), draft({ vendor: '' }), unconfirmed);
 	const current = steps.find((step) => step.state === 'current');
 	expect(current?.id).toBe('receipt');
-	expect(current?.title).toBe(plainNextStep({ sections: [section] }, [], false));
+	expect(current?.title).toBe(plainNextStep({ sections: [section] }, [], ['categories']));
+});
+
+test('the board follows step order when the event and the UO ID are both missing', () => {
+	const sections = [
+		{ section: 'Purchaser', reasons: ['Your UO ID (front and back) missing.'] },
+		{ section: 'Event', reasons: ['Add the event date.'] }
+	];
+	const steps = requestSteps(
+		view({ sections }),
+		draft({
+			activity: { ...draft().activity, dates: [] },
+			purchaser: { ...draft().purchaser, idCardFrontFileId: null, idCardBackFileId: null }
+		}),
+		confirmed
+	);
+	const current = steps.find((step) => step.state === 'current');
+	expect(current).toMatchObject({ id: 'event', title: 'Add the event date' });
+	expect(plainNextStep({ sections }, [], [])).toBe(current?.title);
+});
+
+test('a 95# to double-check is named on the step and the board before later files', () => {
+	const recipientCheck: RequestCheck = {
+		id: 'recipient-confirm:0',
+		severity: 'warning',
+		title: 'Double-check that Akio Freauff’s 95# is theirs',
+		detail: '',
+		fileId: null,
+		slot: null,
+		action: 'confirm'
+	};
+	const sections = [{ section: 'Files', reasons: ['Publicity proof missing.'] }];
+	const steps = requestSteps(
+		view({ sections, checks: [recipientCheck] }),
+		draft({
+			documentationCategories: ['gifts_prizes'],
+			publicityFileId: null,
+			recipients: [
+				{ name: 'Akio Freauff', uo95: '952190904', reason: 'Raffle prize', value: 39.95 }
+			]
+		}),
+		confirmed
+	);
+	const current = steps.find((step) => step.state === 'current');
+	expect(current).toMatchObject({ id: 'recipients', title: recipientCheck.title });
+	expect(plainNextStep({ sections }, [recipientCheck], [])).toBe(current?.title);
+});
+
+test('a defaulted event and payer are quick checks on the board too', () => {
+	const sections = [{ section: 'Files', reasons: ['Publicity proof missing.'] }];
+	const defaulted: StepContext = {
+		reviewCount: 0,
+		sourceOf: (field) => (field === 'activity' || field === 'purchaserSource' ? 'previous' : 'user')
+	};
+	const otherPayer = draft({
+		publicityFileId: null,
+		purchaserSource: { kind: 'purchaser', purchaserId: 'priya' }
+	});
+	const steps = requestSteps(view({ sections }), otherPayer, defaulted);
+	expect(steps.filter((step) => step.state !== 'done').map((step) => step.title)).toEqual([
+		'Check the event',
+		'Check who paid',
+		'Add proof the event was advertised',
+		'Review and fill'
+	]);
+	expect(plainNextStep({ sections }, [], ['event', 'purchaser'])).toBe('Check the event');
+	expect(plainNextStep({ sections }, [], ['purchaser'])).toBe('Check who paid');
+	expect(
+		unconfirmedSteps(
+			{
+				fieldSources: { activity: 'previous', purchaserSource: 'previous' },
+				purchaserSource: { kind: 'purchaser', purchaserId: 'priya' as Id<'purchasers'> }
+			},
+			0
+		)
+	).toEqual(['categories', 'event', 'purchaser']);
+	expect(
+		unconfirmedSteps(
+			{
+				fieldSources: { documentationCategories: 'user', purchaserSource: 'previous' },
+				purchaserSource: { kind: 'self' }
+			},
+			1
+		)
+	).toEqual(['receipt']);
 });
 
 test('suggested categories show in the summary and confirmed ones collapse', () => {

@@ -7,7 +7,17 @@ import { requestLifecycle, todayInEugene, type Stage } from '../lifecycle';
 import { ownerFromIdentity, readinessWithChecks, requireOwnedDoc } from '../purchaseModel';
 import { requestExtractions } from '../checks/load';
 import type { PurchaseReadiness } from '../purchaseReadiness';
-import { categoriesStep, reasonStep, sentBackStep, stage } from '../requestView';
+import { requestReviews } from '../extraction/apply';
+import {
+	checkStep,
+	checkStepTitles,
+	reasonStep,
+	sentBackStep,
+	stage,
+	stepOrder,
+	type RequestCheck,
+	type StepId
+} from '../requestView';
 import { authedMutation, authedQuery } from './helpers';
 
 const boardItem = z.object({
@@ -30,37 +40,49 @@ const boardItem = z.object({
 
 export type BoardItem = z.infer<typeof boardItem>;
 
-const reasonPriority = [
-	'Receipt document missing.',
-	'Vendor missing.',
-	'Total amount must be greater than zero.',
-	'Business purpose missing.',
-	'Item description missing.'
-];
-
 export function plainNextStep(
 	readiness: Pick<PurchaseReadiness, 'sections'>,
-	checks: { severity: 'blocking' | 'warning'; title: string }[],
-	categoriesConfirmed: boolean
+	checks: Pick<RequestCheck, 'severity' | 'title' | 'action' | 'slot'>[],
+	unconfirmed: StepId[]
 ): string | null {
-	const reasons = readiness.sections
-		.flatMap((section) => section.reasons.map((reason) => ({ section: section.section, reason })))
-		.filter((item) => !checks.some((check) => check.title === item.reason));
-	const blocking = checks.find((check) => check.severity === 'blocking');
-	if (reasons.length === 0 && blocking === undefined) return null;
-	if (reasons.some((item) => item.reason === reasonPriority[0])) return 'Add a receipt';
-	const receiptLeft = reasons.some(
-		(item) => reasonStep(item.section, item.reason).step === 'receipt'
+	const titles = new Set(checks.map((check) => check.title));
+	const blocking = [
+		...checks
+			.filter((check) => check.severity === 'blocking')
+			.map((check) => ({ step: checkStep(check), title: check.title })),
+		...readiness.sections.flatMap((section) =>
+			section.reasons
+				.filter((reason) => !titles.has(reason))
+				.map((reason) => reasonStep(section.section, reason))
+		)
+	];
+	if (blocking.length === 0) return null;
+	const confirms = checks.filter(
+		(check) => check.severity === 'warning' && check.action === 'confirm'
 	);
-	if (!categoriesConfirmed && !receiptLeft) return categoriesStep;
-	if (blocking !== undefined) return blocking.title;
-	const first =
-		reasonPriority
-			.map((reason) => reasons.find((item) => item.reason === reason))
-			.find((item) => item !== undefined) ??
-		reasons.find((item) => !item.reason.startsWith('Business purpose has')) ??
-		reasons[0];
-	return first === undefined ? null : reasonStep(first.section, first.reason).title;
+	for (const step of stepOrder) {
+		const title =
+			blocking.find((item) => item.step === step)?.title ??
+			(unconfirmed.includes(step) ? checkStepTitles[step] : undefined) ??
+			confirms.find((check) => checkStep(check) === step)?.title;
+		if (title !== undefined) return title;
+	}
+	return null;
+}
+
+export function unconfirmedSteps(
+	request: Pick<Doc<'purchaseRequests'>, 'fieldSources' | 'purchaserSource'>,
+	reviewCount: number
+): StepId[] {
+	const sources = request.fieldSources ?? {};
+	const defaulted = (source: string | undefined) => source === 'previous' || source === 'suggested';
+	const steps: [StepId, boolean][] = [
+		['receipt', reviewCount > 0],
+		['categories', sources.documentationCategories !== 'user'],
+		['event', defaulted(sources.activity)],
+		['purchaser', request.purchaserSource.kind !== 'self' && defaulted(sources.purchaserSource)]
+	];
+	return steps.filter(([, open]) => open).map(([step]) => step);
 }
 
 const openLimit = 50;
@@ -185,7 +207,7 @@ async function placedItem(ctx: QueryCtx, request: Doc<'purchaseRequests'>, today
 	const nextStep = plainNextStep(
 		readiness,
 		checks,
-		request.fieldSources?.documentationCategories === 'user'
+		unconfirmedSteps(request, requestReviews(request, extractions).length)
 	);
 	const item: BoardItem = {
 		id: request._id,

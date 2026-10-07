@@ -9,39 +9,49 @@ vi.stubEnv('FILES_BASE_URL', 'https://files.example');
 vi.stubEnv('FILES_SIGNING_SECRET', 'test-secret');
 
 const today = '2026-09-29';
-const blocking = { severity: 'blocking' as const, title: 'Publicity shows a different date' };
-const warning = { severity: 'warning' as const, title: 'Add an itemized receipt' };
+const blocking = {
+	severity: 'blocking' as const,
+	title: 'Publicity shows a different date',
+	action: 'upload' as const,
+	slot: 'publicity' as const
+};
+const warning = {
+	severity: 'warning' as const,
+	title: 'Add an itemized receipt',
+	action: 'upload' as const,
+	slot: 'receipt' as const
+};
 const checksSection = { section: 'Document checks', reasons: [blocking.title] };
 
-test('a blocking check is the next step once the request has its receipt', () => {
-	expect(plainNextStep({ sections: [checksSection] }, [blocking, warning], true)).toBe(
+test('a blocking check is the next step once the steps before it are done', () => {
+	expect(plainNextStep({ sections: [checksSection] }, [blocking, warning], [])).toBe(
 		'Publicity shows a different date'
 	);
 	expect(
 		plainNextStep(
 			{ sections: [{ section: 'Purchase details', reasons: ['Vendor missing.'] }, checksSection] },
 			[blocking],
-			true
+			[]
 		)
-	).toBe('Publicity shows a different date');
+	).toBe('Add where it was bought');
 	expect(
 		plainNextStep(
 			{
 				sections: [{ section: 'Files', reasons: ['Receipt document missing.'] }, checksSection]
 			},
 			[blocking],
-			true
+			[]
 		)
 	).toBe('Add a receipt');
 });
 
 test('warnings alone leave no next step', () => {
-	expect(plainNextStep({ sections: [] }, [warning], true)).toBeNull();
+	expect(plainNextStep({ sections: [] }, [warning], [])).toBeNull();
 	expect(
 		plainNextStep(
 			{ sections: [{ section: 'Purchase details', reasons: ['Vendor missing.'] }] },
 			[warning],
-			true
+			[]
 		)
 	).toBe('Add where it was bought');
 });
