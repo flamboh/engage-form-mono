@@ -48,6 +48,25 @@ test('names each prize recipient with their 95# and reason', () => {
 	);
 });
 
+test('a recipient’s gift reason reads as a gift, like the field’s own example', () => {
+	const given = (reason: string) =>
+		generateBusinessPurpose(
+			facts({
+				items: 'a Bluetooth speaker',
+				recipientsRequired: true,
+				recipients: [{ name: 'Akio Freauff', uo95: '952190904', reason }]
+			})
+		).text;
+	expect(given('Raffle prize')).toContain('Akio Freauff (952190904) as a raffle prize at');
+	expect(given('Speaker gift')).toContain('Akio Freauff (952190904) as a speaker gift at');
+	expect(given('the grand prize')).toContain('Akio Freauff (952190904) as the grand prize at');
+	expect(given('award')).toContain('Akio Freauff (952190904) as an award at');
+	expect(given('as a thank-you')).toContain('Akio Freauff (952190904) as a thank-you at');
+	expect(given('Kahoot! trivia winner')).toContain(
+		'Akio Freauff (952190904) for Kahoot! trivia winner at'
+	);
+});
+
 test('lists several recipients', () => {
 	const { text } = generateBusinessPurpose(
 		facts({

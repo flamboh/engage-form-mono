@@ -236,7 +236,10 @@ function recipientText(recipient: BusinessPurposeRecipient) {
 
 function reasonPhrase(reason: string) {
 	const text = midSentence(reason);
-	return /^(for|as)\b/i.test(text) ? text : `for ${text}`;
+	if (/^(for|as)\b/i.test(text)) return text;
+	if (!/\b(prize|gift|award|giveaway)$/i.test(text)) return `for ${text}`;
+	if (/^(a|an|the)\b/i.test(text)) return `as ${text}`;
+	return `as ${/^[aeiou]/i.test(text) ? 'an' : 'a'} ${text}`;
 }
 
 function purposeUse(purpose: string, several: boolean) {
@@ -372,9 +375,8 @@ const commonWords = new Set(
 	tablecloths tablecloth nametags name markers marker pens stickers paint supplies decorations trophy
 	trophies prizes prize gift gifts vinyl record records cassette tape paper posters poster flyers prints
 	shirts bags bag baggies chips cookies fruit juice soda cake cupcakes donuts bagels sandwiches costumes
-	lights balloons streamers books book puzzles figurines senior seniors blank bulk assorted string`.split(
-		/\s+/
-	)
+	lights balloons streamers books book puzzles figurines senior seniors blank bulk assorted string
+	raffle door grand speaker`.split(/\s+/)
 );
 
 function possessive(name: string) {
