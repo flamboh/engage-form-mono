@@ -249,7 +249,10 @@ test.each([
 			documentationCategories: ['office_supplies_goods', 'printing_services', 'gifts_prizes'],
 			officeLocation: 'EMU 101',
 			printingInvoiceFileId: file('invoice'),
-			secondApprovalFileId: null
+			secondApprovalFileId: null,
+			recipients: [
+				{ name: 'Akio Freauff', uo95: '952190904', reason: 'Raffle prize', value: 39.95 }
+			]
 		}),
 		confirmed
 	);

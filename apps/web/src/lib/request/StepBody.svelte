@@ -131,7 +131,12 @@
 {#snippet looksRight(fields: ('activity' | 'purchaserSource')[])}
 	{#if step.state !== 'done' && step.blockingReasons.length === 0}
 		<div>
-			<Button variant="secondary" size="sm" onclick={() => void editor.confirmFields(fields)}>
+			<Button
+				variant="secondary"
+				size="sm"
+				data-advance
+				onclick={() => void editor.confirmFields(fields)}
+			>
 				Looks right
 			</Button>
 		</div>
