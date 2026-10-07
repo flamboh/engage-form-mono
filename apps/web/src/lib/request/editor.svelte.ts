@@ -231,14 +231,14 @@ export class RequestEditor {
 		this.update({ activity: { ...current, ...patch } }, options);
 	}
 
-	chooseEvent(event: EventDetails & { _id: Id<'events'> }) {
+	chooseEvent(event: EventDetails & { _id: Id<'events'> }, dates?: string[]) {
 		const activity = this.form?.activity;
 		if (activity === undefined) return;
 		this.update({
 			activity: {
 				eventId: event._id,
 				name: event.name,
-				dates: activity.dates,
+				dates: dates ?? activity.dates,
 				time: event.time,
 				location: event.location,
 				attendance: event.attendance,

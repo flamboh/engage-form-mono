@@ -106,7 +106,7 @@
 		<span class="text-xs text-quiet">
 			{weekday === null
 				? 'We’ll suggest the receipt date for each request.'
-				: `We’ll suggest the ${weekdayName(weekday)} after each receipt.`}
+				: `We’ll suggest the nearest ${weekdayName(weekday)} for each request.`}
 		</span>
 	</fieldset>
 

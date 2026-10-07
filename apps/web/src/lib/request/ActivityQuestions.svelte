@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Doc } from '$convex/_generated/dataModel';
+	import type { Doc, Id } from '$convex/_generated/dataModel';
 	import {
 		formatEventDates,
 		formatEventTime,
@@ -19,6 +19,9 @@
 
 	let creating = $state(false);
 	let addingDate = $state(false);
+	let typedDate = $state(false);
+	let draftDate = $state('');
+	let autoDate = $state<string | null>(null);
 	let savingBack = $state(false);
 	let editing = $state({ time: false, location: false, attendance: false });
 
@@ -31,11 +34,8 @@
 	const suggestion = $derived(
 		suggestEventDates({ weekday: chosen?.weekday ?? null }, editor.receiptDate || null)
 	);
-	const suggestedDates = $derived(
-		[suggestion.suggested, ...suggestion.alternatives].filter(
-			(date): date is string => date !== null && !dates.includes(date)
-		)
-	);
+	const suggestedDates = $derived(suggestion.dates.filter((date) => !dates.includes(date)));
+	const autoApplied = $derived(autoDate !== null && dates.length === 1 && dates[0] === autoDate);
 	const offDays = $derived(
 		chosen === null || chosen.weekday === null
 			? []
@@ -56,9 +56,22 @@
 		return `${weekdayName(weekday).slice(0, 3)} ${value.slice(5, 7)}/${value.slice(8, 10)}`;
 	}
 
+	function choose(event: EventDetails & { _id: Id<'events'> }) {
+		if (dates.length > 0 && !autoApplied) {
+			editor.chooseEvent(event);
+			return;
+		}
+		const suggested =
+			event.weekday === null
+				? null
+				: suggestEventDates({ weekday: event.weekday }, editor.receiptDate || null).suggested;
+		autoDate = suggested;
+		editor.chooseEvent(event, suggested === null ? [] : [suggested]);
+	}
+
 	async function create(details: EventDetails) {
 		const id = await editor.saveEvent(details);
-		editor.chooseEvent({ _id: id, ...details });
+		choose({ _id: id, ...details });
 		creating = false;
 	}
 
@@ -86,10 +99,44 @@
 		editor.updateActivity({ attendance: value.trim() === '' || !count ? null : count });
 	}
 
+	function toggleDate(date: string) {
+		autoDate = null;
+		editor.toggleDate(date);
+	}
+
+	function openDateInput() {
+		draftDate = dateInputValue(suggestion.suggested);
+		typedDate = false;
+		addingDate = true;
+	}
+
+	function closeDateInput() {
+		addingDate = false;
+		typedDate = false;
+	}
+
 	function addDate(value: string) {
 		if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return;
-		if (!dates.includes(value)) editor.toggleDate(value);
-		addingDate = false;
+		if (!dates.includes(value)) toggleDate(value);
+		closeDateInput();
+	}
+
+	function dateKey(event: KeyboardEvent & { currentTarget: HTMLInputElement }) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			addDate(event.currentTarget.value);
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			closeDateInput();
+		} else if (event.key !== 'Tab' && event.key !== 'Shift') {
+			typedDate = true;
+		}
+	}
+
+	function dateBlur(value: string) {
+		if (!addingDate) return;
+		if (typedDate) addDate(value);
+		closeDateInput();
 	}
 </script>
 
@@ -100,7 +147,7 @@
 		</legend>
 		<div class="flex flex-wrap gap-2">
 			{#each events as event (event._id)}
-				<Chip selected={event._id === activity?.eventId} onclick={() => editor.chooseEvent(event)}>
+				<Chip selected={event._id === activity?.eventId} onclick={() => choose(event)}>
 					{event.name}
 				</Chip>
 			{/each}
@@ -142,17 +189,18 @@
 					{#if dates.length > 0}
 						<span class="font-normal text-(--quiet)">· {formatEventDates(dates)}</span>
 					{/if}
+					{#if autoApplied}<SourceCue source="suggested" />{/if}
 				</span>
 				<div class="flex flex-wrap items-center gap-2">
 					{#each dates as date (date)}
-						<Chip selected onclick={() => editor.toggleDate(date)}>
+						<Chip selected onclick={() => toggleDate(date)}>
 							{shortDate(date)}
 							<span class="sr-only">, selected. Remove</span>
 							<span aria-hidden="true" class="opacity-70">×</span>
 						</Chip>
 					{/each}
 					{#each suggestedDates as date (date)}
-						<Chip onclick={() => editor.toggleDate(date)}>
+						<Chip onclick={() => toggleDate(date)}>
 							{shortDate(date)}
 							{#if date === suggestion.suggested && dates.length === 0}
 								<span class="text-xs text-(--quiet)">suggested</span>
@@ -164,18 +212,30 @@
 							class="input max-w-44"
 							type="date"
 							aria-label="Add a date"
-							value={dateInputValue(suggestion.suggested)}
-							onchange={(event) => addDate(event.currentTarget.value)}
-							onkeydown={(event) => {
-								if (event.key === 'Escape') addingDate = false;
+							bind:value={draftDate}
+							onchange={(event) => {
+								if (!typedDate) addDate(event.currentTarget.value);
 							}}
+							onkeydown={dateKey}
+							onblur={(event) => dateBlur(event.currentTarget.value)}
 							{@attach (node) => node.focus()}
 						/>
+						{#if typedDate}
+							<button
+								class="min-h-9 border border-(--pine) px-3 text-sm font-medium text-(--pine) disabled:opacity-50"
+								type="button"
+								disabled={!/^\d{4}-\d{2}-\d{2}$/.test(draftDate)}
+								onpointerdown={(event) => event.preventDefault()}
+								onclick={() => addDate(draftDate)}
+							>
+								Add
+							</button>
+						{/if}
 					{:else}
 						<button
 							class="px-2 text-sm text-(--quiet) underline hover:text-(--ink)"
 							type="button"
-							onclick={() => (addingDate = true)}
+							onclick={openDateInput}
 						>
 							{dates.length === 0 && suggestedDates.length === 0 ? 'Pick a date' : 'Another date'}
 						</button>
