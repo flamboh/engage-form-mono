@@ -19,6 +19,8 @@
 
 	let creating = $state(false);
 	let addingDate = $state(false);
+	let typedDate = $state(false);
+	let draftDate = $state('');
 	let savingBack = $state(false);
 	let editing = $state({ time: false, location: false, attendance: false });
 
@@ -86,10 +88,39 @@
 		editor.updateActivity({ attendance: value.trim() === '' || !count ? null : count });
 	}
 
+	function openDateInput() {
+		draftDate = dateInputValue(suggestion.suggested);
+		typedDate = false;
+		addingDate = true;
+	}
+
+	function closeDateInput() {
+		addingDate = false;
+		typedDate = false;
+	}
+
 	function addDate(value: string) {
 		if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return;
 		if (!dates.includes(value)) editor.toggleDate(value);
-		addingDate = false;
+		closeDateInput();
+	}
+
+	function dateKey(event: KeyboardEvent & { currentTarget: HTMLInputElement }) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			addDate(event.currentTarget.value);
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			closeDateInput();
+		} else if (event.key !== 'Tab' && event.key !== 'Shift') {
+			typedDate = true;
+		}
+	}
+
+	function dateBlur(value: string) {
+		if (!addingDate) return;
+		if (typedDate) addDate(value);
+		closeDateInput();
 	}
 </script>
 
@@ -164,18 +195,30 @@
 							class="input max-w-44"
 							type="date"
 							aria-label="Add a date"
-							value={dateInputValue(suggestion.suggested)}
-							onchange={(event) => addDate(event.currentTarget.value)}
-							onkeydown={(event) => {
-								if (event.key === 'Escape') addingDate = false;
+							bind:value={draftDate}
+							onchange={(event) => {
+								if (!typedDate) addDate(event.currentTarget.value);
 							}}
+							onkeydown={dateKey}
+							onblur={(event) => dateBlur(event.currentTarget.value)}
 							{@attach (node) => node.focus()}
 						/>
+						{#if typedDate}
+							<button
+								class="min-h-9 border border-(--pine) px-3 text-sm font-medium text-(--pine) disabled:opacity-50"
+								type="button"
+								disabled={!/^\d{4}-\d{2}-\d{2}$/.test(draftDate)}
+								onpointerdown={(event) => event.preventDefault()}
+								onclick={() => addDate(draftDate)}
+							>
+								Add
+							</button>
+						{/if}
 					{:else}
 						<button
 							class="px-2 text-sm text-(--quiet) underline hover:text-(--ink)"
 							type="button"
-							onclick={() => (addingDate = true)}
+							onclick={openDateInput}
 						>
 							{dates.length === 0 && suggestedDates.length === 0 ? 'Pick a date' : 'Another date'}
 						</button>
