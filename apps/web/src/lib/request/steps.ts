@@ -118,7 +118,8 @@ export function requestSteps(
 		for (const reason of section.reasons) {
 			if (checkTitles.has(reason)) continue;
 			const { step, title } = reasonStep(section.section, reason);
-			blocking.set(step, [...(blocking.get(step) ?? []), title]);
+			const titles = blocking.get(step) ?? [];
+			if (!titles.includes(title)) blocking.set(step, [...titles, title]);
 		}
 	}
 	const checksFor = new Map<StepId, RequestCheck[]>();

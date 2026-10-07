@@ -59,6 +59,9 @@
 		return slots;
 	});
 	const notes = $derived(step.checks.filter((check) => check.action !== 'answer'));
+	const reasons = $derived(
+		step.blockingReasons.filter((reason) => !notes.some((check) => check.title === reason))
+	);
 
 	function confirmLabel(check: RequestCheck) {
 		if (check.id.startsWith('recipient-confirm')) return 'It’s theirs';
@@ -99,6 +102,23 @@
 						>
 							{check.fileId !== null && slot !== 'receipt' ? 'Replace' : 'Add'}
 						</FilePick>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+	{/if}
+{/snippet}
+
+{#snippet reasonList()}
+	{#if reasons.length > 0}
+		<ul class="flex flex-col gap-1 text-sm text-(--ink)">
+			{#each reasons as reason (reason)}
+				<li class="flex items-baseline gap-2">
+					<span class="size-2 shrink-0 bg-(--marker-deep)" aria-hidden="true"></span>
+					{#if /^Finish (your profile|the organization details)/.test(reason)}
+						<a class="underline underline-offset-3" href="/app/settings">{reason}</a>
+					{:else}
+						{reason}
 					{/if}
 				</li>
 			{/each}
@@ -165,6 +185,7 @@
 			recipients={form?.recipients ?? []}
 			onchange={(recipients, debounce) => editor.update({ recipients }, { debounce })}
 		/>
+		{@render reasonList()}
 		{@render checkList()}
 	{:else if step.id === 'officeLocation'}
 		<label class="flex max-w-md flex-col gap-1.5">
@@ -214,20 +235,7 @@
 		{/each}
 		{@render checkList()}
 	{:else if step.id === 'review'}
-		{#if step.blockingReasons.length > 0}
-			<ul class="flex flex-col gap-1 text-sm text-(--ink)">
-				{#each step.blockingReasons as reason (reason)}
-					<li class="flex items-baseline gap-2">
-						<span class="size-2 shrink-0 bg-(--marker-deep)" aria-hidden="true"></span>
-						{#if /^Finish (your profile|the organization details)/.test(reason)}
-							<a class="underline underline-offset-3" href="/app/settings">{reason}</a>
-						{:else}
-							{reason}
-						{/if}
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		{@render reasonList()}
 		<BusinessPurposeCard
 			{editor}
 			text={view.businessPurposeText}

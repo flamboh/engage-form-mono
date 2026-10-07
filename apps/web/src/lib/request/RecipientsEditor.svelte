@@ -22,7 +22,7 @@
 <div class="flex flex-col gap-3">
 	{#each recipients as recipient, index (index)}
 		<fieldset
-			class="grid grid-cols-2 gap-2 border-l-2 border-(--line) pl-3 sm:grid-cols-[1.4fr_1fr_0.8fr_auto]"
+			class="grid grid-cols-2 gap-2 border-l-2 border-(--line) pl-3 sm:grid-cols-[1.4fr_1fr_0.8fr]"
 		>
 			<legend class="sr-only">Recipient {index + 1}</legend>
 			<label class="col-span-2 flex flex-col gap-1 text-xs text-(--quiet) sm:col-span-1">
@@ -40,7 +40,7 @@
 					class="input tabular-nums"
 					value={recipient.uo95}
 					inputmode="numeric"
-					placeholder="95…"
+					placeholder="951234567"
 					oninput={(event) => patch(index, { uo95: event.currentTarget.value })}
 				/>
 			</label>
@@ -55,8 +55,18 @@
 						patch(index, { value: Number(event.currentTarget.value.replace(/[$,]/g, '')) || 0 })}
 				/>
 			</label>
+			<label class="col-span-2 flex flex-col gap-1 text-xs text-(--quiet)">
+				Why they got it
+				<input
+					class="input"
+					value={recipient.reason}
+					autocomplete="off"
+					placeholder="Raffle prize, speaker gift"
+					oninput={(event) => patch(index, { reason: event.currentTarget.value })}
+				/>
+			</label>
 			<button
-				class="col-span-2 self-end px-2 py-2 text-left text-xs text-(--quiet) underline hover:text-(--ink) sm:col-span-1"
+				class="col-span-2 self-end justify-self-start px-2 py-2 text-left text-xs text-(--quiet) underline hover:text-(--ink) sm:col-span-1"
 				type="button"
 				onclick={() =>
 					onchange(
