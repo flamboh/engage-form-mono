@@ -8,6 +8,7 @@ import {
 	userAsPurchaserDetails
 } from '../convex/purchaseModel';
 import { evaluatePurchaseReadiness } from '../convex/purchaseReadiness';
+import { requestSteps } from '../apps/web/src/lib/request/steps';
 
 vi.stubEnv('FILES_BASE_URL', 'https://files.example');
 vi.stubEnv('FILES_SIGNING_SECRET', 'test-secret');
@@ -456,6 +457,32 @@ test('Gift recipients need a reason for the Business Purpose', async () => {
 		ready: false,
 		sections: [{ section: 'Recipients', reasons: ['Recipient reason missing.'] }]
 	});
+});
+
+test.each([
+	[{ name: '', uo95: '', reason: '', value: 0 }, 'todo'],
+	[{ name: 'Aidan', uo95: '951951840', reason: '', value: 22.98 }, 'todo'],
+	[{ name: 'Aidan', uo95: '951951840', reason: 'winning trivia', value: 22.98 }, 'done']
+] as const)('the Recipients step follows readiness for %o', async (recipient, state) => {
+	const gift = {
+		...request,
+		documentationCategories: ['gifts_prizes'],
+		recipients: [{ ...recipient }]
+	} as Doc<'purchaseRequests'>;
+	const readiness = await evaluatePurchaseReadiness(gift);
+	const steps = requestSteps(
+		{
+			readiness,
+			checks: [],
+			documents: [],
+			purchase: { ...gift, foodIndividuallyPackaged: null, receiptDate: '2026-05-19' }
+		} as unknown as Parameters<typeof requestSteps>[0],
+		gift,
+		{ reviewCount: 0, sourceOf: () => 'user' }
+	);
+	const step = steps.find((item) => item.id === 'recipients');
+	expect(step?.state === 'done' ? 'done' : 'todo').toBe(state);
+	expect(step?.blockingReasons.length === 0).toBe(state === 'done');
 });
 
 test('assembled Merchandise/Apparel purchase includes optional Brand Approval', async () => {

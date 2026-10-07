@@ -123,6 +123,37 @@ test('gifts add a Recipients step and someone else paying drops Second Approval'
 	expect(steps.find((step) => step.id === 'recipients')?.summary).toBe('Avery Chen');
 });
 
+test('the Recipients step names each missing recipient field once', () => {
+	const steps = requestSteps(
+		view({
+			fundLetter: 'A',
+			sections: [
+				{
+					section: 'Recipients',
+					reasons: [
+						'Recipient reason missing.',
+						'Recipient UO 95 missing.',
+						'Recipient reason missing.'
+					]
+				}
+			]
+		}),
+		draft({
+			documentationCategories: ['gifts_prizes'],
+			recipients: [
+				{ name: 'Avery Chen', uo95: '951000002', reason: '', value: 20 },
+				{ name: 'Sam Rivera', uo95: '', reason: '', value: 20 }
+			]
+		}),
+		confirmed
+	);
+	expect(steps.find((step) => step.id === 'recipients')).toMatchObject({
+		state: 'current',
+		title: 'Say why each recipient got it',
+		blockingReasons: ['Say why each recipient got it', 'Add each recipient’s 95#']
+	});
+});
+
 test('the ASUO fund letter always needs Publicity Proof', () => {
 	const steps = requestSteps(
 		view({ sections: [{ section: 'Files', reasons: ['Publicity proof missing.'] }] }),
@@ -208,12 +239,13 @@ test.each([
 	[{ section: 'Purchaser', reasons: ['Purchaser address missing.'] }],
 	[{ section: 'Purchaser', reasons: ['Your UO ID (front and back) missing.'] }],
 	[{ section: 'Files', reasons: ['Second approval missing.'] }],
-	[{ section: 'Requester', reasons: ['Requester phone missing.'] }]
+	[{ section: 'Requester', reasons: ['Requester phone missing.'] }],
+	[{ section: 'Recipients', reasons: ['Recipient reason missing.'] }]
 ])('the board’s next step matches the current step title: %o', (section) => {
 	const steps = requestSteps(
 		view({ sections: [section], fundLetter: 'A' }),
 		draft({
-			documentationCategories: ['office_supplies_goods', 'printing_services'],
+			documentationCategories: ['office_supplies_goods', 'printing_services', 'gifts_prizes'],
 			officeLocation: 'EMU 101',
 			secondApprovalFileId: null
 		}),
