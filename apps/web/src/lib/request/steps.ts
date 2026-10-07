@@ -297,3 +297,17 @@ export function stepsLeft(steps: Step[]) {
 export function involves(draft: Pick<Draft, 'documentationCategories'>, fundLetter: string) {
 	return categoryList(effectiveCategories(draft, fundLetter));
 }
+
+export type RequestMode = 'closed' | 'reading' | 'steps' | 'ready';
+
+export function requestMode(input: {
+	closed: boolean;
+	reading: boolean;
+	ready: boolean;
+	steps: Step[];
+}): RequestMode {
+	if (input.closed) return 'closed';
+	if (input.reading) return 'reading';
+	const current = input.steps.find((step) => step.state === 'current');
+	return input.ready && (current === undefined || current.id === 'review') ? 'ready' : 'steps';
+}

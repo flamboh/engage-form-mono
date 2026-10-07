@@ -60,9 +60,8 @@
 	}
 
 	function trackedMessage(item: BoardItem) {
-		if (item.stage !== 'after_event') return `${titleOf(item)} is saved in To finish.`;
-		const when = item.finishAfter ? shortDate(item.finishAfter) : 'the event';
-		return `${titleOf(item)} is tracked. It moves to To finish after ${when}.`;
+		const group = item.stage === 'after_event' ? 'After the event' : 'To finish';
+		return `${titleOf(item)} is saved in ${group}.`;
 	}
 
 	function dismissTracked() {
@@ -235,9 +234,7 @@
 
 {#snippet afterNext(item: BoardItem)}
 	<span class="square hollow" aria-hidden="true"></span>
-	<span class="truncate">
-		Come back after {item.finishAfter ? shortDate(item.finishAfter) : 'the event'}
-	</span>
+	<span class="truncate">{item.nextStep ?? 'Check it over'}</span>
 	{@render days(item)}
 {/snippet}
 
@@ -299,7 +296,7 @@
 				{@render group('To finish', 'These need you now.', board.toFinish, finishNext)}
 				{@render group(
 					'After the event',
-					'Tracked. Come back after the event, or finish now.',
+					'The event is still ahead. Finish any time.',
 					board.afterEvent,
 					afterNext,
 					afterActions

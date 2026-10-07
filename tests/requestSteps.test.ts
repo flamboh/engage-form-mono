@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { requestSteps, type StepContext } from '../apps/web/src/lib/request/steps';
+import { requestMode, requestSteps, type StepContext } from '../apps/web/src/lib/request/steps';
 import { plainNextStep } from '../convex/authed/board';
 import type { Id } from '../convex/_generated/dataModel';
 import { categoriesStep, sentBackStep, type RequestCheck } from '../convex/requestView';
@@ -321,4 +321,21 @@ test('toggling a category adds or drops its steps before readiness catches up', 
 	]);
 	expect(ids(['asuo_funds'])).toContain('publicity');
 	expect(ids(['merchandise_apparel'])).toEqual(expect.arrayContaining(['recipients', 'otherDocs']));
+});
+
+test('an event that hasn’t happened yet still reaches Business Purpose and Fill', () => {
+	const ahead = view();
+	Object.assign(ahead.purchase, { activity: { dates: ['2099-01-15'] } });
+	const steps = requestSteps(
+		ahead,
+		draft({ activity: { ...draft().activity, dates: ['2099-01-15'] } }),
+		confirmed
+	);
+	expect(steps.find((step) => step.state === 'current')).toMatchObject({
+		id: 'review',
+		title: 'Business Purpose'
+	});
+	expect(requestMode({ closed: false, reading: false, ready: true, steps })).toBe('ready');
+	expect(requestMode({ closed: false, reading: false, ready: false, steps })).toBe('steps');
+	expect(requestMode({ closed: false, reading: true, ready: false, steps })).toBe('reading');
 });
