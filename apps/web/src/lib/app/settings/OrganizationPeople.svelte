@@ -8,7 +8,7 @@
 	import FieldRow from '$lib/ui/FieldRow.svelte';
 	import InlineError from '$lib/ui/InlineError.svelte';
 	import SectionHeader from '$lib/ui/SectionHeader.svelte';
-	import { useConvexClient, useQuery } from 'convex-svelte';
+	import { useConvexClient } from 'convex-svelte';
 
 	let {
 		organization,
@@ -19,12 +19,8 @@
 	} = $props();
 
 	const client = useConvexClient();
-	const approversQuery = useQuery(api.authed.approvers.recentApprovers, () => ({
-		organizationId: organization._id
-	}));
 	const active = $derived(purchasers.filter((purchaser) => !purchaser.archived));
 	const archived = $derived(purchasers.filter((purchaser) => purchaser.archived));
-	const approvers = $derived(approversQuery.data ?? []);
 
 	let editing = $state<Id<'purchasers'> | 'new' | null>(null);
 	let error = $state('');
@@ -47,10 +43,6 @@
 			});
 			editing = null;
 		});
-	}
-
-	function forget(id: Id<'approvers'>) {
-		return run(() => client.mutation(api.authed.approvers.forgetApprover, { id }));
 	}
 </script>
 
@@ -93,7 +85,7 @@
 			{:else}
 				<FieldRow
 					label="Purchaser"
-					value={purchaser.name}
+					value={[purchaser.name, purchaser.email].filter(Boolean).join(', ')}
 					onaction={() => (editing = purchaser._id)}
 				>
 					<span class="note" class:missing={!purchaser.idCardBackFileId}>
@@ -102,16 +94,8 @@
 				</FieldRow>
 			{/if}
 		{/each}
-		{#each approvers as approver (approver.id)}
-			<FieldRow
-				label="Approver"
-				value={[approver.name, approver.email].filter(Boolean).join(', ')}
-				actionLabel="Forget"
-				onaction={() => forget(approver.id)}
-			/>
-		{/each}
 	</dl>
-	{#if active.length === 0 && approvers.length === 0 && editing !== 'new'}
+	{#if active.length === 0 && editing !== 'new'}
 		<EmptyState
 			title="Just you so far."
 			body="Add people who pay for things and get paid back. Officers you ask for approval show up here too."

@@ -155,21 +155,17 @@ export default defineSchema({
 		name: v.string(),
 		uo95: v.string(),
 		permanentAddress: v.string(),
-		idCardFrontFileId: v.id('files'),
+		idCardFrontFileId: v.union(v.id('files'), v.null()),
 		idCardBackFileId: v.union(v.id('files'), v.null()),
+		email: v.optional(v.string()),
+		title: v.optional(v.string()),
+		approverUsedAt: v.optional(v.number()),
 		archived: v.boolean(),
 		updatedAt: v.number()
 	})
 		.index('by_owner_and_organizationId_and_archived', ['owner', 'organizationId', 'archived'])
 		.index('by_owner_and_archived', ['owner', 'archived'])
 		.index('by_owner', ['owner']),
-	approvers: defineTable({
-		owner: v.string(),
-		organizationId: v.id('organizations'),
-		name: v.string(),
-		email: v.string(),
-		usedAt: v.number()
-	}).index('by_owner_and_organizationId_and_usedAt', ['owner', 'organizationId', 'usedAt']),
 	events: defineTable({
 		owner: v.string(),
 		organizationId: v.id('organizations'),

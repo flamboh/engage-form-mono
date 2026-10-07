@@ -10,7 +10,7 @@
 	import { onDestroy } from 'svelte';
 	import ActionBar, { type BarMode } from './ActionBar.svelte';
 	import AllDetails from './AllDetails.svelte';
-	import ApprovalDialog, { type SavedApprover } from './ApprovalDialog.svelte';
+	import ApprovalDialog from './ApprovalDialog.svelte';
 	import DocumentStrip from './DocumentStrip.svelte';
 	import { RequestEditor, type RequestBackend } from './editor.svelte';
 	import FilledView from './FilledView.svelte';
@@ -28,7 +28,6 @@
 		user,
 		events = [],
 		recentPurposes = [],
-		approvers = [],
 		organizationId,
 		pending,
 		backend,
@@ -39,7 +38,6 @@
 		user: Doc<'users'> | null;
 		events?: Doc<'events'>[];
 		recentPurposes?: string[];
-		approvers?: SavedApprover[];
 		organizationId: Id<'organizations'>;
 		pending: PendingUpload[];
 		backend: RequestBackend;
@@ -295,11 +293,10 @@
 	<ApprovalDialog
 		bind:this={approvalDialog}
 		{editor}
-		{approvers}
+		{purchasers}
 		requesterName={purchase?.requester.name ?? user?.name ?? ''}
 		requesterEmail={purchase?.requester.email ?? user?.studentEmail ?? ''}
-		onremember={(approver) => void backend.rememberApprover(approver).catch(() => {})}
-		onforget={(id) => void backend.forgetApprover(id).catch(() => {})}
+		onsave={(approver) => backend.saveApprover(approver)}
 		onjump={jumpToStep}
 	/>
 

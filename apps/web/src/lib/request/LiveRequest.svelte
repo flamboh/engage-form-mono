@@ -34,9 +34,6 @@
 	const eventsQuery = useQuery(api.authed.events.listEvents, () =>
 		clerkContext.currentSession ? { organizationId } : 'skip'
 	);
-	const approversQuery = useQuery(api.authed.approvers.recentApprovers, () =>
-		clerkContext.currentSession ? { organizationId } : 'skip'
-	);
 
 	const pending = $derived(uploadsFor(purchaseRequestId));
 	const serverFileIds = $derived(viewQuery.data?.documents.map((document) => document.fileId));
@@ -83,12 +80,8 @@
 		discard: async () => {
 			await client.mutation(api.authed.purchaseBuilder.discardDraft, { id: purchaseRequestId });
 		},
-		rememberApprover: async (approver) => {
-			await client.mutation(api.authed.approvers.rememberApprover, { organizationId, ...approver });
-		},
-		forgetApprover: async (id) => {
-			await client.mutation(api.authed.approvers.forgetApprover, { id });
-		},
+		saveApprover: (approver) =>
+			client.mutation(api.authed.approvers.saveApprover, { organizationId, ...approver }),
 		answerFoodPackaging: async (packaged) => {
 			await client.mutation(api.authed.checks.answerFoodPackaging, {
 				purchaseRequestId,
@@ -153,7 +146,6 @@
 	user={userQuery.data ?? null}
 	events={eventsQuery.data ?? []}
 	recentPurposes={purposesQuery.data ?? []}
-	approvers={approversQuery.data ?? []}
 	{organizationId}
 	{pending}
 	{backend}
