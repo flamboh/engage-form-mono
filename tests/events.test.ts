@@ -1,30 +1,61 @@
 import { expect, test } from 'vitest';
 import { formatEventDates, formatEventTime, suggestEventDates } from '../convex/events';
 
-test('weekly events suggest the next matching weekday and the one before it', () => {
-	expect(suggestEventDates({ weekday: 2 }, '2026-05-17')).toEqual({
-		suggested: '2026-05-19',
-		alternatives: ['2026-05-12']
+test('weekly events suggest the most recent occurrence, with the weeks around it', () => {
+	expect(suggestEventDates({ weekday: 3 }, null, '2026-10-09')).toEqual({
+		suggested: '2026-10-07',
+		dates: ['2026-09-30', '2026-10-07', '2026-10-14']
 	});
-	expect(suggestEventDates({ weekday: 2 }, '2026-05-19')).toEqual({
-		suggested: '2026-05-19',
-		alternatives: ['2026-05-12']
+	expect(suggestEventDates({ weekday: 3 }, '2026-10-05', '2026-10-09')).toEqual({
+		suggested: '2026-10-07',
+		dates: ['2026-09-30', '2026-10-07', '2026-10-14']
 	});
-	expect(suggestEventDates({ weekday: 2 }, '2026-05-20')).toEqual({
-		suggested: '2026-05-26',
-		alternatives: ['2026-05-19']
+});
+
+test('an event on today’s weekday suggests today', () => {
+	expect(suggestEventDates({ weekday: 3 }, null, '2026-10-07')).toEqual({
+		suggested: '2026-10-07',
+		dates: ['2026-09-30', '2026-10-07', '2026-10-14']
+	});
+	expect(suggestEventDates({ weekday: 3 }, '2026-10-07', '2026-10-07')).toEqual({
+		suggested: '2026-10-07',
+		dates: ['2026-09-30', '2026-10-07', '2026-10-14']
+	});
+});
+
+test('a receipt after the last occurrence suggests the next one', () => {
+	expect(suggestEventDates({ weekday: 3 }, '2026-10-08', '2026-10-09')).toEqual({
+		suggested: '2026-10-14',
+		dates: ['2026-10-07', '2026-10-14', '2026-10-21']
+	});
+});
+
+test('an older receipt keeps the first occurrence after it as a choice', () => {
+	expect(suggestEventDates({ weekday: 3 }, '2026-09-10', '2026-10-09')).toEqual({
+		suggested: '2026-10-07',
+		dates: ['2026-09-16', '2026-09-30', '2026-10-07', '2026-10-14']
+	});
+});
+
+test('a receipt dated after today is ignored', () => {
+	expect(suggestEventDates({ weekday: 3 }, '2026-11-20', '2026-10-09')).toEqual({
+		suggested: '2026-10-07',
+		dates: ['2026-09-30', '2026-10-07', '2026-10-14']
 	});
 });
 
 test('one-off events suggest the receipt date, and nothing without a receipt date', () => {
-	expect(suggestEventDates({ weekday: null }, '2026-05-22')).toEqual({
-		suggested: '2026-05-22',
-		alternatives: []
+	expect(suggestEventDates({ weekday: null }, '2026-10-02', '2026-10-09')).toEqual({
+		suggested: '2026-10-02',
+		dates: ['2026-10-02']
 	});
-	expect(suggestEventDates({ weekday: 2 }, null)).toEqual({ suggested: null, alternatives: [] });
-	expect(suggestEventDates({ weekday: 2 }, '05/22/2026')).toEqual({
+	expect(suggestEventDates({ weekday: null }, null, '2026-10-09')).toEqual({
 		suggested: null,
-		alternatives: []
+		dates: []
+	});
+	expect(suggestEventDates({ weekday: null }, '10/02/2026', '2026-10-09')).toEqual({
+		suggested: null,
+		dates: []
 	});
 });
 

@@ -10,7 +10,7 @@ const weekdayNames = [
 
 const dayMs = 24 * 60 * 60 * 1000;
 
-export type EventDateSuggestion = { suggested: string | null; alternatives: string[] };
+export type EventDateSuggestion = { suggested: string | null; dates: string[] };
 
 export function parseIsoDate(value: string | null | undefined) {
 	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value?.trim() ?? '');
@@ -45,17 +45,29 @@ export function todayInOregon(now = Date.now()) {
 
 export function suggestEventDates(
 	event: { weekday: number | null },
-	receiptDate: string | null
+	receiptDate: string | null,
+	today = todayInOregon()
 ): EventDateSuggestion {
-	const receipt = parseIsoDate(receiptDate);
-	if (receipt === null) return { suggested: null, alternatives: [] };
+	const now = parseIsoDate(today);
+	if (now === null) return { suggested: null, dates: [] };
+	const parsedReceipt = parseIsoDate(receiptDate);
+	const receipt = parsedReceipt !== null && parsedReceipt <= now ? parsedReceipt : null;
 	if (event.weekday === null || event.weekday < 0 || event.weekday > 6) {
-		return { suggested: isoDate(receipt), alternatives: [] };
+		if (receipt === null) return { suggested: null, dates: [] };
+		return { suggested: isoDate(receipt), dates: [isoDate(receipt)] };
 	}
-	const offset = (event.weekday - receipt.getUTCDay() + 7) % 7;
-	const next = new Date(receipt.getTime() + offset * dayMs);
-	const previous = new Date(next.getTime() - 7 * dayMs);
-	return { suggested: isoDate(next), alternatives: [isoDate(previous)] };
+	const last = addDays(now, -((now.getUTCDay() - event.weekday + 7) % 7));
+	const afterReceipt =
+		receipt === null ? null : addDays(receipt, (event.weekday - receipt.getUTCDay() + 7) % 7);
+	const suggested = afterReceipt !== null && afterReceipt > last ? afterReceipt : last;
+	const dates = [addDays(suggested, -7), suggested, addDays(suggested, 7), afterReceipt]
+		.filter((date): date is Date => date !== null)
+		.map(isoDate);
+	return { suggested: isoDate(suggested), dates: [...new Set(dates)].sort() };
+}
+
+function addDays(date: Date, days: number) {
+	return new Date(date.getTime() + days * dayMs);
 }
 
 export function normalizeEventDates(dates: string[]) {
