@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { requestSteps, type StepContext } from '../apps/web/src/lib/request/steps';
 import { plainNextStep } from '../convex/authed/board';
 import type { Id } from '../convex/_generated/dataModel';
-import { sentBackStep, type RequestCheck } from '../convex/requestView';
+import { categoriesStep, sentBackStep, type RequestCheck } from '../convex/requestView';
 
 const file = (id: string) => id as Id<'files'>;
 
@@ -93,6 +93,7 @@ test('a food, ASUO, self-paid request lists its steps in reviewer order', () => 
 	);
 	expect(steps.map((step) => step.id)).toEqual([
 		'receipt',
+		'categories',
 		'event',
 		'purchaser',
 		'packaging',
@@ -143,8 +144,8 @@ test('a missing ID side adds the UO ID step right after who paid', () => {
 		draft({ purchaser: { ...draft().purchaser, idCardBackFileId: null } }),
 		confirmed
 	);
-	expect(steps.slice(2, 4).map((step) => step.id)).toEqual(['purchaser', 'idCard']);
-	expect(steps[3]).toMatchObject({ state: 'current', title: 'Add your UO ID (front and back)' });
+	expect(steps.slice(3, 5).map((step) => step.id)).toEqual(['purchaser', 'idCard']);
+	expect(steps[4]).toMatchObject({ state: 'current', title: 'Add your UO ID (front and back)' });
 });
 
 test('someone else’s missing ID asks for their UO ID', () => {
@@ -215,12 +216,13 @@ test.each([
 		draft({
 			documentationCategories: ['office_supplies_goods', 'printing_services'],
 			officeLocation: 'EMU 101',
+			printingInvoiceFileId: file('invoice'),
 			secondApprovalFileId: null
 		}),
 		confirmed
 	);
 	expect(steps.find((step) => step.state === 'current')?.title).toBe(
-		plainNextStep({ sections: [section] }, [])
+		plainNextStep({ sections: [section] }, [], true)
 	);
 });
 
@@ -242,6 +244,81 @@ test('publicity missing matches the board with ASUO funds', () => {
 		confirmed
 	);
 	expect(steps.find((step) => step.state === 'current')?.title).toBe(
-		plainNextStep({ sections: [section] }, [])
+		plainNextStep({ sections: [section] }, [], true)
 	);
+});
+
+const unconfirmed: StepContext = {
+	reviewCount: 0,
+	sourceOf: (field) => (field === 'documentationCategories' ? undefined : 'user')
+};
+
+test('unconfirmed categories are one tap right after the receipt, and the board agrees', () => {
+	const section = { section: 'Files', reasons: ['Second approval missing.'] };
+	const steps = requestSteps(
+		view({ sections: [section] }),
+		draft({ secondApprovalFileId: null }),
+		unconfirmed
+	);
+	expect(steps.map((step) => step.id).slice(0, 2)).toEqual(['receipt', 'categories']);
+	expect(steps[1]).toMatchObject({
+		state: 'current',
+		title: categoriesStep,
+		summary: 'Nothing special'
+	});
+	expect(plainNextStep({ sections: [section] }, [], false)).toBe(categoriesStep);
+});
+
+test('a receipt still missing facts comes before the categories, on the board too', () => {
+	const section = { section: 'Purchase details', reasons: ['Vendor missing.'] };
+	const steps = requestSteps(view({ sections: [section] }), draft({ vendor: '' }), unconfirmed);
+	const current = steps.find((step) => step.state === 'current');
+	expect(current?.id).toBe('receipt');
+	expect(current?.title).toBe(plainNextStep({ sections: [section] }, [], false));
+});
+
+test('suggested categories show in the summary and confirmed ones collapse', () => {
+	const suggested = requestSteps(
+		view(),
+		draft({ documentationCategories: ['food', 'gifts_prizes'] }),
+		unconfirmed
+	);
+	expect(suggested.find((step) => step.id === 'categories')?.summary).toBe('Food, Gifts or prizes');
+	const done = requestSteps(view(), draft({ documentationCategories: ['asuo_funds'] }), confirmed);
+	expect(done.find((step) => step.id === 'categories')).toMatchObject({
+		state: 'done',
+		title: 'What it includes',
+		summary: 'Nothing special'
+	});
+});
+
+test('toggling a category adds or drops its steps before readiness catches up', () => {
+	const ids = (categories: string[]) =>
+		requestSteps(
+			view({ fundLetter: 'A' }),
+			draft({ documentationCategories: categories }),
+			confirmed
+		).map((step) => step.id);
+	expect(ids([])).not.toContain('recipients');
+	const gifts = requestSteps(
+		view({ fundLetter: 'A' }),
+		draft({ documentationCategories: ['gifts_prizes'] }),
+		confirmed
+	);
+	expect(gifts.find((step) => step.id === 'recipients')).toMatchObject({
+		state: 'current',
+		title: 'Add who received it'
+	});
+	const office = requestSteps(
+		view({ fundLetter: 'A' }),
+		draft({ documentationCategories: ['office_supplies_goods', 'printing_services'] }),
+		confirmed
+	);
+	expect(office.filter((step) => step.state !== 'done').map((step) => step.title)).toEqual([
+		'Add where it will be kept',
+		'Add the printing invoice',
+		'Review and fill'
+	]);
+	expect(ids(['asuo_funds'])).toContain('publicity');
+	expect(ids(['merchandise_apparel'])).toEqual(expect.arrayContaining(['recipients', 'otherDocs']));
 });

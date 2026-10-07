@@ -249,6 +249,7 @@ const receiptDoc = (reading = false, readFailed = false) =>
 		readFailed
 	);
 const readSources = {
+	documentationCategories: 'suggested',
 	purchaserSource: 'previous',
 	budgetLineItem: 'previous',
 	activity: 'previous',
@@ -288,6 +289,7 @@ const complete = {
 };
 const completeDocs = () => [receiptDoc(), publicityDoc(), approvalDoc(), cateringDoc()];
 const confirmedSources = {
+	documentationCategories: 'user',
 	purchaserSource: 'user',
 	budgetLineItem: 'previous',
 	activity: 'user',

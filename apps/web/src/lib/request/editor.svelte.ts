@@ -65,7 +65,11 @@ export type RequestBackend = {
 	saveIdCards(purchaser: PurchaserDetails, source: Purchase['purchaserSource']): Promise<void>;
 };
 
-export type ConfirmableField = 'activity' | 'purchaserSource' | 'budgetLineItem';
+export type ConfirmableField =
+	| 'activity'
+	| 'purchaserSource'
+	| 'budgetLineItem'
+	| 'documentationCategories';
 export type IdSide = 'front' | 'back';
 
 export type FillPhase = 'idle' | 'opening' | 'sent';

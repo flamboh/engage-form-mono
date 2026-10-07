@@ -14,6 +14,7 @@
 
 	const pinnable = new Set<StepId>([
 		'receipt',
+		'categories',
 		'event',
 		'purchaser',
 		'recipients',
@@ -31,8 +32,10 @@
 		pinned = openId === id ? null : id;
 	}
 
-	function pin(step: Step) {
-		if (pinnable.has(step.id)) pinned = step.id;
+	function pin(step: Step, event: Event) {
+		if (!pinnable.has(step.id)) return;
+		if (event.target instanceof Element && event.target.closest('[data-advance]') !== null) return;
+		pinned = step.id;
 	}
 </script>
 
@@ -112,8 +115,11 @@
 					{#if open}
 						<div
 							id={`step-body-${step.id}`}
+							role="group"
+							aria-label={step.title}
 							class="mt-3 flex flex-col gap-4"
-							onfocusin={() => pin(step)}
+							onfocusin={(event) => pin(step, event)}
+							onpointerdown={(event) => pin(step, event)}
 						>
 							{@render body(step)}
 							{#if pinned === step.id && step.state === 'done'}
