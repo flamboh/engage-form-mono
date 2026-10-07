@@ -90,6 +90,7 @@
 						<Button
 							variant="secondary"
 							size="sm"
+							data-advance
 							onclick={() => void editor.confirmCheck(check.id)}
 						>
 							{confirmLabel(check)}

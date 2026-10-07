@@ -32,10 +32,17 @@
 		pinned = openId === id ? null : id;
 	}
 
+	function advancing(event: Event) {
+		return event.target instanceof Element && event.target.closest('[data-advance]') !== null;
+	}
+
 	function pin(step: Step, event: Event) {
-		if (!pinnable.has(step.id)) return;
-		if (event.target instanceof Element && event.target.closest('[data-advance]') !== null) return;
+		if (!pinnable.has(step.id) || advancing(event)) return;
 		pinned = step.id;
+	}
+
+	function advance(step: Step, event: Event) {
+		if (pinned === step.id && step.state === 'current' && advancing(event)) pinned = null;
 	}
 </script>
 
@@ -120,6 +127,7 @@
 							class="mt-3 flex flex-col gap-4"
 							onfocusin={(event) => pin(step, event)}
 							onpointerdown={(event) => pin(step, event)}
+							onpointerup={(event) => advance(step, event)}
 						>
 							{@render body(step)}
 							{#if pinned === step.id && step.state === 'done'}
