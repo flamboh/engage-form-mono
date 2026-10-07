@@ -1,5 +1,5 @@
 import type { Doc, Id } from '$convex/_generated/dataModel';
-import type { Approver } from '$convex/approvalEmail';
+import type { Approver } from '$convex/approvalMessage';
 import type { DocumentSlot, RequestView } from '$convex/requestView';
 import {
 	savedPurchaserDetails,
@@ -55,8 +55,9 @@ export type RequestBackend = {
 	reopen(): Promise<void>;
 	discard(): Promise<void>;
 	upload(files: File[], slot: UploadSlot): void;
-	rememberApprover(approver: Approver): Promise<void>;
-	forgetApprover(id: Id<'approvers'>): Promise<void>;
+	saveApprover(
+		approver: Approver & { purchaserId: Id<'purchasers'> | null }
+	): Promise<Id<'purchasers'>>;
 	answerFoodPackaging(packaged: boolean): Promise<void>;
 	confirmCheck(checkId: string): Promise<void>;
 	confirmFields(fields: ConfirmableField[]): Promise<void>;

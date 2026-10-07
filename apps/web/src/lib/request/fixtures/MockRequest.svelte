@@ -5,10 +5,8 @@
 	import type { RequestBackend } from '../editor.svelte';
 	import { slotField } from '../editor.svelte';
 	import RequestPage from '../RequestPage.svelte';
-	import type { SavedApprover } from '../ApprovalDialog.svelte';
 	import { untrack } from 'svelte';
 	import {
-		mockApprovers,
 		mockEngageUrl,
 		mockEvents,
 		mockOrganizationId,
@@ -28,7 +26,7 @@
 	const initialScenario = untrack(() => scenario);
 	const initial = scenarioView(initialScenario);
 	let view = $state<RequestView>(initial);
-	let approvers = $state<SavedApprover[]>(mockApprovers());
+	let saved = $state(structuredClone(mockSaved));
 	let events = $state<Doc<'events'>[]>(initialScenario === 'no-events' ? [] : mockEvents);
 	const pending = $derived(uploadsFor(mockRequestId));
 	const session = { getToken: async () => null };
@@ -183,16 +181,30 @@
 		discard: async () => {
 			await wait(150);
 		},
-		rememberApprover: async (approver) => {
+		saveApprover: async ({ purchaserId, ...approver }) => {
 			await wait(120);
-			const rest = approvers.filter(
-				(saved) => saved.email.toLowerCase() !== approver.email.toLowerCase()
-			);
-			approvers = [{ id: `mock_approver_${++counter}` as Id<'approvers'>, ...approver }, ...rest];
-		},
-		forgetApprover: async (id) => {
-			await wait(120);
-			approvers = approvers.filter((saved) => saved.id !== id);
+			const details = { email: approver.email, title: approver.title, approverUsedAt: Date.now() };
+			const existing = saved.purchasers.find((purchaser) => purchaser._id === purchaserId);
+			if (existing !== undefined) {
+				Object.assign(existing, details);
+				return existing._id;
+			}
+			const id = `mock_purchaser_${++counter}` as Id<'purchasers'>;
+			saved.purchasers.push({
+				_id: id,
+				_creationTime: Date.now(),
+				owner: 'mock',
+				organizationId: mockOrganizationId,
+				name: approver.name,
+				uo95: '',
+				permanentAddress: '',
+				idCardFrontFileId: null,
+				idCardBackFileId: null,
+				archived: false,
+				updatedAt: Date.now(),
+				...details
+			});
+			return id;
 		},
 		answerFoodPackaging: async (packaged) => {
 			await wait(120);
@@ -252,14 +264,13 @@
 
 <RequestPage
 	{view}
-	saved={mockSaved}
+	{saved}
 	user={mockUser}
 	recentPurposes={[
 		'snacks for the general meeting',
 		'prizes for the bouldering comp',
 		'gear swap supplies'
 	]}
-	{approvers}
 	{events}
 	organizationId={mockOrganizationId}
 	{pending}

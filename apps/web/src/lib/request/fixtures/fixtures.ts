@@ -126,6 +126,23 @@ export const mockSaved: SavedData = {
 			permanentAddress: '1200 Alder St, Eugene, OR 97401',
 			idCardFrontFileId: file('mock_sam_id'),
 			idCardBackFileId: file('mock_sam_id_back'),
+			email: 'srivera@uoregon.edu',
+			archived: false,
+			updatedAt: now
+		},
+		{
+			_id: 'mock_purchaser_priya' as Id<'purchasers'>,
+			_creationTime: now,
+			owner: 'mock',
+			organizationId: mockOrganizationId,
+			name: 'Priya Natarajan',
+			uo95: '',
+			permanentAddress: '',
+			idCardFrontFileId: null,
+			idCardBackFileId: null,
+			email: 'priyan@uoregon.edu',
+			title: 'Treasurer',
+			approverUsedAt: now,
 			archived: false,
 			updatedAt: now
 		}
@@ -571,18 +588,3 @@ function businessPurposeView(purchase: Purchase) {
 }
 
 export const mockRead = readReceipt;
-
-export function mockApprovers() {
-	return [
-		{
-			id: 'mock_approver_sam' as Id<'approvers'>,
-			name: 'Sam Rivera',
-			email: 'srivera@uoregon.edu'
-		},
-		{
-			id: 'mock_approver_priya' as Id<'approvers'>,
-			name: 'Priya Natarajan',
-			email: 'priyan@uoregon.edu'
-		}
-	];
-}

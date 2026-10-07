@@ -1,83 +1,56 @@
 import { z } from 'zod/v4';
 import { zid } from 'convex-helpers/server/zod4';
-import { ownerFromIdentity, requireOwnedDoc } from '../purchaseModel';
-import { nullReturn } from '../purchaseZod';
-import { authedMutation, authedQuery } from './helpers';
+import { ownerFromIdentity, requireOwnedDoc, requireText } from '../purchaseModel';
+import { authedMutation } from './helpers';
 
-const recentLimit = 5;
-
-const approverItem = z.object({
-	id: zid('approvers'),
-	name: z.string(),
-	email: z.string()
-});
-
-export const recentApprovers = authedQuery({
-	args: { organizationId: zid('organizations') },
-	returns: z.array(approverItem),
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const rows = await ctx.db
-			.query('approvers')
-			.withIndex('by_owner_and_organizationId_and_usedAt', (q) =>
-				q.eq('owner', owner).eq('organizationId', args.organizationId)
-			)
-			.order('desc')
-			.take(recentLimit);
-		return rows.map((row) => ({ id: row._id, name: row.name, email: row.email }));
-	}
-});
-
-export const rememberApprover = authedMutation({
+export const saveApprover = authedMutation({
 	args: {
 		organizationId: zid('organizations'),
+		purchaserId: zid('purchasers').nullable(),
 		name: z.string().max(200),
-		email: z.string().max(320)
+		email: z.string().max(320),
+		title: z.string().max(200)
 	},
-	returns: nullReturn,
+	returns: zid('purchasers'),
 	handler: async (ctx, args) => {
 		const owner = ownerFromIdentity(ctx.identity);
 		await requireOwnedDoc(ctx, 'organizations', args.organizationId, owner);
 		const name = args.name.trim();
 		const email = args.email.trim();
-		if (name === '' && email === '') return null;
-		const rows = await ctx.db
-			.query('approvers')
-			.withIndex('by_owner_and_organizationId_and_usedAt', (q) =>
-				q.eq('owner', owner).eq('organizationId', args.organizationId)
-			)
-			.order('desc')
-			.take(50);
-		const same = rows.find((row) =>
-			email === ''
-				? row.email === '' && row.name.toLowerCase() === name.toLowerCase()
-				: row.email.toLowerCase() === email.toLowerCase()
-		);
-		const usedAt = Date.now();
-		if (same === undefined) {
-			await ctx.db.insert('approvers', {
-				owner,
-				organizationId: args.organizationId,
-				name,
-				email,
-				usedAt
-			});
-		} else {
-			await ctx.db.patch(same._id, { name: name || same.name, email, usedAt });
+		const now = Date.now();
+		const details = { email, title: args.title.trim(), approverUsedAt: now, updatedAt: now };
+		if (args.purchaserId !== null) {
+			const purchaser = await requireOwnedDoc(ctx, 'purchasers', args.purchaserId, owner);
+			if (purchaser.organizationId !== args.organizationId) throw new Error('Record not found.');
+			await ctx.db.patch(purchaser._id, details);
+			return purchaser._id;
 		}
-		for (const stale of rows.slice(recentLimit * 2)) await ctx.db.delete(stale._id);
-		return null;
-	}
-});
-
-export const forgetApprover = authedMutation({
-	args: { id: zid('approvers') },
-	returns: nullReturn,
-	handler: async (ctx, args) => {
-		const owner = ownerFromIdentity(ctx.identity);
-		const row = await ctx.db.get(args.id);
-		if (row === null || row.owner !== owner) throw new Error('Approver not found.');
-		await ctx.db.delete(row._id);
-		return null;
+		requireText(name, 'Approver name missing.');
+		const purchasers = await ctx.db
+			.query('purchasers')
+			.withIndex('by_owner_and_organizationId_and_archived', (q) =>
+				q.eq('owner', owner).eq('organizationId', args.organizationId).eq('archived', false)
+			)
+			.take(200);
+		const same = purchasers.find((purchaser) =>
+			email !== '' && purchaser.email !== undefined && purchaser.email !== ''
+				? purchaser.email.toLowerCase() === email.toLowerCase()
+				: purchaser.name.trim().toLowerCase() === name.toLowerCase()
+		);
+		if (same !== undefined) {
+			await ctx.db.patch(same._id, details);
+			return same._id;
+		}
+		return await ctx.db.insert('purchasers', {
+			owner,
+			organizationId: args.organizationId,
+			name,
+			uo95: '',
+			permanentAddress: '',
+			idCardFrontFileId: null,
+			idCardBackFileId: null,
+			archived: false,
+			...details
+		});
 	}
 });

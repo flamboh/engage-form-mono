@@ -150,8 +150,11 @@ export const purchaserDoc = z.object({
 	name: z.string(),
 	uo95: z.string(),
 	permanentAddress: z.string(),
-	idCardFrontFileId: zid('files'),
+	idCardFrontFileId: zid('files').nullable(),
 	idCardBackFileId: zid('files').nullable(),
+	email: z.string().optional(),
+	title: z.string().optional(),
+	approverUsedAt: z.number().optional(),
 	archived: z.boolean(),
 	updatedAt: z.number()
 });
