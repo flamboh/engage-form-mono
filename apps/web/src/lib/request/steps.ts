@@ -1,5 +1,6 @@
 import type { FieldSource, FormState } from './editor.svelte';
 import {
+	categoriesStep,
 	checkStep,
 	idCardTitle,
 	reasonStep,
@@ -54,6 +55,7 @@ type Draft = Pick<
 
 const doneTitles: Record<StepId, string> = {
 	receipt: 'Receipt',
+	categories: 'What it includes',
 	event: 'Event',
 	purchaser: 'Who paid',
 	idCard: 'UO ID',
@@ -111,7 +113,8 @@ export function requestSteps(
 	context: StepContext
 ): Step[] {
 	const self = draft.purchaserSource.kind === 'self';
-	const categories = effectiveCategories(draft, view.purchase.studentOrganization.fundLetter);
+	const fundLetter = view.purchase.studentOrganization.fundLetter;
+	const categories = effectiveCategories(draft, fundLetter);
 	const checkTitles = new Set(view.checks.map((check) => check.title));
 	const blocking = new Map<StepId, string[]>();
 	for (const section of view.readiness.sections) {
@@ -131,6 +134,25 @@ export function requestSteps(
 		const titles = checks.filter((check) => check.severity === 'blocking').map((c) => c.title);
 		if (titles.length > 0) blocking.set(step, [...titles, ...(blocking.get(step) ?? [])]);
 	}
+	const gaps: [StepId, boolean, string, string][] = [
+		['recipients', draft.recipients.length === 0, 'Recipients', 'Recipient missing.'],
+		[
+			'officeLocation',
+			draft.officeLocation.trim() === '',
+			'Purchase details',
+			'Office location missing.'
+		],
+		['publicity', !hasFile(draft.publicityFileId), 'Files', 'Publicity proof missing.'],
+		[
+			'otherDocs',
+			categories.includes('printing_services') && !hasFile(draft.printingInvoiceFileId),
+			'Files',
+			'Printing invoice missing.'
+		]
+	];
+	for (const [step, missing, section, reason] of gaps) {
+		if (missing && !blocking.has(step)) blocking.set(step, [reasonStep(section, reason).title]);
+	}
 	const filename = (id: string | null) =>
 		view.documents.find((document) => document.fileId === id)?.filename ?? '';
 	const packaged = view.purchase.foodIndividuallyPackaged ?? null;
@@ -142,6 +164,7 @@ export function requestSteps(
 
 	const applies: Record<StepId, boolean> = {
 		receipt: true,
+		categories: true,
 		event: true,
 		purchaser: true,
 		idCard: idMissing || blocking.has('idCard') || (context.keep?.has('idCard') ?? false),
@@ -161,6 +184,7 @@ export function requestSteps(
 
 	const needsCheck: Partial<Record<StepId, boolean>> = {
 		receipt: context.reviewCount > 0,
+		categories: context.sourceOf('documentationCategories') !== 'user',
 		event: isDefault(context.sourceOf('activity')),
 		purchaser: !self && isDefault(context.sourceOf('purchaserSource'))
 	};
@@ -170,6 +194,10 @@ export function requestSteps(
 			draft.receiptFileIds.length === 0
 				? 'A photo or PDF of what you bought'
 				: receiptSummary(draft, receiptDate) || 'Reading the receipt',
+		categories: () =>
+			categoryList(
+				categories.filter((category) => category !== 'asuo_funds' || fundLetter !== 'I')
+			).join(', ') || 'Nothing special',
 		event: () => eventSummary(draft.activity) || 'Which event it was for, when and where',
 		purchaser: () => (self ? `You, ${draft.purchaser.name}` : draft.purchaser.name),
 		idCard: () =>
@@ -250,6 +278,7 @@ function titleFor(id: StepId, reasons: string[], packaged: boolean | null, self:
 	if (id === 'event') return 'Check the event';
 	if (id === 'purchaser') return 'Check who paid';
 	if (id === 'receipt') return 'Check the receipt';
+	if (id === 'categories') return categoriesStep;
 	return doneTitles[id];
 }
 
@@ -268,4 +297,18 @@ export function stepsLeft(steps: Step[]) {
 
 export function involves(draft: Pick<Draft, 'documentationCategories'>, fundLetter: string) {
 	return categoryList(effectiveCategories(draft, fundLetter));
+}
+
+export type RequestMode = 'closed' | 'reading' | 'steps' | 'ready';
+
+export function requestMode(input: {
+	closed: boolean;
+	reading: boolean;
+	ready: boolean;
+	steps: Step[];
+}): RequestMode {
+	if (input.closed) return 'closed';
+	if (input.reading) return 'reading';
+	const current = input.steps.find((step) => step.state === 'current');
+	return input.ready && (current === undefined || current.id === 'review') ? 'ready' : 'steps';
 }

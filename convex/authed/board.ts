@@ -7,7 +7,7 @@ import { requestLifecycle, todayInEugene, type Stage } from '../lifecycle';
 import { ownerFromIdentity, readinessWithChecks, requireOwnedDoc } from '../purchaseModel';
 import { requestExtractions } from '../checks/load';
 import type { PurchaseReadiness } from '../purchaseReadiness';
-import { reasonStep, sentBackStep, stage } from '../requestView';
+import { categoriesStep, reasonStep, sentBackStep, stage } from '../requestView';
 import { authedMutation, authedQuery } from './helpers';
 
 const boardItem = z.object({
@@ -40,13 +40,19 @@ const reasonPriority = [
 
 export function plainNextStep(
 	readiness: Pick<PurchaseReadiness, 'sections'>,
-	checks: { severity: 'blocking' | 'warning'; title: string }[]
+	checks: { severity: 'blocking' | 'warning'; title: string }[],
+	categoriesConfirmed: boolean
 ): string | null {
 	const reasons = readiness.sections
 		.flatMap((section) => section.reasons.map((reason) => ({ section: section.section, reason })))
 		.filter((item) => !checks.some((check) => check.title === item.reason));
 	const blocking = checks.find((check) => check.severity === 'blocking');
+	if (reasons.length === 0 && blocking === undefined) return null;
 	if (reasons.some((item) => item.reason === reasonPriority[0])) return 'Add a receipt';
+	const receiptLeft = reasons.some(
+		(item) => reasonStep(item.section, item.reason).step === 'receipt'
+	);
+	if (!categoriesConfirmed && !receiptLeft) return categoriesStep;
 	if (blocking !== undefined) return blocking.title;
 	const first =
 		reasonPriority
@@ -176,7 +182,11 @@ async function placedItem(ctx: QueryCtx, request: Doc<'purchaseRequests'>, today
 		lifecycle.stage === 'reading'
 			? requestLifecycle(request, { ...context, reading: false }).stage
 			: lifecycle.stage;
-	const nextStep = plainNextStep(readiness, checks);
+	const nextStep = plainNextStep(
+		readiness,
+		checks,
+		request.fieldSources?.documentationCategories === 'user'
+	);
 	const item: BoardItem = {
 		id: request._id,
 		vendor: request.vendor,

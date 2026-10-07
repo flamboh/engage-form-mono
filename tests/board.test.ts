@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import type { Doc } from '../convex/_generated/dataModel';
 import { markSentBack, organizationBoard, plainNextStep } from '../convex/authed/board';
-import { sentBackStep } from '../convex/requestView';
+import { categoriesStep, sentBackStep } from '../convex/requestView';
 import { readinessWithChecks } from '../convex/purchaseModel';
 import type { DocumentFacts } from '../convex/extraction/facts';
 
@@ -14,13 +14,14 @@ const warning = { severity: 'warning' as const, title: 'Add an itemized receipt'
 const checksSection = { section: 'Document checks', reasons: [blocking.title] };
 
 test('a blocking check is the next step once the request has its receipt', () => {
-	expect(plainNextStep({ sections: [checksSection] }, [blocking, warning])).toBe(
+	expect(plainNextStep({ sections: [checksSection] }, [blocking, warning], true)).toBe(
 		'Publicity shows a different date'
 	);
 	expect(
 		plainNextStep(
 			{ sections: [{ section: 'Purchase details', reasons: ['Vendor missing.'] }, checksSection] },
-			[blocking]
+			[blocking],
+			true
 		)
 	).toBe('Publicity shows a different date');
 	expect(
@@ -28,17 +29,20 @@ test('a blocking check is the next step once the request has its receipt', () =>
 			{
 				sections: [{ section: 'Files', reasons: ['Receipt document missing.'] }, checksSection]
 			},
-			[blocking]
+			[blocking],
+			true
 		)
 	).toBe('Add a receipt');
 });
 
 test('warnings alone leave no next step', () => {
-	expect(plainNextStep({ sections: [] }, [warning])).toBeNull();
+	expect(plainNextStep({ sections: [] }, [warning], true)).toBeNull();
 	expect(
-		plainNextStep({ sections: [{ section: 'Purchase details', reasons: ['Vendor missing.'] }] }, [
-			warning
-		])
+		plainNextStep(
+			{ sections: [{ section: 'Purchase details', reasons: ['Vendor missing.'] }] },
+			[warning],
+			true
+		)
 	).toBe('Add where it was bought');
 });
 
@@ -65,6 +69,20 @@ test('a matching publicity date keeps the request ready to fill', async () => {
 	expect(board.readyToFill).toMatchObject([
 		{ id: readyRequest._id, nextStep: null, stage: 'ready' }
 	]);
+});
+
+test('unconfirmed categories are the board’s next step, as on the request page', async () => {
+	const unconfirmed = {
+		...readyRequest,
+		status: 'draft',
+		publicityFileId: null,
+		fieldSources: {}
+	} as Doc<'purchaseRequests'>;
+	const board = await organizationBoard._handler(
+		boardCtx([unconfirmed], []) as never,
+		{ organizationId: 'org_1', today } as never
+	);
+	expect([...board.toFinish, ...board.afterEvent]).toMatchObject([{ nextStep: categoriesStep }]);
 });
 
 test('requests land in their groups, sorted by what is most urgent', async () => {
@@ -250,6 +268,7 @@ const readyRequest = {
 	status: 'ready',
 	typeOfPurchase: 'personal_reimbursement',
 	documentationCategories: ['asuo_funds'],
+	fieldSources: { documentationCategories: 'user' },
 	organizationSourceId: 'org_1',
 	purchaserSource: { kind: 'self' },
 	studentOrganization: {

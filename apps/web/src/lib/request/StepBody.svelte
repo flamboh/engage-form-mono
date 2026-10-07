@@ -3,9 +3,11 @@
 	import type { DocumentSlot, RequestCheck, RequestView } from '$convex/requestView';
 	import type { UploadSlot } from '$lib/uploads.svelte';
 	import Button from '$lib/ui/Button.svelte';
+	import SourceCue from '$lib/ui/SourceCue.svelte';
 	import ActivityQuestions from './ActivityQuestions.svelte';
 	import BudgetLinePicker from './BudgetLinePicker.svelte';
 	import BusinessPurposeCard from './BusinessPurposeCard.svelte';
+	import CategoryPicker from './CategoryPicker.svelte';
 	import DropTarget from './DropTarget.svelte';
 	import type { RequestEditor } from './editor.svelte';
 	import FilePick from './FilePick.svelte';
@@ -147,6 +149,31 @@
 			<BudgetLinePicker {editor} {budgetLines} />
 		</div>
 		{@render checkList()}
+	{:else if step.id === 'categories'}
+		{@const fundLetter = view.purchase.studentOrganization.fundLetter}
+		{@const source = editor.sourceOf('documentationCategories')}
+		{@const picked = (form?.documentationCategories ?? []).some(
+			(category) => category !== 'asuo_funds' || fundLetter !== 'I'
+		)}
+		<p class="text-sm text-(--quiet)">
+			Food, prizes, printing and a few others need extra documents. Tap any that apply.
+			<SourceCue
+				source={source === 'suggested' ? 'items' : source === 'previous' ? source : undefined}
+			/>
+		</p>
+		<CategoryPicker {editor} {fundLetter} />
+		{#if step.state !== 'done'}
+			<div>
+				<Button
+					variant="secondary"
+					size="sm"
+					data-advance
+					onclick={() => void editor.confirmFields(['documentationCategories'])}
+				>
+					{picked ? 'Looks right' : 'Nothing special'}
+				</Button>
+			</div>
+		{/if}
 	{:else if step.id === 'event'}
 		<ActivityQuestions {editor} {events} />
 		{@render looksRight(['activity'])}

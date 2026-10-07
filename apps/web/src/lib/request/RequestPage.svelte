@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Doc, Id } from '$convex/_generated/dataModel';
-	import { receiptFactsComplete, todayInEugene, type Stage } from '$convex/lifecycle';
+	import type { Stage } from '$convex/lifecycle';
 	import type { RequestView, StepId } from '$convex/requestView';
 	import type { SavedData } from '$lib/purchase/draftDetails';
 	import { goto } from '$app/navigation';
@@ -14,12 +14,13 @@
 	import DocumentStrip from './DocumentStrip.svelte';
 	import { RequestEditor, type RequestBackend } from './editor.svelte';
 	import FilledView from './FilledView.svelte';
+	import { monthDay } from './labels';
+	import ReadingView from './ReadingView.svelte';
 	import RequestMenu from './RequestMenu.svelte';
 	import SentBackDialog from '$lib/board/SentBackDialog.svelte';
 	import StepBody from './StepBody.svelte';
 	import StepList from './StepList.svelte';
-	import { requestSteps, stepsLeft } from './steps';
-	import TrackedView from './TrackedView.svelte';
+	import { requestMode, requestSteps, stepsLeft } from './steps';
 
 	let {
 		view,
@@ -51,13 +52,11 @@
 		() => backend
 	);
 
-	let finishing = $state(false);
 	let approvalDialog = $state<ApprovalDialog | null>(null);
 	let sendingBack = $state(false);
 
 	onDestroy(() => void editor.flush());
 
-	const today = todayInEugene(Date.now());
 	const purchase = $derived(view?.purchase);
 	const form = $derived(editor.form);
 	const organization = $derived(saved?.organizations.find((org) => org._id === organizationId));
@@ -97,38 +96,21 @@
 	const approved = $derived(purchase?.status === 'approved');
 	const filled = $derived(purchase?.status === 'ready' && purchase.lastFilledAt !== null);
 	const closed = $derived(approved || filled);
-	const tracked = $derived.by(() => {
-		if (view === undefined || form === null || closed || finishing || ready) return false;
-		if (reading || view.stage === 'reading' || view.stage === 'after_event') return true;
-		return !receiptFactsComplete({
-			...form,
-			totalAmount: form.totalAmount ?? 0,
-			receiptCount: form.receiptFileIds.length
-		});
-	});
+	const mode = $derived(requestMode({ closed, reading, ready, steps }));
 	const allDetails = $derived(page.url.searchParams.get('view') === 'all');
 	const stage = $derived.by((): Stage | null => {
 		if (view === undefined) return null;
 		if (reading && !closed) return 'reading';
 		return view.stage;
 	});
-	const eventAhead = $derived(view?.finishAfter != null && view.finishAfter > today);
 	const barMode = $derived.by((): BarMode => {
 		if (view === undefined || purchase === undefined) return { kind: 'loading' };
 		if (approved) return { kind: 'approved' };
 		if (filled && purchase.lastFilledAt !== null) {
 			return { kind: 'filled', filledAt: purchase.lastFilledAt };
 		}
-		if (tracked && reading) return { kind: 'reading' };
-		if (tracked) {
-			return {
-				kind: 'tracked',
-				left: Math.max(1, left),
-				finishFirst: view.finishAfter !== null && view.finishAfter <= today,
-				eventAhead
-			};
-		}
-		if (ready && (current === null || current.id === 'review')) return { kind: 'ready' };
+		if (mode === 'reading') return { kind: 'reading' };
+		if (mode === 'ready') return { kind: 'ready' };
 		return { kind: 'steps', left, next: current?.title ?? 'Look it over' };
 	});
 	const title = $derived(
@@ -160,13 +142,7 @@
 		editor.upload(files, slot);
 	}
 
-	function finishNow() {
-		finishing = true;
-		window.scrollTo({ top: 0 });
-	}
-
 	function jumpToStep(id: StepId) {
-		finishing = true;
 		requestAnimationFrame(() => {
 			const element = document.getElementById(`step-${id}`);
 			if (element === null) return;
@@ -195,7 +171,7 @@
 			{#if purchase && stage !== null}
 				<div class="flex shrink-0 items-center gap-2 sm:gap-3">
 					<span class="max-sm:hidden"><StatusPill {stage} /></span>
-					{#if !tracked || allDetails}
+					{#if mode !== 'reading' || allDetails}
 						<nav
 							class="flex border border-(--line) bg-(--surface) text-sm"
 							aria-label="Request view"
@@ -285,18 +261,15 @@
 					/>
 				{:else if closed}
 					<FilledView {view} allDetailsHref={allHref} />
-				{:else if tracked}
-					<TrackedView
-						{editor}
-						{reading}
-						{events}
-						{budgetLines}
-						{recentPurposes}
-						finishAfter={view.finishAfter}
-						deadline={view.deadline}
-						{today}
-					/>
+				{:else if mode === 'reading'}
+					<ReadingView {editor} {recentPurposes} />
 				{:else}
+					{#if view.deadline !== null}
+						<p class="-mb-2 text-sm text-(--quiet)">
+							Submit by <strong class="font-semibold text-(--ink)">{monthDay(view.deadline)}</strong
+							>: 30 days from the receipt.
+						</p>
+					{/if}
 					<StepList {steps}>
 						{#snippet body(step)}
 							<StepBody
@@ -346,7 +319,6 @@
 		mode={barMode}
 		{boardHref}
 		{trackedHref}
-		onfinish={finishNow}
 		onsentback={() => (sendingBack = true)}
 	/>
 </div>

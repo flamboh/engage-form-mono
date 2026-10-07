@@ -84,6 +84,7 @@ export type RequestCheck = z.infer<typeof requestCheck>;
 
 export type StepId =
 	| 'receipt'
+	| 'categories'
 	| 'event'
 	| 'purchaser'
 	| 'idCard'
@@ -98,6 +99,7 @@ export type StepId =
 
 export const stepOrder: StepId[] = [
 	'receipt',
+	'categories',
 	'event',
 	'purchaser',
 	'idCard',
@@ -112,6 +114,8 @@ export const stepOrder: StepId[] = [
 ];
 
 export const sentBackStep = 'Fix what Engage sent back';
+
+export const categoriesStep = 'Check what it includes';
 
 const reasonSteps: [RegExp, StepId, string][] = [
 	[/^Your UO ID/, 'idCard', 'Add your UO ID (front and back)'],

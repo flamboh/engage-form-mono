@@ -6,7 +6,6 @@
 	export type BarMode =
 		| { kind: 'loading' }
 		| { kind: 'reading' }
-		| { kind: 'tracked'; left: number; finishFirst: boolean; eventAhead: boolean }
 		| { kind: 'steps'; left: number; next: string }
 		| { kind: 'ready' }
 		| { kind: 'filled'; filledAt: number }
@@ -17,14 +16,12 @@
 		mode,
 		boardHref,
 		trackedHref,
-		onfinish,
 		onsentback
 	}: {
 		editor: RequestEditor;
 		mode: BarMode;
 		boardHref: string;
 		trackedHref: string;
-		onfinish: () => void;
 		onsentback: () => void;
 	} = $props();
 
@@ -41,14 +38,6 @@
 			{:else if mode.kind === 'reading'}
 				<p class="font-semibold text-(--ink)">It’s tracked already</p>
 				<p class="text-(--quiet)">You can leave. It keeps reading.</p>
-			{:else if mode.kind === 'tracked'}
-				<p class="font-semibold text-(--ink)">Tracked</p>
-				<p class="text-(--quiet)">
-					{mode.left}
-					{mode.left === 1 ? 'thing' : 'things'} to finish{mode.eventAhead
-						? ' after the event'
-						: ''}
-				</p>
 			{:else if mode.kind === 'steps'}
 				<p class="font-semibold text-(--ink)">
 					{mode.left}
@@ -85,14 +74,6 @@
 		<div class="flex shrink-0 items-center gap-2">
 			{#if mode.kind === 'reading'}
 				<Button variant="secondary" href={trackedHref}>Back to board</Button>
-			{:else if mode.kind === 'tracked'}
-				{#if mode.finishFirst}
-					<Button variant="secondary" href={trackedHref}>Done for now</Button>
-					<Button variant="primary" onclick={onfinish}>Finish now</Button>
-				{:else}
-					<Button variant="secondary" onclick={onfinish}>Finish now</Button>
-					<Button variant="primary" href={trackedHref}>Done for now</Button>
-				{/if}
 			{:else if mode.kind === 'steps'}
 				<Button variant="secondary" href={boardHref}>Finish later</Button>
 			{:else if mode.kind === 'ready'}

@@ -84,7 +84,9 @@ export const getRequestView = authedQuery({
 export const confirmFields = authedMutation({
 	args: {
 		purchaseRequestId: zid('purchaseRequests'),
-		fields: z.array(z.enum(['activity', 'purchaserSource', 'budgetLineItem']))
+		fields: z.array(
+			z.enum(['activity', 'purchaserSource', 'budgetLineItem', 'documentationCategories'])
+		)
 	},
 	returns: nullReturn,
 	handler: async (ctx, args) => {
