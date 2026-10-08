@@ -69,7 +69,7 @@ The 30 days after a **Receipt**'s date in which Engage expects a **Personal Reim
 _Avoid_: Deadline, grace period
 
 **Allocation**:
-The amount a **Student Organization** was given for one **Budget Line Item** in one fiscal year (July 1 to June 30). A **Budget Line Item** without one is untracked.
+The amount ASUO gave a **Student Organization**'s **Fund** for one fiscal year (July 1 to June 30). Since 2026–27 ASUO allocates only per **Fund**; a **Budget Line Item** may carry its own for the organization's tracking. A **Fund** without one falls back to the sum of its lines' allocations.
 _Avoid_: Budget, limit, balance
 
 **Engage**:
@@ -168,7 +168,7 @@ _Avoid_: ID card image, ID file, card upload
 - A **Personal Reimbursement** has exactly one **Reimbursement Reason**
 - A **Purchase Request** has one or more **Budget Splits**; with more than one, their amounts add up to the total
 - A **Budget Line Item** belongs to exactly one **Fund**
-- A **Budget Line Item** has at most one **Allocation** per fiscal year
+- A **Fund** and a **Budget Line Item** each have at most one **Allocation** per fiscal year
 - A **Purchase Request** may have one or more **Recipients**
 - A **Purchase Request** may have one or more **Documents**
 - A **Purchase Request** for an event using **ASUO Funds** requires **Publicity Proof**
