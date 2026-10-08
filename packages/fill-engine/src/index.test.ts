@@ -163,7 +163,7 @@ test('creates upload fill plans', () => {
 	expect(createFillPlan('selfApproval', samplePurchaseRequest).actions).toEqual([
 		{
 			type: 'file',
-			labelIncludes: 'upload',
+			labelIncludes: 'authorized signer of your organization indicates',
 			files: [
 				samplePurchaseRequest.documents.find(
 					(document) => document.id === samplePurchaseRequest.secondApprovalFileId
@@ -175,7 +175,7 @@ test('creates upload fill plans', () => {
 	expect(createFillPlan('publicity', samplePurchaseRequest).actions).toEqual([
 		{
 			type: 'file',
-			labelIncludes: 'upload',
+			labelIncludes: 'proof that your event was promoted',
 			files: [
 				samplePurchaseRequest.documents.find(
 					(document) => document.id === samplePurchaseRequest.publicityFileId
@@ -199,7 +199,7 @@ test('creates upload fill plans', () => {
 	).toEqual([
 		{
 			type: 'file',
-			labelIncludes: 'upload',
+			labelIncludes: 'upload your approved catering waiver',
 			files: [cateringWaiver]
 		}
 	]);

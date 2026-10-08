@@ -259,6 +259,11 @@ function findUploadButton(labelIncludes: string) {
 
 	if (labelNode === null) return buttons[0] ?? null;
 
+	const owningButton = labelNode.closest<HTMLElement>(
+		'button, [role="button"], input[type="button"], a'
+	);
+	if (owningButton !== null && buttons.includes(owningButton)) return owningButton;
+
 	return (
 		findClickableElementsIn(labelNode, 'Upload File')[0] ??
 		buttons.find((button) => follows(labelNode, button)) ??

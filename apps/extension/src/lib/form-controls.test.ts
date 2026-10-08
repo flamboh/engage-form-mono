@@ -191,6 +191,36 @@ test('distinguishes optional receipt upload labels', async () => {
 	expect(secondUploadButton.clicked).toBe(true);
 });
 
+test('uploads when the page label is the Upload File text inside the button', async () => {
+	const dom = installFakeDom();
+	const uploadButton = fakeElement('button', 'Upload File', 3, { visible: true });
+	const buttonText = fakeElement('div', 'Upload File', 4, { visible: true });
+	const fileInput = fakeElement('input', '', 5, { visible: false });
+	buttonText.clickableAncestor = uploadButton;
+
+	dom.elements = [
+		fakeElement('div', 'Please upload proof that your event was promoted.', 1, {
+			visible: true,
+			width: 1600
+		}),
+		uploadButton,
+		buttonText,
+		fileInput
+	];
+
+	const result = await setFiles(
+		'upload',
+		[{ filename: 'flyer.png', contentType: 'image/png' }],
+		async () => {
+			fileInput.files = { length: 1 };
+			return { ok: true };
+		}
+	);
+
+	expect(result).toEqual({ ok: true });
+	expect(uploadButton.clicked).toBe(true);
+});
+
 function installFakeDom() {
 	const dom = {
 		elements: [] as FakeElement[],
@@ -220,9 +250,9 @@ function fakeElement(
 	tagName: 'button' | 'div' | 'input',
 	textContent: string,
 	order: number,
-	options: { visible: boolean }
+	options: { visible: boolean; width?: number }
 ) {
-	return new FakeElement(tagName, textContent, order, options.visible);
+	return new FakeElement(tagName, textContent, order, options.visible, options.width);
 }
 
 function matchesSelector(element: FakeElement, selector: string) {
@@ -235,6 +265,7 @@ function matchesSelector(element: FakeElement, selector: string) {
 }
 
 class FakeElement {
+	clickableAncestor: FakeElement | null = null;
 	closestElement: FakeElement | null = null;
 	clicked = false;
 	dataset: Record<string, string> = {};
@@ -244,13 +275,16 @@ class FakeElement {
 	readonly tagName: 'button' | 'div' | 'input';
 	readonly textContent: string;
 	readonly visible: boolean;
+	readonly width: number;
 
 	constructor(
 		tagName: 'button' | 'div' | 'input',
 		textContent: string,
 		order: number,
-		visible: boolean
+		visible: boolean,
+		width = 120
 	) {
+		this.width = width;
 		this.order = order;
 		this.tagName = tagName;
 		this.textContent = textContent;
@@ -262,6 +296,7 @@ class FakeElement {
 	}
 
 	closest(selector: string) {
+		if (selector.includes('button')) return this.clickableAncestor;
 		if (selector.includes('upload') || selector.includes('drop')) return this.closestElement;
 		return null;
 	}
@@ -284,7 +319,7 @@ class FakeElement {
 		return {
 			height: this.visible ? 20 : 0,
 			top: this.order * 20,
-			width: this.visible ? 120 : 0
+			width: this.visible ? this.width : 0
 		};
 	}
 

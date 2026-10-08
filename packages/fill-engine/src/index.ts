@@ -161,7 +161,7 @@ export const engageSchema: EngageStepSchema[] = [
 		step: 'selfApproval',
 		headingIncludes: ['seeking self reimbursement'],
 		fields: [
-			conditionalFileField('upload', (purchase) =>
+			conditionalFileField('authorized signer of your organization indicates', (purchase) =>
 				purchase.requesterIsPurchaser && purchase.secondApprovalFileId !== null
 					? [documentById(purchase, purchase.secondApprovalFileId)]
 					: []
@@ -188,7 +188,7 @@ export const engageSchema: EngageStepSchema[] = [
 		step: 'publicity',
 		headingIncludes: ['event open to all students'],
 		fields: [
-			conditionalFileField('upload', (purchase) =>
+			conditionalFileField('proof that your event was promoted', (purchase) =>
 				purchase.publicityFileId === null ? [] : [documentById(purchase, purchase.publicityFileId)]
 			)
 		]
@@ -197,7 +197,7 @@ export const engageSchema: EngageStepSchema[] = [
 		step: 'cateringWaiver',
 		headingIncludes: ['catering waiver'],
 		fields: [
-			conditionalFileField('upload', (purchase) =>
+			conditionalFileField('upload your approved catering waiver', (purchase) =>
 				purchase.cateringWaiverFileId === null
 					? []
 					: [documentById(purchase, purchase.cateringWaiverFileId)]
