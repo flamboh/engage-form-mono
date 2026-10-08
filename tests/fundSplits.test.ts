@@ -1,5 +1,11 @@
 import { expect, test } from 'vitest';
-import { editAmount, startFundSync, toggleOption } from '../apps/web/src/lib/request/fundSplits';
+import {
+	coverOverflow,
+	editAmount,
+	overflowFor,
+	startFundSync,
+	toggleOption
+} from '../apps/web/src/lib/request/fundSplits';
 
 const admin = { fund: 'administrative' as const, line: null };
 const programming = { fund: 'programming' as const, line: null };
@@ -60,4 +66,25 @@ test('saved amounts that add up keep syncing', () => {
 			86
 		).on
 	).toBe(false);
+});
+
+const kahoot = { fund: 'administrative' as const, line: 'Yearly Kahoot! Subscription' };
+const weekly = { fund: 'programming' as const, line: 'Weekly Musical Discussion Events' };
+
+test('a line with less left than the total offers to cover the rest from another line', () => {
+	const left = (option: { line: string | null }) => (option.line === kahoot.line ? 100 : 1200);
+	const overflow = overflowFor([{ ...kahoot, amount: null }], 141.28, left);
+	expect(overflow).toEqual({ split: { ...kahoot, amount: null }, left: 100, short: 41.28 });
+	expect(coverOverflow(overflow!, weekly).splits).toEqual([
+		{ ...kahoot, amount: 100 },
+		{ ...weekly, amount: 41.28 }
+	]);
+	expect(overflowFor([{ ...weekly, amount: null }], 141.28, left)).toBeNull();
+	expect(overflowFor([{ ...kahoot, amount: null }], 141.28, () => null)).toBeNull();
+});
+
+test('a line with nothing left moves the whole purchase', () => {
+	const overflow = overflowFor([{ ...kahoot, amount: null }], 30, () => -12);
+	expect(overflow).toMatchObject({ left: 0, short: 30 });
+	expect(coverOverflow(overflow!, weekly).splits).toEqual([{ ...weekly, amount: null }]);
 });

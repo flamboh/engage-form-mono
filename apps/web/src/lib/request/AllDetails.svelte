@@ -35,6 +35,7 @@
 		events,
 		purchasers,
 		budgetLines,
+		budgetLeft,
 		fundLetter,
 		recentPurposes,
 		userName,
@@ -48,6 +49,7 @@
 		events: Doc<'events'>[];
 		purchasers: Doc<'purchasers'>[];
 		budgetLines: { name: string; fund: Fund }[];
+		budgetLeft: Record<string, number | null> | null;
 		fundLetter: string;
 		recentPurposes: string[];
 		userName: string;
@@ -137,7 +139,7 @@
 </script>
 
 {#snippet panel(name: Panel, content: import('svelte').Snippet)}
-	{#if open === name && !locked}
+	{#if open === name && (!locked || name === 'budget')}
 		<div class="border-b border-(--line) py-4 sm:col-span-2">
 			{@render content()}
 		</div>
@@ -175,7 +177,6 @@
 			label="Charged to"
 			value={form && form.budgetSplits.length > 0 ? splitsLabel(form.budgetSplits) : ''}
 			actionLabel="Change"
-			readonly={locked}
 			onaction={() => toggle('budget')}
 		/>
 		<FieldRow
@@ -188,7 +189,7 @@
 			onaction={() => toggle('involves')}
 		/>
 		{#snippet budgetPanel()}
-			<FundPicker {editor} {budgetLines} />
+			<FundPicker {editor} {budgetLines} {budgetLeft} />
 		{/snippet}
 		{#snippet involvesPanel()}
 			<CategoryPicker {editor} {fundLetter} />

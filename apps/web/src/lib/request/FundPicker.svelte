@@ -14,12 +14,24 @@
 	} from '$convex/funds';
 	import Chip from '$lib/ui/Chip.svelte';
 	import type { RequestEditor } from './editor.svelte';
-	import { editAmount, startFundSync, toggleOption } from './fundSplits';
+	import {
+		coverOverflow,
+		editAmount,
+		overflowFor,
+		startFundSync,
+		toggleOption
+	} from './fundSplits';
+	import { formatMoney } from './labels';
 
 	let {
 		editor,
-		budgetLines
-	}: { editor: RequestEditor; budgetLines: { name: string; fund: Fund }[] } = $props();
+		budgetLines,
+		budgetLeft = null
+	}: {
+		editor: RequestEditor;
+		budgetLines: { name: string; fund: Fund }[];
+		budgetLeft?: Record<string, number | null> | null;
+	} = $props();
 
 	const splits = $derived(editor.form?.budgetSplits ?? []);
 	const total = $derived(editor.form?.totalAmount ?? null);
@@ -36,6 +48,18 @@
 		splits.length > 1 && total !== null ? splitProblem(splits, total) : null
 	);
 
+	const leftIn = (option: BudgetOption) => budgetLeft?.[optionLabel(option)] ?? null;
+	const overflow = $derived(overflowFor(splits, total, leftIn));
+	const covers = $derived(
+		overflow === null
+			? []
+			: budgetOptions(budgetLines).filter(
+					(option) =>
+						!sameOption(option, overflow.split) &&
+						(leftIn(option) === null || (leftIn(option) ?? 0) >= overflow.short)
+				)
+	);
+
 	let sync = $state(untrack(() => startFundSync(splits, total)));
 	let typing = $state<{ index: number; text: string } | null>(null);
 
@@ -47,6 +71,18 @@
 	function toggle(option: BudgetOption) {
 		typing = null;
 		save(toggleOption(splits, option, total, sync), false);
+	}
+
+	function cover(option: BudgetOption) {
+		if (overflow === null) return;
+		typing = null;
+		save(coverOverflow(overflow, option), false);
+	}
+
+	function leftNote(option: BudgetOption) {
+		const left = leftIn(option);
+		if (left === null) return '';
+		return left < 0 ? `${formatMoney(-left)} over` : `${formatMoney(left)} available`;
 	}
 
 	function typeAmount(index: number, text: string) {
@@ -80,7 +116,12 @@
 		<div class="flex max-w-sm flex-col gap-2">
 			{#each splits as split, index (optionLabel(split))}
 				<label class="grid grid-cols-[1fr_8rem] items-center gap-3 text-sm text-(--ink)">
-					<span>{optionLabel(split)}</span>
+					<span>
+						{optionLabel(split)}
+						{#if leftNote(split)}
+							<span class="block text-xs text-(--quiet)">{leftNote(split)}</span>
+						{/if}
+					</span>
 					<input
 						class="input tabular-nums"
 						inputmode="decimal"
@@ -92,6 +133,23 @@
 					/>
 				</label>
 			{/each}
+		</div>
+	{/if}
+	{#if overflow !== null && covers.length > 0}
+		<div class="flex flex-col gap-2 border-l-2 border-(--line) pl-3">
+			<p class="text-sm text-(--ink)">
+				{#if overflow.left > 0}
+					Only {formatMoney(overflow.left)} left in {optionLabel(overflow.split)}. Cover the other
+					{formatMoney(overflow.short)} from:
+				{:else}
+					Nothing left in {optionLabel(overflow.split)} this year. Charge it to:
+				{/if}
+			</p>
+			<div class="flex flex-wrap gap-2">
+				{#each covers as option (optionLabel(option))}
+					<Chip variant="add" onclick={() => cover(option)}>{optionLabel(option)}</Chip>
+				{/each}
+			</div>
 		</div>
 	{/if}
 	{#if splits.length > 0 && total !== null && total > 0}

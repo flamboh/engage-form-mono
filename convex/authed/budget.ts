@@ -9,8 +9,10 @@ import {
 	currentFiscalYear,
 	fiscalYear,
 	fiscalYearStartMs,
+	hasAllocations,
 	ledgerStage,
 	requestDate,
+	requestFiscalYear,
 	summarizeBudget
 } from '../budget';
 import { todayInEugene } from '../lifecycle';
@@ -53,6 +55,15 @@ const budgetSummaryShape = z.object({
 		pending: z.number(),
 		remaining: z.number()
 	}),
+	funds: z.array(
+		z.object({
+			fund,
+			allocated: z.number().nullable(),
+			spent: z.number(),
+			pending: z.number(),
+			remaining: z.number().nullable()
+		})
+	),
 	untracked: z.object({ spent: z.number(), pending: z.number() }),
 	purchases: z.number()
 });
@@ -103,6 +114,29 @@ export const budgetSummary = authedQuery({
 			),
 			...summarizeBudget(organization.budgetLines, year, requests)
 		};
+	}
+});
+
+export const budgetLeft = authedQuery({
+	args: { purchaseRequestId: zid('purchaseRequests') },
+	returns: z.record(z.string(), z.number().nullable()).nullable(),
+	handler: async (ctx, args) => {
+		const owner = ownerFromIdentity(ctx.identity);
+		const request = await requireOwnedDoc(ctx, 'purchaseRequests', args.purchaseRequestId, owner);
+		if (request.organizationSourceId === null) return null;
+		const organization = await requireOwnedDoc(
+			ctx,
+			'organizations',
+			request.organizationSourceId,
+			owner
+		);
+		if (!hasAllocations(organization.budgetLines)) return null;
+		const year = requestFiscalYear(request);
+		const others = (
+			await yearStream(ctx, owner, organization._id, year).take(MAX_REQUESTS_PER_YEAR)
+		).filter((other) => other._id !== request._id);
+		const summary = summarizeBudget(organization.budgetLines, year, others);
+		return Object.fromEntries(summary.lines.map((line) => [line.name, line.remaining]));
 	}
 });
 

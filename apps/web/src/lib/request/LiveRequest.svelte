@@ -18,6 +18,9 @@
 
 	const clerkContext = getClerkContext();
 	const client = useConvexClient();
+	const budgetLeftQuery = useQuery(api.authed.budget.budgetLeft, () =>
+		clerkContext.currentSession ? { purchaseRequestId } : 'skip'
+	);
 	const viewQuery = useQuery(api.authed.documents.getRequestView, () =>
 		clerkContext.currentSession ? { id: purchaseRequestId } : 'skip'
 	);
@@ -146,6 +149,7 @@
 	user={userQuery.data ?? null}
 	events={eventsQuery.data ?? []}
 	recentPurposes={purposesQuery.data ?? []}
+	budgetLeft={budgetLeftQuery.data ?? null}
 	{organizationId}
 	{pending}
 	{backend}

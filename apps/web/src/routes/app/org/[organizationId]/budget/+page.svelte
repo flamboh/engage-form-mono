@@ -3,6 +3,7 @@
 	import { api } from '$convex/_generated/api';
 	import type { Id } from '$convex/_generated/dataModel';
 	import { hasAllocations } from '$convex/budget';
+	import { fundLabel } from '$convex/funds';
 	import AppShell from '$lib/app/AppShell.svelte';
 	import { errorMessage } from '$lib/errors';
 	import { formatMoney } from '$lib/board/format';
@@ -33,6 +34,26 @@
 	const summary = $derived(summaryQuery.data);
 	const over = $derived(summary !== undefined && summary.totals.remaining < 0);
 	const settingsHref = $derived(`/app/settings#org-${organizationId}`);
+
+	const groups = $derived(
+		(summary?.funds ?? []).map((fund) => {
+			const lines = (summary?.lines ?? []).filter((line) => line.fund === fund.fund);
+			return {
+				fund: fund.fund,
+				lines:
+					fund.allocated === null && lines.length === 1 && lines[0]?.name === fundLabel[fund.fund]
+						? []
+						: lines,
+				total: {
+					...fund,
+					name: fundLabel[fund.fund],
+					purchases: lines.reduce((sum, line) => sum + line.purchases, 0),
+					approvedCount: lines.reduce((sum, line) => sum + line.approvedCount, 0),
+					pendingVendors: [...new Set(lines.flatMap((line) => line.pendingVendors))].slice(0, 3)
+				}
+			};
+		})
+	);
 
 	function leftLabel(remaining: number | null) {
 		if (remaining === null) return 'Not tracked';
@@ -108,7 +129,8 @@
 
 			<table class="lines">
 				<caption class="sr-only">
-					Budget lines for {summary.fiscalYear.label}: allocated, spent, pending and left
+					Administrative and Programming funds and their budget lines for {summary.fiscalYear
+						.label}: allocated, spent, pending and left
 				</caption>
 				<thead>
 					<tr>
@@ -120,33 +142,39 @@
 						<th scope="col">Left</th>
 					</tr>
 				</thead>
-				<tbody>
-					{#each summary.lines as line (line.name)}
-						{@const overBy = line.remaining !== null && line.remaining < 0}
-						<tr>
-							<th scope="row" class="c-name">
-								{line.name || 'No budget line'}
-								{#if overBy}
-									<span class="over-note">Over by {formatMoney(-(line.remaining ?? 0))}</span>
-								{/if}
-							</th>
-							<td class="c-meter"><LineMeter {line} /></td>
-							<td class="c-alloc" class:text-quiet={line.allocated === null}>
-								{line.allocated === null ? 'Not tracked' : formatMoney(line.allocated)}
-							</td>
-							<td class="c-spent">{formatMoney(line.spent)}</td>
-							<td class="c-pend">{formatMoney(line.pending)}</td>
-							<td
-								class="c-left"
-								class:neg={overBy}
-								class:na={line.remaining === null}
-								class:text-quiet={line.remaining === null}
-							>
-								{leftLabel(line.remaining)}
-							</td>
-						</tr>
-					{/each}
-				</tbody>
+				{#snippet row(line: (typeof groups)[number]['total'], fundRow: boolean)}
+					{@const overBy = line.remaining !== null && line.remaining < 0}
+					<tr class:fund-row={fundRow}>
+						<th scope="row" class="c-name">
+							{line.name || 'No budget line'}
+							{#if overBy}
+								<span class="over-note">Over by {formatMoney(-(line.remaining ?? 0))}</span>
+							{/if}
+						</th>
+						<td class="c-meter"><LineMeter {line} /></td>
+						<td class="c-alloc" class:text-quiet={line.allocated === null}>
+							{line.allocated === null ? 'Not tracked' : formatMoney(line.allocated)}
+						</td>
+						<td class="c-spent">{formatMoney(line.spent)}</td>
+						<td class="c-pend">{formatMoney(line.pending)}</td>
+						<td
+							class="c-left"
+							class:neg={overBy}
+							class:na={line.remaining === null}
+							class:text-quiet={line.remaining === null}
+						>
+							{leftLabel(line.remaining)}
+						</td>
+					</tr>
+				{/snippet}
+				{#each groups as group (group.fund)}
+					<tbody>
+						{@render row(group.total, true)}
+						{#each group.lines as line (line.name)}
+							{@render row(line, false)}
+						{/each}
+					</tbody>
+				{/each}
 			</table>
 
 			<div class="mt-11">
@@ -222,6 +250,18 @@
 		font-weight: 550;
 		text-align: left;
 		white-space: normal;
+	}
+
+	.lines .fund-row th,
+	.lines .fund-row td {
+		padding-top: 18px;
+		border-bottom-color: var(--ink);
+		font-weight: 650;
+	}
+
+	.lines tr:not(.fund-row) .c-name {
+		padding-left: 14px;
+		font-weight: 450;
 	}
 
 	.lines .c-meter {

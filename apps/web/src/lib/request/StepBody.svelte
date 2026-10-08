@@ -27,6 +27,7 @@
 		events,
 		purchasers,
 		budgetLines,
+		budgetLeft,
 		userName,
 		organization,
 		reading,
@@ -39,6 +40,7 @@
 		events: Doc<'events'>[];
 		purchasers: Doc<'purchasers'>[];
 		budgetLines: { name: string; fund: Fund }[];
+		budgetLeft: Record<string, number | null> | null;
 		userName: string;
 		organization: Doc<'organizations'> | undefined;
 		reading: boolean;
@@ -152,7 +154,7 @@
 		<ReceiptFacts {editor} {reading} hero={false} />
 		<div class="flex flex-col gap-2">
 			<span class="text-sm text-(--quiet)">Charged to</span>
-			<FundPicker {editor} {budgetLines} />
+			<FundPicker {editor} {budgetLines} {budgetLeft} />
 		</div>
 		{@render checkList()}
 	{:else if step.id === 'categories'}

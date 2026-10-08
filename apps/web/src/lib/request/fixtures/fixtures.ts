@@ -548,6 +548,8 @@ function amazonImage() {
 
 export const scenarioNames = Object.keys(scenarios);
 
+export const mockBudgetLeft = { 'Event Expenses': 20, Equipment: 400, Travel: null };
+
 export function scenarioView(name: string): RequestView {
 	const scenario = (scenarios[name] ?? scenarios.reading)();
 	const purchase = { ...basePurchase(), ...scenario.purchase };

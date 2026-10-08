@@ -315,11 +315,17 @@ export const saveDraftSnapshot = authedMutation({
 		await ctx.db.patch(args.id, {
 			...patch,
 			...(fieldSources === request.fieldSources ? {} : { fieldSources }),
-			...(request.status === 'approved' ? { status: 'ready' as const, approvedAt: null } : {})
+			...(request.status === 'approved' && !budgetOnly(patch)
+				? { status: 'ready' as const, approvedAt: null }
+				: {})
 		});
 		return null;
 	}
 });
+
+function budgetOnly(patch: object) {
+	return Object.keys(patch).every((key) => key === 'budgetSplits' || key === 'updatedAt');
+}
 
 const documentFields = [
 	'receiptFileIds',

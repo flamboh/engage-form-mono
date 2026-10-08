@@ -69,3 +69,31 @@ function fill(splits: BudgetSplit[], edited: number[], total: number | null) {
 	);
 	return splits.map((split, index) => ({ ...split, amount: amounts[index] ?? 0 }));
 }
+
+export type Overflow = { split: BudgetSplit; left: number; short: number };
+
+export function overflowFor(
+	splits: BudgetSplit[],
+	total: number | null,
+	leftIn: (option: BudgetOption) => number | null
+): Overflow | null {
+	const split = splits[0];
+	if (splits.length !== 1 || split === undefined || total === null || total <= 0) return null;
+	const left = leftIn(split);
+	if (left === null || cents(left) >= cents(total)) return null;
+	const kept = Math.max(0, left);
+	return { split, left: kept, short: (cents(total) - cents(kept)) / 100 };
+}
+
+export function coverOverflow(overflow: Overflow, from: BudgetOption) {
+	if (overflow.left === 0) {
+		return { splits: [{ ...from, amount: null }], sync: { on: true, edited: [] } };
+	}
+	return {
+		splits: [
+			{ ...overflow.split, amount: overflow.left },
+			{ ...from, amount: overflow.short }
+		],
+		sync: { on: true, edited: [0] }
+	};
+}

@@ -1,6 +1,6 @@
 import type { Doc } from './_generated/dataModel';
 import { requestLifecycle, todayInEugene, type Stage } from './lifecycle';
-import { budgetOptions, optionLabel, resolvedSplits, type Fund } from './funds';
+import { budgetOptions, funds, optionLabel, resolvedSplits, type Fund } from './funds';
 
 export type BudgetLine = Doc<'organizations'>['budgetLines'][number];
 
@@ -23,8 +23,17 @@ export type BudgetLineSummary = {
 	pendingVendors: string[];
 };
 
+export type FundSummary = {
+	fund: Fund;
+	allocated: number | null;
+	spent: number;
+	pending: number;
+	remaining: number | null;
+};
+
 export type BudgetSummary = {
 	lines: BudgetLineSummary[];
+	funds: FundSummary[];
 	totals: { allocated: number; spent: number; pending: number; remaining: number };
 	untracked: { spent: number; pending: number };
 	purchases: number;
@@ -170,6 +179,7 @@ export function summarizeBudget(
 	}
 	return {
 		lines: summaries,
+		funds: summarizeFunds(summaries),
 		totals: {
 			allocated: dollars(totals.allocated),
 			spent: dollars(totals.spent),
@@ -179,6 +189,29 @@ export function summarizeBudget(
 		untracked: { spent: dollars(untracked.spent), pending: dollars(untracked.pending) },
 		purchases: requests.length
 	};
+}
+
+function summarizeFunds(lines: BudgetLineSummary[]): FundSummary[] {
+	return funds
+		.map((fund) => {
+			const inFund = lines.filter((line) => line.fund === fund);
+			const tracked = inFund.filter((line) => line.allocated !== null);
+			const sum = (values: number[]) =>
+				dollars(values.reduce((acc, value) => acc + cents(value), 0));
+			const allocated =
+				tracked.length === 0 ? null : sum(tracked.map((line) => line.allocated ?? 0));
+			const spent = sum(inFund.map((line) => line.spent));
+			const pending = sum(inFund.map((line) => line.pending));
+			return {
+				fund,
+				allocated,
+				spent,
+				pending,
+				remaining:
+					allocated === null ? null : dollars(cents(allocated) - cents(spent) - cents(pending))
+			};
+		})
+		.filter((summary) => lines.some((line) => line.fund === summary.fund));
 }
 
 export function availableFiscalYears(

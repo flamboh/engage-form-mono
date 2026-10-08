@@ -15,6 +15,7 @@
 		mockRequestId,
 		mockSaved,
 		mockUser,
+		mockBudgetLeft,
 		scenarioNames,
 		scenarioView,
 		withReadiness
@@ -273,6 +274,7 @@
 	]}
 	{events}
 	organizationId={mockOrganizationId}
+	budgetLeft={mockBudgetLeft}
 	{pending}
 	{backend}
 />

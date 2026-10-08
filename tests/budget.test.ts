@@ -153,6 +153,41 @@ describe('summarizeBudget', () => {
 		]);
 	});
 
+	test('funds add up their lines, and an overflow counts against each fund it came from', () => {
+		const summary = summarizeBudget(
+			[
+				{
+					name: 'Yearly Kahoot! Subscription',
+					fund: 'administrative',
+					allocations: [{ fiscalYear: 2026, amount: 100 }]
+				},
+				{
+					name: 'Weekly Musical Discussion Events',
+					fund: 'programming',
+					allocations: [{ fiscalYear: 2026, amount: 1200 }]
+				},
+				{ name: 'Zine', fund: 'programming', allocations: [] }
+			],
+			2026,
+			[
+				{
+					budgetSplits: [
+						{ fund: 'administrative', line: 'Yearly Kahoot! Subscription', amount: 100 },
+						{ fund: 'programming', line: 'Weekly Musical Discussion Events', amount: 41.28 }
+					],
+					totalAmount: 141.28,
+					status: 'approved',
+					vendor: 'Kahoot!'
+				},
+				spend('Zine', 12.5, 'draft')
+			]
+		);
+		expect(summary.funds).toEqual([
+			{ fund: 'administrative', allocated: 100, spent: 100, pending: 0, remaining: 0 },
+			{ fund: 'programming', allocated: 1200, spent: 41.28, pending: 12.5, remaining: 1146.22 }
+		]);
+	});
+
 	test('pending vendors are listed once and capped at three', () => {
 		const summary = summarizeBudget([line('Food', [[2026, 600]])], 2026, [
 			spend('Food', 1, 'draft', 'Costco'),

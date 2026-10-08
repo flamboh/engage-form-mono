@@ -28,6 +28,7 @@
 		user,
 		events = [],
 		recentPurposes = [],
+		budgetLeft = null,
 		organizationId,
 		pending,
 		backend,
@@ -38,6 +39,7 @@
 		user: Doc<'users'> | null;
 		events?: Doc<'events'>[];
 		recentPurposes?: string[];
+		budgetLeft?: Record<string, number | null> | null;
 		organizationId: Id<'organizations'>;
 		pending: PendingUpload[];
 		backend: RequestBackend;
@@ -249,6 +251,7 @@
 						{events}
 						{purchasers}
 						{budgetLines}
+						{budgetLeft}
 						{fundLetter}
 						{recentPurposes}
 						{userName}
@@ -277,6 +280,7 @@
 								{events}
 								{purchasers}
 								{budgetLines}
+								{budgetLeft}
 								{userName}
 								{organization}
 								{reading}
