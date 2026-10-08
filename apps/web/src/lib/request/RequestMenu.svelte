@@ -27,7 +27,7 @@
 	}
 
 	function closeOnOutside(event: MouseEvent) {
-		if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) {
+		if (menu?.open && !event.composedPath().includes(menu)) {
 			menu.open = false;
 			confirming = false;
 		}
