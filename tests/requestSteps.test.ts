@@ -330,33 +330,6 @@ test('the board follows step order when the event and the UO ID are both missing
 	expect(plainNextStep({ sections }, [], [])).toBe(current?.title);
 });
 
-test('a 95# to double-check is named on the step and the board before later files', () => {
-	const recipientCheck: RequestCheck = {
-		id: 'recipient-confirm:0',
-		severity: 'warning',
-		title: 'Double-check that Akio Freauff’s 95# is theirs',
-		detail: '',
-		fileId: null,
-		slot: null,
-		action: 'confirm'
-	};
-	const sections = [{ section: 'Files', reasons: ['Publicity proof missing.'] }];
-	const steps = requestSteps(
-		view({ sections, checks: [recipientCheck] }),
-		draft({
-			documentationCategories: ['gifts_prizes'],
-			publicityFileId: null,
-			recipients: [
-				{ name: 'Akio Freauff', uo95: '952190904', reason: 'Raffle prize', value: 39.95 }
-			]
-		}),
-		confirmed
-	);
-	const current = steps.find((step) => step.state === 'current');
-	expect(current).toMatchObject({ id: 'recipients', title: recipientCheck.title });
-	expect(plainNextStep({ sections }, [recipientCheck], [])).toBe(current?.title);
-});
-
 test('a defaulted event and payer are quick checks on the board too', () => {
 	const sections = [{ section: 'Files', reasons: ['Publicity proof missing.'] }];
 	const defaulted: StepContext = {

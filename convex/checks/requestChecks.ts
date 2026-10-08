@@ -321,13 +321,12 @@ function eventPhrase(input: CheckInput) {
 }
 
 function recipientChecks(input: CheckInput): RequestCheck[] {
-	const checks: RequestCheck[] = [];
-	input.recipients.forEach((recipient, index) => {
+	return input.recipients.flatMap((recipient, index) => {
 		const id = normalizedUo95(recipient.uo95);
+		if (id === '' || /^95\d{7}$/.test(id)) return [];
 		const name = recipient.name.trim();
-		if (id === '') return;
-		if (!/^95\d{7}$/.test(id)) {
-			checks.push({
+		return [
+			{
 				id: `recipient-id:${index}`,
 				severity: 'blocking',
 				title: `Fix ${name === '' ? 'the recipient' : `${name}’s`} 95#`,
@@ -335,21 +334,9 @@ function recipientChecks(input: CheckInput): RequestCheck[] {
 				fileId: null,
 				slot: null,
 				action: null
-			});
-			return;
-		}
-		if (name === '' || confirmed(input, recipientConfirmation(recipient))) return;
-		checks.push({
-			id: `recipient-confirm:${index}`,
-			severity: 'warning',
-			title: `Double-check that ${name}’s 95# is theirs`,
-			detail: `${id} — reviewers deny requests when the 95# belongs to someone else.`,
-			fileId: null,
-			slot: null,
-			action: 'confirm'
-		});
+			}
+		];
 	});
-	return checks;
 }
 
 export function confirmationFor(input: CheckInput, checkId: string): Confirmation | null {
@@ -360,22 +347,10 @@ export function confirmationFor(input: CheckInput, checkId: string): Confirmatio
 		const publicity = input.documents.find((document) => document.slot === 'publicity');
 		return publicity === undefined ? null : publicityDateConfirmation(publicity);
 	}
-	const recipient = /^recipient-confirm:(\d+)$/.exec(checkId);
-	if (recipient !== null) {
-		const found = input.recipients[Number(recipient[1])];
-		return found === undefined ? null : recipientConfirmation(found);
-	}
 	return null;
 }
 
 export function withConfirmation(confirmations: Confirmation[], confirmation: Confirmation) {
-	if (confirmation.id === 'recipient-confirm') {
-		return confirmations.some(
-			(existing) => existing.id === confirmation.id && existing.key === confirmation.key
-		)
-			? confirmations
-			: [...confirmations, confirmation];
-	}
 	return [...confirmations.filter((existing) => existing.id !== confirmation.id), confirmation];
 }
 
@@ -421,13 +396,6 @@ function basisChanged(basis: StoredBasis | null, input: CheckInput, totalChecked
 
 function publicityDateConfirmation(publicity: CheckDocument): Confirmation {
 	return { id: 'publicity-date', key: publicity.fileId };
-}
-
-function recipientConfirmation(recipient: { name: string; uo95: string }): Confirmation {
-	return {
-		id: 'recipient-confirm',
-		key: `${recipient.name.trim().toLowerCase()}|${normalizedUo95(recipient.uo95)}`
-	};
 }
 
 function confirmed(input: CheckInput, confirmation: Confirmation) {

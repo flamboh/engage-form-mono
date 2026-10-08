@@ -348,23 +348,6 @@ describe('recipients', () => {
 			action: null
 		});
 	});
-
-	test('asks once per recipient to double-check the 95#', () => {
-		const value = prizes([
-			{ name: 'Casey Park', uo95: '951 234 567' },
-			{ name: 'Robin Vale', uo95: '950000001' }
-		]);
-		expect(requestChecks(value).map((check) => check.title)).toEqual([
-			'Double-check that Casey Park’s 95# is theirs',
-			'Double-check that Robin Vale’s 95# is theirs'
-		]);
-		const first = confirmationFor(value, 'recipient-confirm:0')!;
-		expect(first.key).toBe('casey park|951234567');
-		const confirmed = { ...value, confirmations: [first] };
-		expect(ids(confirmed)).toEqual(['recipient-confirm:1']);
-		const edited = prizes([{ name: 'Casey Park', uo95: '951234568' }], [first]);
-		expect(ids(edited)).toEqual(['recipient-confirm:0']);
-	});
 });
 
 test('blocking checks make the request not ready, warnings do not', () => {

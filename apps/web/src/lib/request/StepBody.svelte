@@ -66,7 +66,6 @@
 	);
 
 	function confirmLabel(check: RequestCheck) {
-		if (check.id.startsWith('recipient-confirm')) return 'It’s theirs';
 		if (check.id === 'approval-recheck') return 'Still matches';
 		return 'It’s right';
 	}
@@ -216,6 +215,7 @@
 	{:else if step.id === 'recipients'}
 		<RecipientsEditor
 			recipients={form?.recipients ?? []}
+			total={form?.totalAmount ?? null}
 			onchange={(recipients, debounce) => editor.update({ recipients }, { debounce })}
 		/>
 		{@render reasonList()}

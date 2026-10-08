@@ -1,13 +1,35 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Recipient } from '$lib/purchase/draftDetails';
+	import { addRecipient, editValue, removeRecipient, startSync } from './recipientValues';
 
 	let {
 		recipients,
+		total,
 		onchange
 	}: {
 		recipients: Recipient[];
+		total: number | null;
 		onchange: (recipients: Recipient[], debounce: boolean) => void;
 	} = $props();
+
+	let sync = $state(untrack(() => startSync(recipients, total)));
+	let typing = $state<{ index: number; text: string } | null>(null);
+
+	function apply(result: { recipients: Recipient[]; sync: typeof sync }, debounce: boolean) {
+		sync = result.sync;
+		onchange(result.recipients, debounce);
+	}
+
+	function typeValue(index: number, text: string) {
+		typing = { index, text };
+		const value = Number(text.replace(/[$,]/g, '')) || 0;
+		apply(editValue(recipients, index, value, total, sync), true);
+	}
+
+	function shown(value: number) {
+		return value === 0 ? '' : String(Number(value.toFixed(2)));
+	}
 
 	function patch(index: number, next: Partial<Recipient>) {
 		onchange(
@@ -48,11 +70,11 @@
 				Value
 				<input
 					class="input tabular-nums"
-					value={recipient.value || ''}
+					value={typing?.index === index ? typing.text : shown(recipient.value)}
 					inputmode="decimal"
 					placeholder="$"
-					oninput={(event) =>
-						patch(index, { value: Number(event.currentTarget.value.replace(/[$,]/g, '')) || 0 })}
+					oninput={(event) => typeValue(index, event.currentTarget.value)}
+					onblur={() => (typing = null)}
 				/>
 			</label>
 			<label class="col-span-2 flex flex-col gap-1 text-xs text-(--quiet)">
@@ -68,11 +90,10 @@
 			<button
 				class="col-span-2 self-end justify-self-start px-2 py-2 text-left text-xs text-(--quiet) underline hover:text-(--ink) sm:col-span-1"
 				type="button"
-				onclick={() =>
-					onchange(
-						recipients.filter((_, itemIndex) => itemIndex !== index),
-						false
-					)}
+				onclick={() => {
+					typing = null;
+					apply(removeRecipient(recipients, index, total, sync), false);
+				}}
 			>
 				Remove
 			</button>
@@ -81,7 +102,7 @@
 	<button
 		class="self-start border border-(--ink) px-3 py-1.5 text-sm font-medium text-(--ink) hover:bg-(--ink) hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--pine)"
 		type="button"
-		onclick={() => onchange([...recipients, { name: '', uo95: '', reason: '', value: 0 }], false)}
+		onclick={() => apply(addRecipient(recipients, total, sync), false)}
 	>
 		Add recipient
 	</button>

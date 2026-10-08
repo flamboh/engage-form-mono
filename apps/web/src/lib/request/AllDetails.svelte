@@ -327,6 +327,7 @@
 		{#snippet recipientsPanel()}
 			<RecipientsEditor
 				recipients={form?.recipients ?? []}
+				total={form?.totalAmount ?? null}
 				onchange={(recipients, debounce) => editor.update({ recipients }, { debounce })}
 			/>
 		{/snippet}
