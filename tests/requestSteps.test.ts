@@ -32,7 +32,7 @@ function draft(overrides: Record<string, unknown> = {}) {
 		vendor: 'Market of Choice',
 		itemDescription: 'chips and salsa',
 		totalAmount: 36.18,
-		budgetLineItem: 'Event Expenses',
+		budgetSplits: [{ fund: 'programming', line: 'Event Expenses', amount: null }],
 		receiptFileIds: [file('receipt')],
 		secondApprovalFileId: file('approval'),
 		publicityFileId: file('flyer'),

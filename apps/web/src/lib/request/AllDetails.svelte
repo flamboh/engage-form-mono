@@ -1,11 +1,12 @@
 <script lang="ts">
+	import { splitsLabel, type Fund } from '$convex/funds';
 	import type { Doc } from '$convex/_generated/dataModel';
 	import { formatEventTime } from '$convex/events';
 	import type { DocumentSlot, RequestView } from '$convex/requestView';
 	import type { UploadSlot } from '$lib/uploads.svelte';
 	import FieldRow from '$lib/ui/FieldRow.svelte';
 	import ActivityQuestions from './ActivityQuestions.svelte';
-	import BudgetLinePicker from './BudgetLinePicker.svelte';
+	import FundPicker from './FundPicker.svelte';
 	import BusinessPurposeCard from './BusinessPurposeCard.svelte';
 	import CategoryPicker from './CategoryPicker.svelte';
 	import type { RequestEditor } from './editor.svelte';
@@ -46,7 +47,7 @@
 		view: RequestView;
 		events: Doc<'events'>[];
 		purchasers: Doc<'purchasers'>[];
-		budgetLines: string[];
+		budgetLines: { name: string; fund: Fund }[];
 		fundLetter: string;
 		recentPurposes: string[];
 		userName: string;
@@ -172,7 +173,7 @@
 		</div>
 		<FieldRow
 			label="Charged to"
-			value={form?.budgetLineItem ?? ''}
+			value={form && form.budgetSplits.length > 0 ? splitsLabel(form.budgetSplits) : ''}
 			actionLabel="Change"
 			readonly={locked}
 			onaction={() => toggle('budget')}
@@ -187,7 +188,7 @@
 			onaction={() => toggle('involves')}
 		/>
 		{#snippet budgetPanel()}
-			<BudgetLinePicker {editor} {budgetLines} onpicked={() => (open = null)} />
+			<FundPicker {editor} {budgetLines} />
 		{/snippet}
 		{#snippet involvesPanel()}
 			<CategoryPicker {editor} {fundLetter} />

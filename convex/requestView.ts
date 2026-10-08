@@ -132,7 +132,8 @@ const reasonSteps: [RegExp, StepId, string][] = [
 	[/^Vendor missing/, 'receipt', 'Add where it was bought'],
 	[/^Item description missing/, 'receipt', 'Say what was bought'],
 	[/^Total amount/, 'receipt', 'Add the total'],
-	[/^Budget line item missing/, 'receipt', 'Pick a budget line'],
+	[/^Fund missing/, 'receipt', 'Pick a fund'],
+	[/^Split amounts/, 'receipt', 'Split the amount between funds'],
 	[/^Purchaser profile must belong/, 'purchaser', 'Choose who paid again'],
 	[/^Purchaser/, 'purchaser', 'Finish who paid'],
 	[/^Recipient name missing/, 'recipients', 'Add each recipient’s name'],
@@ -147,11 +148,7 @@ const reasonSteps: [RegExp, StepId, string][] = [
 	[/^Business purpose/, 'review', 'Say what it was for'],
 	[/^Reimbursement reason/, 'review', 'Add a reimbursement reason'],
 	[/^Requester/, 'review', 'Finish your profile'],
-	[
-		/^(Student organization|Index number|Budget line missing)/,
-		'review',
-		'Finish the organization details'
-	],
+	[/^(Student organization|Index number)/, 'review', 'Finish the organization details'],
 	[/^Type of Purchase/, 'review', 'Only reimbursements are supported']
 ];
 

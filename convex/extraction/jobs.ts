@@ -13,6 +13,7 @@ import { demoteIfNotReady, renderBusinessPurpose } from '../purchaseModel';
 import { isCurrentAttempt, placeDocument, receiptFieldsPatch, slotForKind, slotOf } from './apply';
 import { documentKinds, type DocumentExtraction, type ParsedField } from './jev';
 import { documentFacts } from './facts';
+import { budgetOptions, optionForLabel, optionLabel, sameOption } from '../funds';
 import { approvalBasisOf } from '../checks/load';
 import { approvalBasisKey, withConfirmation } from '../checks/requestChecks';
 import { decideDefaults, extractDocument, readDocumentText, type ExtractionEnv } from './pipeline';
@@ -203,8 +204,9 @@ export const decisionContext = internalQuery({
 		const request = await ctx.db.get(args.purchaseRequestId);
 		if (request === null || request.status !== 'draft') return null;
 		const sources = request.fieldSources ?? {};
+		const options = budgetOptions(request.studentOrganization.budgetLines);
 		const decideBudget =
-			sources.budgetLineItem !== 'user' && request.studentOrganization.budgetLines.length > 1;
+			sources.budgetSplits !== 'user' && request.budgetSplits.length <= 1 && options.length > 1;
 		const decideCategories = sources.documentationCategories !== 'user';
 		if (!decideBudget && !decideCategories) return null;
 		if (request.vendor.trim() === '' && request.itemDescription.trim() === '') return null;
@@ -212,7 +214,7 @@ export const decisionContext = internalQuery({
 			vendor: request.vendor,
 			itemDescription: request.itemDescription,
 			businessPurpose: renderBusinessPurpose(request),
-			budgetLines: decideBudget ? request.studentOrganization.budgetLines : []
+			budgetLines: decideBudget ? options.map(optionLabel) : []
 		};
 	}
 });
@@ -228,16 +230,20 @@ export const applyDecisions = internalMutation({
 		if (request === null || request.status !== 'draft') return null;
 		const sources = { ...(request.fieldSources ?? {}) };
 		const patch: Partial<Doc<'purchaseRequests'>> = {};
-		const budgetLine = args.budgetLine;
+		const option =
+			args.budgetLine === null
+				? null
+				: optionForLabel(request.studentOrganization.budgetLines, args.budgetLine.value);
+		const current = request.budgetSplits[0];
 		if (
-			budgetLine !== null &&
-			sources.budgetLineItem !== 'user' &&
-			request.studentOrganization.budgetLines.includes(budgetLine.value) &&
-			budgetLine.value !== request.budgetLineItem &&
-			(request.budgetLineItem === '' || budgetLine.confident)
+			option !== null &&
+			sources.budgetSplits !== 'user' &&
+			request.budgetSplits.length <= 1 &&
+			(current === undefined || !sameOption(current, option)) &&
+			(current === undefined || args.budgetLine?.confident === true)
 		) {
-			patch.budgetLineItem = budgetLine.value;
-			sources.budgetLineItem = 'suggested';
+			patch.budgetSplits = [{ ...option, amount: null }];
+			sources.budgetSplits = 'suggested';
 		}
 		if (sources.documentationCategories !== 'user' && args.categories.length > 0) {
 			const kept = request.documentationCategories.filter((category) => category === 'asuo_funds');

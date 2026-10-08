@@ -1,5 +1,6 @@
 import type { Doc, Id } from './_generated/dataModel';
 import { effectiveDocumentationCategories } from './purchaseCategories';
+import { splitProblem } from './funds';
 import {
 	businessPurposeFactsFrom,
 	generateBusinessPurpose,
@@ -58,9 +59,6 @@ export async function evaluatePurchaseReadiness(
 		request.studentOrganization.indexNumber,
 		'Index number missing.'
 	);
-	if (request.studentOrganization.budgetLines.length === 0) {
-		add('Student organization', 'Budget line missing.');
-	}
 
 	requireSectionText('Requester', request.requester.name, 'Requester name missing.');
 	requireSectionText('Requester', request.requester.email, 'Requester email missing.');
@@ -75,7 +73,8 @@ export async function evaluatePurchaseReadiness(
 
 	requireSectionText('Purchase details', request.vendor, 'Vendor missing.');
 	requireSectionText('Purchase details', request.itemDescription, 'Item description missing.');
-	requireSectionText('Purchase details', request.budgetLineItem, 'Budget line item missing.');
+	const fundProblem = splitProblem(request.budgetSplits, request.totalAmount);
+	if (fundProblem !== null) add('Purchase details', fundProblem);
 	requireSectionText(
 		'Purchase details',
 		request.reimbursementReason,

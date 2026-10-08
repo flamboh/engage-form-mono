@@ -19,8 +19,10 @@ import {
 	userFieldSources
 } from '../purchaseModel';
 import { normalizeActivity } from './events';
+import { budgetOptions, sameOption, type Fund } from '../funds';
 import {
 	budgetLine,
+	budgetSplit,
 	fileKind,
 	fundLetter,
 	nullReturn,
@@ -176,7 +178,6 @@ export const upsertOrganization = authedMutation({
 		requireText(args.name, 'Organization name missing.');
 		requireText(args.indexNumber, 'Index number missing.');
 		const budgetLines = normalizeBudgetLines(args.budgetLines);
-		if (budgetLines.length === 0) throw new Error('Add at least one budget line.');
 		const fields = {
 			owner,
 			name: args.name,
@@ -270,7 +271,7 @@ export const createDraftForOrganization = authedMutation({
 			...draft,
 			organizationSourceId: organization._id,
 			studentOrganization: studentOrganizationDetails(organization),
-			budgetLineItem: organization.budgetLines[0]?.name ?? '',
+			budgetSplits: defaultSplits(organization.budgetLines),
 			...withSuggestedEvent(
 				previousRequestDefaults(
 					previous,
@@ -433,7 +434,7 @@ function emptyDraft(
 		vendor: '',
 		itemDescription: '',
 		totalAmount: 0,
-		budgetLineItem: '',
+		budgetSplits: [],
 		reimbursementReason: 'Other processes are too slow.',
 		businessPurposeOverride: null,
 		receiptFileIds: [],
@@ -471,10 +472,31 @@ function normalizeBudgetLines(lines: z.infer<typeof budgetLine>[]) {
 		}
 		result.push({
 			name,
+			fund: line.fund,
 			allocations: [...allocations]
 				.sort(([a], [b]) => a - b)
 				.map(([fiscalYear, amount]) => ({ fiscalYear, amount }))
 		});
+	}
+	return result;
+}
+
+function defaultSplits(lines: { name: string; fund: Fund }[]) {
+	const options = budgetOptions(lines);
+	if (options.length === 1) return [{ ...options[0], amount: null }];
+	if (lines.length === 0) return [{ fund: 'programming' as const, line: null, amount: null }];
+	return [];
+}
+
+function normalizeSplits(splits: z.infer<typeof budgetSplit>[]) {
+	const result: z.infer<typeof budgetSplit>[] = [];
+	for (const split of splits) {
+		if (result.some((item) => sameOption(item, split))) continue;
+		const amount =
+			split.amount !== null && Number.isFinite(split.amount) && split.amount >= 0
+				? Math.round(split.amount * 100) / 100
+				: null;
+		result.push({ fund: split.fund, line: split.line, amount });
 	}
 	return result;
 }
@@ -492,7 +514,7 @@ function snapshotPatch(snapshot: z.infer<typeof wizardSnapshot>) {
 			typeof snapshot.totalAmount === 'number' && Number.isFinite(snapshot.totalAmount)
 				? snapshot.totalAmount
 				: 0,
-		budgetLineItem: snapshot.budgetLineItem,
+		budgetSplits: normalizeSplits(snapshot.budgetSplits),
 		reimbursementReason:
 			snapshot.typeOfPurchase === 'personal_reimbursement' ? 'Other processes are too slow.' : '',
 		businessPurposeOverride: normalizeOverride(snapshot.businessPurposeOverride),

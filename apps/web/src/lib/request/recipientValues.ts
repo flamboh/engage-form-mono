@@ -1,4 +1,5 @@
 import type { Recipient } from '$lib/purchase/draftDetails';
+import { shareRest } from './shareRest';
 
 export type ValueSync = { on: boolean; edited: number[] };
 
@@ -51,15 +52,10 @@ export function editValue(
 function fill(recipients: Recipient[], total: number | null, edited: number[]) {
 	if (total === null) return recipients;
 	if (recipients.length === 1 && total >= 50) return recipients;
-	const open = recipients.map((_, index) => index).filter((index) => !edited.includes(index));
-	if (open.length === 0) return recipients;
-	const taken = edited.reduce((acc, index) => acc + cents(recipients[index]?.value ?? 0), 0);
-	const left = Math.max(0, cents(total) - taken);
-	const share = Math.floor(left / open.length);
-	const extra = left - share * open.length;
-	return recipients.map((recipient, index) => {
-		const slot = open.indexOf(index);
-		if (slot === -1) return recipient;
-		return { ...recipient, value: (share + (slot < extra ? 1 : 0)) / 100 };
-	});
+	const values = shareRest(
+		recipients.map((recipient) => recipient.value),
+		edited,
+		total
+	);
+	return recipients.map((recipient, index) => ({ ...recipient, value: values[index] ?? 0 }));
 }

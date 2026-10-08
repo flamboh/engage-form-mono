@@ -21,15 +21,18 @@ const modules = import.meta.glob('../convex/**/!(*.test).ts');
 
 const line = (name: string, allocations: [number, number][] = []): BudgetLine => ({
 	name,
+	fund: 'programming',
 	allocations: allocations.map(([fiscalYear, amount]) => ({ fiscalYear, amount }))
 });
 
+const onLine = (name: string) => [{ fund: 'programming' as const, line: name, amount: null }];
+
 const spend = (
-	budgetLineItem: string,
+	name: string,
 	totalAmount: number,
 	status: Doc<'purchaseRequests'>['status'],
 	vendor = 'Safeway'
-) => ({ budgetLineItem, totalAmount, status, vendor });
+) => ({ budgetSplits: onLine(name), totalAmount, status, vendor });
 
 describe('fiscal years', () => {
 	test('Jun 30 closes one year and Jul 1 opens the next', () => {
@@ -76,6 +79,7 @@ describe('summarizeBudget', () => {
 		expect(summary.lines).toEqual([
 			{
 				name: 'Food',
+				fund: 'programming',
 				allocated: 600,
 				spent: 100.3,
 				pending: 50.5,
@@ -131,6 +135,24 @@ describe('summarizeBudget', () => {
 		expect(summary.totals.remaining).toBe(480);
 	});
 
+	test('a split request counts each part against its own line or fund', () => {
+		const summary = summarizeBudget([], 2026, [
+			{
+				budgetSplits: [
+					{ fund: 'administrative', line: null, amount: 55 },
+					{ fund: 'programming', line: null, amount: 31 }
+				],
+				totalAmount: 86,
+				status: 'approved',
+				vendor: 'Costco'
+			}
+		]);
+		expect(summary.lines.map((item) => [item.name, item.fund, item.spent])).toEqual([
+			['Administrative', 'administrative', 55],
+			['Programming', 'programming', 31]
+		]);
+	});
+
 	test('pending vendors are listed once and capped at three', () => {
 		const summary = summarizeBudget([line('Food', [[2026, 600]])], 2026, [
 			spend('Food', 1, 'draft', 'Costco'),
@@ -167,13 +189,13 @@ describe('budget queries', () => {
 			receiptDate: '2026-08-02',
 			totalAmount: 5,
 			vendor: 'Old line',
-			budgetLineItem: 'Snacks'
+			budgetSplits: onLine('Snacks')
 		});
 		await insert({
 			receiptDate: '2027-02-01',
 			totalAmount: 40,
 			vendor: 'Amazon',
-			budgetLineItem: 'Prizes'
+			budgetSplits: onLine('Prizes')
 		});
 		await insert({ receiptDate: undefined, totalAmount: 7, vendor: 'Undated' });
 		const owner = t.withIdentity({ tokenIdentifier: 'owner' });
@@ -279,20 +301,22 @@ describe('budget queries', () => {
 			budgetLines: [
 				{
 					name: ' Food ',
+					fund: 'programming',
 					allocations: [
 						{ fiscalYear: 2026, amount: 100.004 },
 						{ fiscalYear: 2025, amount: 80 },
 						{ fiscalYear: 2026, amount: 120.456 }
 					]
 				},
-				{ name: 'food', allocations: [] },
-				{ name: '', allocations: [] }
+				{ name: 'food', fund: 'programming', allocations: [] },
+				{ name: '', fund: 'programming', allocations: [] }
 			]
 		});
 		const organization = await t.run((ctx) => ctx.db.get(id));
 		expect(organization?.budgetLines).toEqual([
 			{
 				name: 'Food',
+				fund: 'programming',
 				allocations: [
 					{ fiscalYear: 2025, amount: 80 },
 					{ fiscalYear: 2026, amount: 120.46 }
@@ -305,7 +329,9 @@ describe('budget queries', () => {
 				name: 'Album Listening Club',
 				indexNumber: 'OS353i',
 				fundLetter: 'I',
-				budgetLines: [{ name: 'Food', allocations: [{ fiscalYear: 2026, amount: -1 }] }]
+				budgetLines: [
+					{ name: 'Food', fund: 'programming', allocations: [{ fiscalYear: 2026, amount: -1 }] }
+				]
 			})
 		).rejects.toThrow('Allocation for Food must be zero or more.');
 	});
@@ -330,7 +356,7 @@ describe('budget queries', () => {
 type Overrides = Partial<
 	Pick<
 		Doc<'purchaseRequests'>,
-		'receiptDate' | 'totalAmount' | 'vendor' | 'status' | 'budgetLineItem'
+		'receiptDate' | 'totalAmount' | 'vendor' | 'status' | 'budgetSplits'
 	>
 >;
 
@@ -387,7 +413,10 @@ function request(
 			name: 'Album Listening Club',
 			indexNumber: 'OS353i',
 			fundLetter: 'I',
-			budgetLines: ['Food', 'Prizes']
+			budgetLines: [
+				{ name: 'Food', fund: 'programming' },
+				{ name: 'Prizes', fund: 'programming' }
+			]
 		},
 		requester: { ...person, email: 'obo@uoregon.edu', phone: '9073104429' },
 		purchaser: person,
@@ -403,7 +432,7 @@ function request(
 		vendor: 'Safeway',
 		itemDescription: 'snacks',
 		totalAmount: 0,
-		budgetLineItem: 'Food',
+		budgetSplits: onLine('Food'),
 		reimbursementReason: 'Other processes are too slow.',
 		businessPurposeOverride: null,
 		receiptFileIds: [],
@@ -433,7 +462,7 @@ describe('ledger CSV', () => {
 				receiptDate: '2026-09-12',
 				vendor: 'Costco',
 				itemDescription: 'chips, "salsa"',
-				budgetLineItem: 'Event Expenses',
+				budgetLabel: 'Event Expenses',
 				eventName: 'Weekly listening event',
 				eventDates: ['2026-09-15', '2026-09-22'],
 				stage: 'approved',
@@ -446,7 +475,7 @@ describe('ledger CSV', () => {
 				receiptDate: '2026-09-02',
 				vendor: '=HYPERLINK("x")',
 				itemDescription: 'lattes',
-				budgetLineItem: 'Food',
+				budgetLabel: 'Food',
 				eventName: '',
 				eventDates: [],
 				stage: 'to_finish',

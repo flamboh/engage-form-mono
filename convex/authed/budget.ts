@@ -14,6 +14,8 @@ import {
 	summarizeBudget
 } from '../budget';
 import { todayInEugene } from '../lifecycle';
+import { optionLabel, splitsLabel } from '../funds';
+import { fund } from '../purchaseZod';
 import { ownerFromIdentity, requireOwnedDoc } from '../purchaseModel';
 import { authedQuery } from './helpers';
 import { stage } from '../requestView';
@@ -35,6 +37,7 @@ const budgetSummaryShape = z.object({
 	lines: z.array(
 		z.object({
 			name: z.string(),
+			fund,
 			allocated: z.number().nullable(),
 			spent: z.number(),
 			pending: z.number(),
@@ -59,7 +62,7 @@ const ledgerRow = z.object({
 	receiptDate: z.string(),
 	vendor: z.string(),
 	itemDescription: z.string(),
-	budgetLineItem: z.string(),
+	budgetLabel: z.string(),
 	eventName: z.string(),
 	eventDates: z.array(z.string()),
 	stage,
@@ -125,7 +128,10 @@ export const purchaseLedger = authedQuery({
 		const today = todayInEugene(Date.now());
 		const result = await yearStream(ctx, owner, args.organizationId, year)
 			.filterWith(async (request) => {
-				if (args.budgetLine !== undefined && request.budgetLineItem !== args.budgetLine) {
+				if (
+					args.budgetLine !== undefined &&
+					!request.budgetSplits.some((split) => optionLabel(split) === args.budgetLine)
+				) {
 					return false;
 				}
 				if (args.stage === 'approved') return request.status === 'approved';
@@ -147,7 +153,7 @@ function toLedgerRow(request: Doc<'purchaseRequests'>, today: string): LedgerRow
 		receiptDate: requestDate(request),
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
-		budgetLineItem: request.budgetLineItem,
+		budgetLabel: splitsLabel(request.budgetSplits),
 		eventName: request.activity.name,
 		eventDates: request.activity.dates,
 		stage: ledgerStage(request, today),

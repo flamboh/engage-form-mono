@@ -1,11 +1,12 @@
 <script lang="ts">
+	import type { Fund } from '$convex/funds';
 	import type { Doc } from '$convex/_generated/dataModel';
 	import type { DocumentSlot, RequestCheck, RequestView } from '$convex/requestView';
 	import type { UploadSlot } from '$lib/uploads.svelte';
 	import Button from '$lib/ui/Button.svelte';
 	import SourceCue from '$lib/ui/SourceCue.svelte';
 	import ActivityQuestions from './ActivityQuestions.svelte';
-	import BudgetLinePicker from './BudgetLinePicker.svelte';
+	import FundPicker from './FundPicker.svelte';
 	import BusinessPurposeCard from './BusinessPurposeCard.svelte';
 	import CategoryPicker from './CategoryPicker.svelte';
 	import DropTarget from './DropTarget.svelte';
@@ -37,7 +38,7 @@
 		view: RequestView;
 		events: Doc<'events'>[];
 		purchasers: Doc<'purchasers'>[];
-		budgetLines: string[];
+		budgetLines: { name: string; fund: Fund }[];
 		userName: string;
 		organization: Doc<'organizations'> | undefined;
 		reading: boolean;
@@ -151,7 +152,7 @@
 		<ReceiptFacts {editor} {reading} hero={false} />
 		<div class="flex flex-col gap-2">
 			<span class="text-sm text-(--quiet)">Charged to</span>
-			<BudgetLinePicker {editor} {budgetLines} />
+			<FundPicker {editor} {budgetLines} />
 		</div>
 		{@render checkList()}
 	{:else if step.id === 'categories'}

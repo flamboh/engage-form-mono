@@ -85,7 +85,7 @@ export const confirmFields = authedMutation({
 	args: {
 		purchaseRequestId: zid('purchaseRequests'),
 		fields: z.array(
-			z.enum(['activity', 'purchaserSource', 'budgetLineItem', 'documentationCategories'])
+			z.enum(['activity', 'purchaserSource', 'budgetSplits', 'documentationCategories'])
 		)
 	},
 	returns: nullReturn,

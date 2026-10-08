@@ -66,8 +66,11 @@ const activity = v.object({
 	openToAllStudents: v.boolean()
 });
 
+export const fund = v.union(v.literal('administrative'), v.literal('programming'));
+
 export const budgetLine = v.object({
 	name: v.string(),
+	fund,
 	allocations: v.array(v.object({ fiscalYear: v.number(), amount: v.number() }))
 });
 
@@ -75,7 +78,13 @@ const studentOrganizationDetails = v.object({
 	name: v.string(),
 	indexNumber: v.string(),
 	fundLetter,
-	budgetLines: v.array(v.string())
+	budgetLines: v.array(v.object({ name: v.string(), fund }))
+});
+
+const budgetSplit = v.object({
+	fund,
+	line: v.union(v.string(), v.null()),
+	amount: v.union(v.number(), v.null())
 });
 
 const requesterDetails = v.object({
@@ -193,7 +202,7 @@ export default defineSchema({
 		vendor: v.string(),
 		itemDescription: v.string(),
 		totalAmount: v.number(),
-		budgetLineItem: v.string(),
+		budgetSplits: v.array(budgetSplit),
 		reimbursementReason: v.string(),
 		businessPurposeOverride: v.union(v.string(), v.null()),
 		receiptFileIds: v.array(v.id('files')),

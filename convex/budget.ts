@@ -1,5 +1,6 @@
 import type { Doc } from './_generated/dataModel';
 import { requestLifecycle, todayInEugene, type Stage } from './lifecycle';
+import { budgetOptions, optionLabel, resolvedSplits, type Fund } from './funds';
 
 export type BudgetLine = Doc<'organizations'>['budgetLines'][number];
 
@@ -7,11 +8,12 @@ export type FiscalYear = { year: number; start: string; end: string; label: stri
 
 export type BudgetRequest = Pick<
 	Doc<'purchaseRequests'>,
-	'status' | 'budgetLineItem' | 'totalAmount' | 'vendor'
+	'status' | 'budgetSplits' | 'totalAmount' | 'vendor'
 >;
 
 export type BudgetLineSummary = {
 	name: string;
+	fund: Fund;
 	allocated: number | null;
 	spent: number;
 	pending: number;
@@ -90,6 +92,7 @@ export function summarizeBudget(
 	const rows = new Map<
 		string,
 		{
+			fund: Fund;
 			allocated: number | null;
 			spent: number;
 			pending: number;
@@ -98,9 +101,11 @@ export function summarizeBudget(
 			pendingVendors: string[];
 		}
 	>();
-	for (const line of lines) {
-		const allocated = allocationFor(line, year);
-		rows.set(line.name, {
+	for (const option of budgetOptions(lines)) {
+		const line = lines.find((item) => item.name === option.line);
+		const allocated = line === undefined ? null : allocationFor(line, year);
+		rows.set(optionLabel(option), {
+			fund: option.fund,
 			allocated: allocated === null ? null : cents(allocated),
 			spent: 0,
 			pending: 0,
@@ -110,27 +115,31 @@ export function summarizeBudget(
 		});
 	}
 	for (const request of requests) {
-		let row = rows.get(request.budgetLineItem);
-		if (row === undefined) {
-			row = {
-				allocated: null,
-				spent: 0,
-				pending: 0,
-				purchases: 0,
-				approvedCount: 0,
-				pendingVendors: []
-			};
-			rows.set(request.budgetLineItem, row);
-		}
-		const amount = cents(request.totalAmount);
-		row.purchases += 1;
-		if (request.status === 'approved') {
-			row.spent += amount;
-			row.approvedCount += 1;
-		} else {
-			row.pending += amount;
-			const vendor = request.vendor.trim();
-			if (vendor !== '' && !row.pendingVendors.includes(vendor)) row.pendingVendors.push(vendor);
+		for (const split of resolvedSplits(request.budgetSplits, request.totalAmount)) {
+			const label = optionLabel(split);
+			let row = rows.get(label);
+			if (row === undefined) {
+				row = {
+					fund: split.fund,
+					allocated: null,
+					spent: 0,
+					pending: 0,
+					purchases: 0,
+					approvedCount: 0,
+					pendingVendors: []
+				};
+				rows.set(label, row);
+			}
+			const amount = cents(split.amount);
+			row.purchases += 1;
+			if (request.status === 'approved') {
+				row.spent += amount;
+				row.approvedCount += 1;
+			} else {
+				row.pending += amount;
+				const vendor = request.vendor.trim();
+				if (vendor !== '' && !row.pendingVendors.includes(vendor)) row.pendingVendors.push(vendor);
+			}
 		}
 	}
 	const totals = { allocated: 0, spent: 0, pending: 0, remaining: 0 };
@@ -149,6 +158,7 @@ export function summarizeBudget(
 		}
 		summaries.push({
 			name,
+			fund: row.fund,
 			allocated: row.allocated === null ? null : dollars(row.allocated),
 			spent: dollars(row.spent),
 			pending: dollars(row.pending),

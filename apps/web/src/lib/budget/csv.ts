@@ -38,7 +38,7 @@ export function ledgerCsv(rows: LedgerRow[]) {
 				row.receiptDate,
 				text(row.vendor),
 				text(row.itemDescription),
-				text(row.budgetLineItem),
+				text(row.budgetLabel),
 				text(row.eventName),
 				row.eventDates.join(' '),
 				stageLabels[row.stage],

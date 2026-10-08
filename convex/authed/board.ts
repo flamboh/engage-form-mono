@@ -3,6 +3,7 @@ import { zid } from 'convex-helpers/server/zod4';
 import type { Doc } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
 import { fiscalYearOfDate, hasAllocations, requestFiscalYear } from '../budget';
+import { splitsLabel } from '../funds';
 import { requestLifecycle, todayInEugene, type Stage } from '../lifecycle';
 import { ownerFromIdentity, readinessWithChecks, requireOwnedDoc } from '../purchaseModel';
 import { requestExtractions } from '../checks/load';
@@ -26,7 +27,7 @@ const boardItem = z.object({
 	itemDescription: z.string(),
 	totalAmount: z.number(),
 	receiptDate: z.string().nullable(),
-	budgetLineItem: z.string(),
+	budgetLabel: z.string(),
 	stage,
 	nextStep: z.string().nullable(),
 	finishAfter: z.string().nullable(),
@@ -215,7 +216,7 @@ async function placedItem(ctx: QueryCtx, request: Doc<'purchaseRequests'>, today
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
 		receiptDate: request.receiptDate ?? null,
-		budgetLineItem: request.budgetLineItem,
+		budgetLabel: splitsLabel(request.budgetSplits),
 		stage: lifecycle.stage,
 		nextStep: nextStep ?? (request.reviewerNote === null ? null : sentBackStep),
 		finishAfter: lifecycle.finishAfter,

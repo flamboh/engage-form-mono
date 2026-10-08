@@ -191,7 +191,7 @@
 						<td class="c-items">
 							<span class="line-clamp-2">{row.itemDescription}</span>
 						</td>
-						<td class="c-line">{row.budgetLineItem}</td>
+						<td class="c-line">{row.budgetLabel}</td>
 						<td class="c-status"><StatusPill stage={row.stage} /></td>
 						<td class="num">{formatMoney(row.totalAmount)}</td>
 					</tr>

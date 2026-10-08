@@ -20,7 +20,7 @@ const readyRequest = {
 		name: 'Album Listening Club',
 		indexNumber: 'OS353i',
 		fundLetter: 'I',
-		budgetLines: ['Event Expenses']
+		budgetLines: [{ name: 'Event Expenses', fund: 'programming' }]
 	},
 	requester: {
 		id: 'user_1',
@@ -52,7 +52,7 @@ const readyRequest = {
 	vendor: 'Amazon',
 	itemDescription: 'record',
 	totalAmount: 22.98,
-	budgetLineItem: 'Event Expenses',
+	budgetSplits: [{ fund: 'programming', line: 'Event Expenses', amount: null }],
 	reimbursementReason: 'Other processes are too slow.',
 	businessPurposeOverride: 'Reimburse Oliver Boorstein for record.',
 	receiptFileIds: ['file_receipt'],
@@ -285,7 +285,7 @@ function snapshotOf(request: Doc<'purchaseRequests'>) {
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
-		budgetLineItem: request.budgetLineItem,
+		budgetSplits: request.budgetSplits,
 		businessPurposeOverride: request.businessPurposeOverride,
 		purpose: '',
 		receiptFileIds: request.receiptFileIds,

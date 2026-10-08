@@ -285,7 +285,7 @@ const readyRequest = {
 		name: 'Album Listening Club',
 		indexNumber: 'OS353i',
 		fundLetter: 'I',
-		budgetLines: ['Event Expenses']
+		budgetLines: [{ name: 'Event Expenses', fund: 'programming' }]
 	},
 	requester: {
 		id: 'user_1',
@@ -317,7 +317,7 @@ const readyRequest = {
 	vendor: 'Amazon',
 	itemDescription: 'record',
 	totalAmount: 22.98,
-	budgetLineItem: 'Event Expenses',
+	budgetSplits: [{ fund: 'programming', line: 'Event Expenses', amount: null }],
 	reimbursementReason: 'Other processes are too slow.',
 	purpose: 'prizes for trivia night',
 	businessPurposeOverride: null,

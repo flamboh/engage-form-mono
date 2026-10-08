@@ -40,9 +40,9 @@ const organization: Doc<'organizations'> = {
 	indexNumber: '123456',
 	fundLetter: 'I',
 	budgetLines: [
-		{ name: 'Event Expenses', allocations: [] },
-		{ name: 'Equipment', allocations: [] },
-		{ name: 'Travel', allocations: [] }
+		{ name: 'Event Expenses', fund: 'programming', allocations: [] },
+		{ name: 'Equipment', fund: 'administrative', allocations: [] },
+		{ name: 'Travel', fund: 'programming', allocations: [] }
 	],
 	archived: false,
 	updatedAt: now
@@ -204,7 +204,7 @@ function basePurchase(): Purchase {
 			name: organization.name,
 			indexNumber: organization.indexNumber,
 			fundLetter: organization.fundLetter,
-			budgetLines: organization.budgetLines.map((line) => line.name)
+			budgetLines: organization.budgetLines.map((line) => ({ name: line.name, fund: line.fund }))
 		},
 		requester: {
 			id: mockUser._id,
@@ -228,7 +228,7 @@ function basePurchase(): Purchase {
 		vendor: '',
 		itemDescription: '',
 		totalAmount: 0,
-		budgetLineItem: 'Event Expenses',
+		budgetSplits: [{ fund: 'programming', line: 'Event Expenses', amount: null }],
 		reimbursementReason: 'Other processes are too slow.',
 		businessPurposeOverride: null,
 		purpose: '',
@@ -249,7 +249,7 @@ function basePurchase(): Purchase {
 		reviewerNote: null,
 		fieldSources: {
 			purchaserSource: 'previous',
-			budgetLineItem: 'previous',
+			budgetSplits: 'previous',
 			activity: 'previous'
 		}
 	};
@@ -268,7 +268,7 @@ const receiptDoc = (reading = false, readFailed = false) =>
 const readSources = {
 	documentationCategories: 'suggested',
 	purchaserSource: 'previous',
-	budgetLineItem: 'previous',
+	budgetSplits: 'previous',
 	activity: 'previous',
 	vendor: 'receipt',
 	itemDescription: 'receipt',
@@ -308,7 +308,7 @@ const completeDocs = () => [receiptDoc(), publicityDoc(), approvalDoc(), caterin
 const confirmedSources = {
 	documentationCategories: 'user',
 	purchaserSource: 'user',
-	budgetLineItem: 'previous',
+	budgetSplits: 'previous',
 	activity: 'user',
 	vendor: 'receipt',
 	itemDescription: 'receipt',

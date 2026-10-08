@@ -11,6 +11,7 @@ import { effectiveDocumentationCategories } from './purchaseCategories';
 import { fileDownloadUrl } from './files';
 import { businessPurposeFor } from './businessPurpose';
 import { todayInOregon } from './events';
+import { budgetOptions, fundAmounts, sameOption, type Fund } from './funds';
 
 export { evaluatePurchaseReadiness } from './purchaseReadiness';
 export { effectiveDocumentationCategories } from './purchaseCategories';
@@ -26,7 +27,7 @@ export type StudentOrganizationDetails = {
 	name: string;
 	indexNumber: string;
 	fundLetter: Doc<'organizations'>['fundLetter'];
-	budgetLines: string[];
+	budgetLines: { name: string; fund: Fund }[];
 };
 export type RequesterDetails = {
 	id: Id<'users'>;
@@ -91,7 +92,7 @@ const userTrackedFields = [
 	'vendor',
 	'itemDescription',
 	'totalAmount',
-	'budgetLineItem',
+	'budgetSplits',
 	'businessPurposeOverride',
 	'officeLocation',
 	'recipients'
@@ -137,7 +138,7 @@ export function changedSnapshotPatch<Patch extends object>(
 export type PreviousRequestDefaults = Pick<
 	Doc<'purchaseRequests'>,
 	| 'purchaserSource'
-	| 'budgetLineItem'
+	| 'budgetSplits'
 	| 'documentationCategories'
 	| 'reimbursementReason'
 	| 'activity'
@@ -179,9 +180,13 @@ export function previousRequestDefaults(
 		};
 		sources.activity = 'previous';
 	}
-	if (organization.budgetLines.some((line) => line.name === previous.budgetLineItem)) {
-		defaults.budgetLineItem = previous.budgetLineItem;
-		sources.budgetLineItem = 'previous';
+	const options = budgetOptions(organization.budgetLines);
+	if (
+		previous.budgetSplits.length > 0 &&
+		previous.budgetSplits.every((split) => options.some((option) => sameOption(option, split)))
+	) {
+		defaults.budgetSplits = previous.budgetSplits.map((split) => ({ ...split, amount: null }));
+		sources.budgetSplits = 'previous';
 	}
 	if (previous.documentationCategories.length > 0) {
 		defaults.documentationCategories = previous.documentationCategories;
@@ -259,7 +264,7 @@ export async function assemblePurchase(ctx: Ctx, request: Doc<'purchaseRequests'
 		vendor: request.vendor,
 		itemDescription: request.itemDescription,
 		totalAmount: request.totalAmount,
-		budgetLineItem: request.budgetLineItem,
+		budgetSplits: fundAmounts(request.budgetSplits, request.totalAmount),
 		reimbursementReason: reimbursementReasonFor(request.typeOfPurchase),
 		businessPurposeText: renderBusinessPurpose(request),
 		requesterIsPurchaser: purchaserIsSelf,
@@ -366,7 +371,7 @@ export function studentOrganizationDetails(org: Doc<'organizations'>): StudentOr
 		name: org.name,
 		indexNumber: org.indexNumber,
 		fundLetter: org.fundLetter,
-		budgetLines: org.budgetLines.map((line) => line.name)
+		budgetLines: org.budgetLines.map((line) => ({ name: line.name, fund: line.fund }))
 	};
 }
 

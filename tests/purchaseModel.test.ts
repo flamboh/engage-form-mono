@@ -26,7 +26,7 @@ const request = {
 		name: 'Album Listening Club',
 		indexNumber: 'OS353i',
 		fundLetter: 'I',
-		budgetLines: ['Event Expenses']
+		budgetLines: [{ name: 'Event Expenses', fund: 'programming' }]
 	},
 	requester: {
 		id: 'user_1',
@@ -58,7 +58,7 @@ const request = {
 	vendor: 'Amazon',
 	itemDescription: 'record',
 	totalAmount: 22.98,
-	budgetLineItem: 'Event Expenses',
+	budgetSplits: [{ fund: 'programming', line: 'Event Expenses', amount: null }],
 	reimbursementReason: 'Other processes are too slow.',
 	businessPurposeOverride: null,
 	receiptFileIds: ['file_receipt'],
@@ -151,7 +151,10 @@ test('new drafts copy the previous event facts without its dates', () => {
 	};
 	const defaults = previousRequestDefaults(
 		previous,
-		{ _id: 'org_1' as never, budgetLines: [{ name: 'Event Expenses', allocations: [] }] },
+		{
+			_id: 'org_1' as never,
+			budgetLines: [{ name: 'Event Expenses', fund: 'programming', allocations: [] }]
+		},
 		null,
 		event
 	);
@@ -160,7 +163,10 @@ test('new drafts copy the previous event facts without its dates', () => {
 	expect(
 		previousRequestDefaults(
 			previous,
-			{ _id: 'org_1' as never, budgetLines: [{ name: 'Event Expenses', allocations: [] }] },
+			{
+				_id: 'org_1' as never,
+				budgetLines: [{ name: 'Event Expenses', fund: 'programming', allocations: [] }]
+			},
 			null,
 			{ ...event, archived: true }
 		).activity?.eventId
@@ -568,7 +574,7 @@ test('reports blocked Draft reasons grouped by section', async () => {
 			vendor: '',
 			itemDescription: '',
 			totalAmount: 0,
-			budgetLineItem: '',
+			budgetSplits: [],
 			receiptFileIds: [],
 			secondApprovalFileId: null,
 			publicityFileId: null
@@ -578,11 +584,7 @@ test('reports blocked Draft reasons grouped by section', async () => {
 		sections: [
 			{
 				section: 'Student organization',
-				reasons: [
-					'Student organization name missing.',
-					'Index number missing.',
-					'Budget line missing.'
-				]
+				reasons: ['Student organization name missing.', 'Index number missing.']
 			},
 			{
 				section: 'Requester',
@@ -602,7 +604,7 @@ test('reports blocked Draft reasons grouped by section', async () => {
 				reasons: [
 					'Vendor missing.',
 					'Item description missing.',
-					'Budget line item missing.',
+					'Fund missing.',
 					'Total amount must be greater than zero.'
 				]
 			},

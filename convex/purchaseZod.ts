@@ -75,8 +75,11 @@ export const activity = z.object({
 
 const budgetAllocation = z.object({ fiscalYear: z.number(), amount: z.number() });
 
+export const fund = z.enum(['administrative', 'programming']);
+
 export const budgetLine = z.object({
 	name: z.string(),
+	fund,
 	allocations: z.array(budgetAllocation)
 });
 
@@ -84,7 +87,13 @@ export const studentOrganizationDetails = z.object({
 	name: z.string(),
 	indexNumber: z.string(),
 	fundLetter,
-	budgetLines: z.array(z.string())
+	budgetLines: z.array(z.object({ name: z.string(), fund }))
+});
+
+export const budgetSplit = z.object({
+	fund,
+	line: z.string().nullable(),
+	amount: z.number().nullable()
 });
 
 export const requesterDetails = z.object({
@@ -190,7 +199,7 @@ export const purchaseRequestDoc = z.object({
 	vendor: z.string(),
 	itemDescription: z.string(),
 	totalAmount: z.number(),
-	budgetLineItem: z.string(),
+	budgetSplits: z.array(budgetSplit),
 	reimbursementReason: z.string(),
 	businessPurposeOverride: z.string().nullable(),
 	receiptFileIds: z.array(zid('files')),
@@ -231,7 +240,7 @@ export const wizardSnapshot = z.object({
 	vendor: z.string(),
 	itemDescription: z.string(),
 	totalAmount: z.number().nullable(),
-	budgetLineItem: z.string(),
+	budgetSplits: z.array(budgetSplit),
 	businessPurposeOverride: z.string().nullable(),
 	purpose: z.string(),
 	receiptFileIds: z.array(zid('files')),

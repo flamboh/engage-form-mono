@@ -5,7 +5,7 @@
 	import Chip from '$lib/ui/Chip.svelte';
 	import InlineError from '$lib/ui/InlineError.svelte';
 	import SectionHeader from '$lib/ui/SectionHeader.svelte';
-	import { SUGGESTED_BUDGET_LINES } from '$lib/welcome/defaults';
+	import { fundLabel, funds, type Fund } from '$convex/funds';
 
 	type BudgetLine = Doc<'organizations'>['budgetLines'][number];
 
@@ -23,6 +23,7 @@
 	let year = $state(currentYear);
 	let adding = $state(false);
 	let newLine = $state('');
+	let newFund = $state<Fund>('programming');
 	let error = $state('');
 
 	const years = $derived(
@@ -34,12 +35,6 @@
 			])
 		].sort((a, b) => a - b)
 	);
-	const suggestions = $derived(
-		SUGGESTED_BUDGET_LINES.filter(
-			(name) => !lines.some((line) => line.name.toLowerCase() === name.toLowerCase())
-		)
-	);
-
 	function amountFor(line: BudgetLine) {
 		const amount = line.allocations.find((item) => item.fiscalYear === year)?.amount;
 		return amount === undefined
@@ -77,9 +72,13 @@
 			error = `${value} is already a line.`;
 			return;
 		}
-		await save([...lines, { name: value, allocations: [] }]);
+		await save([...lines, { name: value, fund: newFund, allocations: [] }]);
 		newLine = '';
 		adding = false;
+	}
+
+	async function setFund(line: BudgetLine, fund: Fund) {
+		await save(lines.map((item) => (item.name === line.name ? { ...item, fund } : item)));
 	}
 
 	async function removeLine(line: BudgetLine) {
@@ -88,11 +87,15 @@
 </script>
 
 <div class="flex flex-col">
-	<SectionHeader title="Budget lines" level={3}>
+	<SectionHeader title="Your budget lines" level={3}>
 		{#snippet action()}
 			<Button variant="quiet" size="sm" onclick={() => (adding = !adding)}>Add line</Button>
 		{/snippet}
 	</SectionHeader>
+	<p class="hint top">
+		Optional, for your own tracking. Engage only sees how much comes from Administrative and
+		Programming.
+	</p>
 	<div class="years" role="group" aria-label="Fiscal year">
 		<span>Allocated in</span>
 		{#each years as option (option)}
@@ -104,7 +107,8 @@
 	<table>
 		<thead>
 			<tr>
-				<th scope="col">Line, as Engage spells it</th>
+				<th scope="col">Line</th>
+				<th scope="col">Fund</th>
 				<th scope="col" class="num">Allocated {fiscalYearLabel(year)}, optional</th>
 				<th scope="col"><span class="sr-only">Remove</span></th>
 			</tr>
@@ -113,6 +117,17 @@
 			{#each lines as line (line.name)}
 				<tr>
 					<td>{line.name}</td>
+					<td>
+						<select
+							aria-label={`${line.name} fund`}
+							value={line.fund}
+							onchange={(event) => setFund(line, event.currentTarget.value as Fund)}
+						>
+							{#each funds as fund (fund)}
+								<option value={fund}>{fundLabel[fund]}</option>
+							{/each}
+						</select>
+					</td>
 					<td class="num">
 						{#key year}
 							<input
@@ -131,7 +146,6 @@
 						<button
 							type="button"
 							aria-label={`Remove ${line.name}`}
-							disabled={lines.length === 1}
 							onclick={() => removeLine(line)}
 						>
 							<svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
@@ -148,7 +162,7 @@
 			<div class="flex gap-2">
 				<input
 					class="input"
-					placeholder="Line name, as Engage spells it"
+					placeholder="Line name"
 					aria-label="New budget line"
 					bind:value={newLine}
 					{@attach (node) => node.focus()}
@@ -159,13 +173,13 @@
 				/>
 				<Button variant="secondary" onclick={() => addLine(newLine)}>Add</Button>
 			</div>
-			{#if suggestions.length > 0}
-				<div class="flex flex-wrap gap-2">
-					{#each suggestions as name (name)}
-						<Chip variant="add" onclick={() => addLine(name)}>{name}</Chip>
-					{/each}
-				</div>
-			{/if}
+			<div class="flex flex-wrap gap-2" role="group" aria-label="New line fund">
+				{#each funds as fund (fund)}
+					<Chip selected={newFund === fund} onclick={() => (newFund = fund)}>
+						{fundLabel[fund]}
+					</Chip>
+				{/each}
+			</div>
 		</div>
 	{/if}
 	{#if error}<div class="pt-3"><InlineError message={error} /></div>{/if}
@@ -253,10 +267,6 @@
 		color: var(--alert);
 	}
 
-	.remove button:disabled {
-		visibility: hidden;
-	}
-
 	.add {
 		display: flex;
 		flex-direction: column;
@@ -270,6 +280,17 @@
 		padding: 12px 0 0;
 		font-size: 13.5px;
 		color: var(--quiet);
+	}
+
+	.hint.top {
+		padding: 8px 0 0;
+	}
+
+	td select {
+		border: 1px solid var(--line);
+		background: var(--surface);
+		padding: 4px 6px;
+		font-size: 13.5px;
 	}
 
 	.hint a {

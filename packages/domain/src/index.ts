@@ -36,7 +36,14 @@ export type StudentOrganization = {
 	name: string;
 	indexNumber: string;
 	fundLetter: FundLetter;
-	budgetLines: string[];
+	budgetLines: { name: string; fund: Fund }[];
+};
+
+export type Fund = 'administrative' | 'programming';
+
+export const fundLabel: Record<Fund, string> = {
+	administrative: 'Administrative',
+	programming: 'Programming'
 };
 
 export type Requester = {
@@ -79,7 +86,7 @@ export type PurchaseRequest = {
 	vendor: string;
 	itemDescription: string;
 	totalAmount: number;
-	budgetLineItem: string;
+	budgetSplits: { fund: Fund; amount: number }[];
 	reimbursementReason: string;
 	businessPurposeText: string;
 	requesterIsPurchaser: boolean;
@@ -111,7 +118,7 @@ export const samplePurchaseRequest: PurchaseRequest = {
 		name: 'Album Listening Club',
 		indexNumber: 'OS353i',
 		fundLetter: 'I',
-		budgetLines: ['Event Expenses']
+		budgetLines: [{ name: 'Weekly Musical Discussion Events', fund: 'programming' }]
 	},
 	requester: {
 		id: 'person_oliver',
@@ -136,7 +143,7 @@ export const samplePurchaseRequest: PurchaseRequest = {
 	vendor: 'Amazon',
 	itemDescription: 'Mort Garson music vinyl',
 	totalAmount: 22.98,
-	budgetLineItem: 'Event Expenses',
+	budgetSplits: [{ fund: 'programming', amount: 22.98 }],
 	reimbursementReason: fixedPersonalReimbursementReason,
 	businessPurposeText:
 		"Album Listening Club wishes to reimburse Oliver Boorstein because they purchased a Mort Garson music vinyl from Amazon for $22.98. This Mort Garson music vinyl was given as a gift to Aidan O'Donnell (951951840) for winning the Kahoot! Trivia during Album Listening Club weekly event which took place on 04/21 at 6:30pm in McKenzie 240A with about 50 students in attendance.",
@@ -175,7 +182,9 @@ export function formatMoney(amount: number) {
 }
 
 export function budgetLineText(purchaseRequest: PurchaseRequest) {
-	return `${formatMoney(purchaseRequest.totalAmount)} from ${purchaseRequest.budgetLineItem}`;
+	return purchaseRequest.budgetSplits
+		.map((split) => `${formatMoney(split.amount)} from ${fundLabel[split.fund]}`)
+		.join(', ');
 }
 
 export function reimbursementRecipientText(purchaseRequest: PurchaseRequest) {
@@ -256,12 +265,9 @@ export function validatePurchaseReadiness(purchaseRequest: PurchaseRequest) {
 		purchaseRequest.itemDescription,
 		'Item description missing.'
 	);
-	requireText(
-		issues,
-		'budgetLineItem',
-		purchaseRequest.budgetLineItem,
-		'Budget line item missing.'
-	);
+	if (purchaseRequest.budgetSplits.length === 0) {
+		issues.push({ field: 'budgetSplits', message: 'Fund missing.' });
+	}
 	requireText(
 		issues,
 		'businessPurposeText',

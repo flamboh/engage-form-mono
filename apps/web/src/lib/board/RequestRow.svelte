@@ -26,7 +26,7 @@
 	const meta = $derived(
 		[
 			item.totalAmount > 0 ? formatMoney(item.totalAmount) : '',
-			item.budgetLineItem.trim(),
+			item.budgetLabel,
 			item.receiptDate ? monthDay(item.receiptDate) : ''
 		].filter((part) => part !== '')
 	);

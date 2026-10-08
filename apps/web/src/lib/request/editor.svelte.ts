@@ -1,3 +1,4 @@
+import type { BudgetSplit } from '$convex/funds';
 import type { Doc, Id } from '$convex/_generated/dataModel';
 import type { Approver } from '$convex/approvalMessage';
 import type { DocumentSlot, RequestView } from '$convex/requestView';
@@ -28,7 +29,7 @@ export type FormState = {
 	vendor: string;
 	itemDescription: string;
 	totalAmount: number | null;
-	budgetLineItem: string;
+	budgetSplits: BudgetSplit[];
 	businessPurposeOverride: string | null;
 	purpose: string;
 	receiptFileIds: Id<'files'>[];
@@ -69,7 +70,7 @@ export type RequestBackend = {
 export type ConfirmableField =
 	| 'activity'
 	| 'purchaserSource'
-	| 'budgetLineItem'
+	| 'budgetSplits'
 	| 'documentationCategories';
 export type IdSide = 'front' | 'back';
 
@@ -141,7 +142,7 @@ export class RequestEditor {
 			vendor: purchase.vendor,
 			itemDescription: purchase.itemDescription,
 			totalAmount: purchase.totalAmount || null,
-			budgetLineItem: purchase.budgetLineItem,
+			budgetSplits: purchase.budgetSplits,
 			businessPurposeOverride: purchase.businessPurposeOverride,
 			purpose: purchase.purpose ?? '',
 			receiptFileIds: purchase.receiptFileIds,

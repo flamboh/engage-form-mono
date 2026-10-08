@@ -1,3 +1,4 @@
+import { splitsLabel } from '../../../../../convex/funds';
 import type { FieldSource, FormState } from './editor.svelte';
 import {
 	checkStep,
@@ -40,7 +41,7 @@ type Draft = Pick<
 	| 'vendor'
 	| 'itemDescription'
 	| 'totalAmount'
-	| 'budgetLineItem'
+	| 'budgetSplits'
 	| 'receiptFileIds'
 	| 'secondApprovalFileId'
 	| 'publicityFileId'
@@ -90,7 +91,7 @@ function receiptSummary(draft: Draft, receiptDate: string) {
 		receiptDate ? `on ${shortDate(receiptDate)}` : ''
 	].filter(Boolean);
 	const bought = parts.join(' ');
-	const line = draft.budgetLineItem ? `charged to ${draft.budgetLineItem}` : '';
+	const line = draft.budgetSplits.length > 0 ? `charged to ${splitsLabel(draft.budgetSplits)}` : '';
 	return [bought, line].filter(Boolean).join(', ');
 }
 

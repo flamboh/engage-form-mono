@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { RequestView } from '$convex/requestView';
+	import { fundText } from '$convex/funds';
 	import FieldRow from '$lib/ui/FieldRow.svelte';
 	import { formatMoney, monthDay, shortDate } from './labels';
 
@@ -68,7 +69,11 @@
 	<section class="flex flex-col" aria-label="Summary">
 		<FieldRow label="Total" value={formatMoney(purchase.totalAmount)} readonly />
 		<FieldRow label="Event" value={eventText} readonly />
-		<FieldRow label="Charged to" value={purchase.budgetLineItem} readonly />
+		<FieldRow
+			label="Charged to"
+			value={fundText(purchase.budgetSplits, purchase.totalAmount)}
+			readonly
+		/>
 		<a
 			class="mt-4 self-start text-sm text-(--quiet) underline underline-offset-3 hover:text-(--ink)"
 			href={allDetailsHref}>Show all details</a

@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import {
+	budgetLineText,
 	generateBusinessPurpose,
 	recipientIdText,
 	recipientValueText,
@@ -224,5 +225,26 @@ test('requires second approval only for requester purchases', () => {
 	).not.toContainEqual({
 		field: 'secondApprovalFileId',
 		message: 'Second approval missing.'
+	});
+});
+
+test('writes the Engage line item as an amount from each ASUO fund', () => {
+	expect(budgetLineText(samplePurchaseRequest)).toBe('$22.98 from Programming');
+	expect(
+		budgetLineText({
+			...samplePurchaseRequest,
+			totalAmount: 86,
+			budgetSplits: [
+				{ fund: 'administrative', amount: 55 },
+				{ fund: 'programming', amount: 31 }
+			]
+		})
+	).toBe('$55.00 from Administrative, $31.00 from Programming');
+});
+
+test('requires a fund', () => {
+	expect(validatePurchaseReadiness({ ...samplePurchaseRequest, budgetSplits: [] })).toContainEqual({
+		field: 'budgetSplits',
+		message: 'Fund missing.'
 	});
 });

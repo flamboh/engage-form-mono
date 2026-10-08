@@ -84,13 +84,21 @@ _Avoid_: Purpose text, reimbursement description
 The explanation for choosing reimbursement instead of another purchasing process.
 _Avoid_: Reason, business purpose, justification
 
+**Fund**:
+One of the two ASUO spending categories a purchase is paid from: Administrative or Programming. Engage's Line Item field gets the amount from each, like "$55.00 from Administrative".
+_Avoid_: Category (that means **Documentation Categories**), budget line, account
+
 **Budget Line Item**:
-The student organization funding category charged by a purchase request.
+An optional, organization-defined line under one **Fund**, like "Weekly Musical Discussion Events" under Programming. Only used for the organization's own budget tracking; Engage never sees it.
 _Avoid_: Budget line, category, account
+
+**Budget Split**:
+The part of a **Purchase Request**'s total charged to one **Budget Line Item**, or to a **Fund** when the organization has no lines.
+_Avoid_: Allocation, share
 
 **Fund Letter**:
 The Engage funding code letter for a student organization's money source.
-_Avoid_: Fund, fund context
+_Avoid_: Fund (that is Administrative or Programming), fund context
 
 **ASUO Funds**:
 The documentation category for events funded by ASUO-administered student organization money.
@@ -158,7 +166,8 @@ _Avoid_: ID card image, ID file, card upload
 - An **Activity** has one or more dates when the purchase was used
 - A **Purchase Request** has exactly one **Business Purpose**, generated from its facts or customized
 - A **Personal Reimbursement** has exactly one **Reimbursement Reason**
-- A **Purchase Request** charges exactly one **Budget Line Item**
+- A **Purchase Request** has one or more **Budget Splits**; with more than one, their amounts add up to the total
+- A **Budget Line Item** belongs to exactly one **Fund**
 - A **Budget Line Item** has at most one **Allocation** per fiscal year
 - A **Purchase Request** may have one or more **Recipients**
 - A **Purchase Request** may have one or more **Documents**

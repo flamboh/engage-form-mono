@@ -67,7 +67,7 @@ const draft = {
 	vendor: '',
 	itemDescription: '',
 	totalAmount: 0,
-	budgetLineItem: 'Event Expenses',
+	budgetSplits: [{ fund: 'programming', line: 'Event Expenses', amount: null }],
 	reimbursementReason: 'Other processes are too slow.',
 	businessPurposeOverride: null,
 	receiptFileIds: [receiptA, receiptB],
@@ -256,7 +256,7 @@ test('new drafts copy defaults from the previous request in the organization', (
 	const previous = {
 		...draft,
 		purchaserSource: { kind: 'purchaser', purchaserId: purchaser._id },
-		budgetLineItem: 'Food',
+		budgetSplits: [{ fund: 'programming', line: 'Food', amount: 12 }],
 		documentationCategories: ['food'],
 		activity: {
 			eventId: null,
@@ -271,8 +271,8 @@ test('new drafts copy defaults from the previous request in the organization', (
 	const organization = {
 		_id: 'org_1',
 		budgetLines: [
-			{ name: 'Event Expenses', allocations: [] },
-			{ name: 'Food', allocations: [] }
+			{ name: 'Event Expenses', fund: 'programming', allocations: [] },
+			{ name: 'Food', fund: 'programming', allocations: [] }
 		]
 	} as never;
 	expect(previousRequestDefaults(previous, organization, purchaser)).toEqual({
@@ -286,25 +286,28 @@ test('new drafts copy defaults from the previous request in the organization', (
 			idCardBackFileId: null
 		},
 		activity: { ...previous.activity, dates: [] },
-		budgetLineItem: 'Food',
+		budgetSplits: [{ fund: 'programming', line: 'Food', amount: null }],
 		documentationCategories: ['food'],
 		reimbursementReason: 'Other processes are too slow.',
 		fieldSources: {
 			purchaserSource: 'previous',
 			activity: 'previous',
-			budgetLineItem: 'previous',
+			budgetSplits: 'previous',
 			documentationCategories: 'previous',
 			reimbursementReason: 'previous'
 		}
 	});
 	const archived = { ...purchaser, archived: true } as Doc<'purchasers'>;
 	const withoutPurchaser = previousRequestDefaults(
-		{ ...previous, budgetLineItem: 'Gone Line' } as Doc<'purchaseRequests'>,
+		{
+			...previous,
+			budgetSplits: [{ fund: 'programming', line: 'Gone Line', amount: null }]
+		} as Doc<'purchaseRequests'>,
 		organization,
 		archived
 	);
 	expect(withoutPurchaser).not.toHaveProperty('purchaserSource');
-	expect(withoutPurchaser).not.toHaveProperty('budgetLineItem');
+	expect(withoutPurchaser).not.toHaveProperty('budgetSplits');
 	expect(previousRequestDefaults(null, organization, null)).toEqual({});
 });
 
@@ -313,11 +316,15 @@ test('snapshot edits mark changed fields as user-set', () => {
 		...draft,
 		vendor: 'Bigbox Wholesale',
 		totalAmount: 28.48,
-		fieldSources: { vendor: 'receipt', totalAmount: 'receipt', budgetLineItem: 'suggested' }
+		fieldSources: { vendor: 'receipt', totalAmount: 'receipt', budgetSplits: 'suggested' }
 	} as Doc<'purchaseRequests'>;
 	expect(
-		userFieldSources(filled, { vendor: 'Bigbox', totalAmount: 28.48, budgetLineItem: 'Food' })
-	).toEqual({ vendor: 'user', totalAmount: 'receipt', budgetLineItem: 'user' });
+		userFieldSources(filled, {
+			vendor: 'Bigbox',
+			totalAmount: 28.48,
+			budgetSplits: [{ fund: 'programming', line: 'Food', amount: null }]
+		})
+	).toEqual({ vendor: 'user', totalAmount: 'receipt', budgetSplits: 'user' });
 	expect(userFieldSources(filled, { vendor: 'Bigbox Wholesale' })).toBe(filled.fieldSources);
 });
 
@@ -326,7 +333,7 @@ test('snapshot saves with changedFields only apply and mark the edited fields', 
 		...draft,
 		vendor: 'Bigbox Wholesale',
 		totalAmount: 28.48,
-		budgetLineItem: 'Event Expenses',
+		budgetSplits: [{ fund: 'programming', line: 'Event Expenses', amount: null }],
 		fieldSources: { vendor: 'receipt', totalAmount: 'receipt' }
 	} as Doc<'purchaseRequests'>;
 	const staleSnapshot = {
@@ -334,18 +341,21 @@ test('snapshot saves with changedFields only apply and mark the edited fields', 
 		reimbursementReason: 'Other processes are too slow.',
 		vendor: '',
 		totalAmount: 0,
-		budgetLineItem: 'Food',
+		budgetSplits: [{ fund: 'programming', line: 'Food', amount: null }],
 		businessPurposeOverride: 'For the vendor',
 		purchaserSource: { kind: 'self' as const },
 		purchaser: filled.purchaser,
 		updatedAt: 5
 	};
-	const patch = changedSnapshotPatch(staleSnapshot, ['budgetLineItem']);
-	expect(patch).toEqual({ budgetLineItem: 'Food', updatedAt: 5 });
+	const patch = changedSnapshotPatch(staleSnapshot, ['budgetSplits']);
+	expect(patch).toEqual({
+		budgetSplits: [{ fund: 'programming', line: 'Food', amount: null }],
+		updatedAt: 5
+	});
 	expect(userFieldSources(filled, patch)).toEqual({
 		vendor: 'receipt',
 		totalAmount: 'receipt',
-		budgetLineItem: 'user'
+		budgetSplits: 'user'
 	});
 	expect(Object.keys(changedSnapshotPatch(staleSnapshot, ['businessPurposeOverride']))).toEqual([
 		'businessPurposeOverride',
