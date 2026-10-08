@@ -109,9 +109,7 @@ export const budgetSummary = authedQuery({
 		const purchaseYears = await yearsWithPurchases(ctx, owner, organization._id, current);
 		return {
 			fiscalYear: fiscalYear(year),
-			fiscalYears: availableFiscalYears(organization, current, purchaseYears).map(
-				fiscalYear
-			),
+			fiscalYears: availableFiscalYears(organization, current, purchaseYears).map(fiscalYear),
 			...summarizeBudget(organization, year, requests)
 		};
 	}

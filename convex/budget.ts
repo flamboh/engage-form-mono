@@ -234,8 +234,7 @@ function summarizeFunds(
 			};
 		})
 		.filter(
-			(summary) =>
-				summary.allocated !== null || lines.some((line) => line.fund === summary.fund)
+			(summary) => summary.allocated !== null || lines.some((line) => line.fund === summary.fund)
 		);
 }
 
