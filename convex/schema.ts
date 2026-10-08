@@ -74,6 +74,8 @@ export const budgetLine = v.object({
 	allocations: v.array(v.object({ fiscalYear: v.number(), amount: v.number() }))
 });
 
+export const fundAllocation = v.object({ fund, fiscalYear: v.number(), amount: v.number() });
+
 const studentOrganizationDetails = v.object({
 	name: v.string(),
 	indexNumber: v.string(),
@@ -144,6 +146,7 @@ export default defineSchema({
 		indexNumber: v.string(),
 		fundLetter,
 		budgetLines: v.array(budgetLine),
+		fundAllocations: v.optional(v.array(fundAllocation)),
 		archived: v.boolean(),
 		updatedAt: v.number()
 	})

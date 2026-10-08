@@ -38,7 +38,8 @@
 				name: name.trim(),
 				indexNumber: indexNumber.trim(),
 				fundLetter,
-				budgetLines: []
+				budgetLines: [],
+				fundAllocations: []
 			});
 			await onSaved(id);
 		} catch (err) {

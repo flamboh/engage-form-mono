@@ -133,7 +133,7 @@ export const organizationBoard = authedQuery({
 			organization: {
 				id: organization._id,
 				name: organization.name,
-				hasAllocations: hasAllocations(organization.budgetLines)
+				hasAllocations: hasAllocations(organization)
 			},
 			readyToFill: group('ready').sort(byUpdatedAt),
 			toFinish: group('to_finish').sort(byDaysLeft),

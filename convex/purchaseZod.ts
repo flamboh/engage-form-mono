@@ -83,6 +83,8 @@ export const budgetLine = z.object({
 	allocations: z.array(budgetAllocation)
 });
 
+export const fundAllocation = z.object({ fund, fiscalYear: z.number(), amount: z.number() });
+
 export const studentOrganizationDetails = z.object({
 	name: z.string(),
 	indexNumber: z.string(),
@@ -147,6 +149,7 @@ export const organizationDoc = z.object({
 	indexNumber: z.string(),
 	fundLetter,
 	budgetLines: z.array(budgetLine),
+	fundAllocations: z.array(fundAllocation).optional(),
 	archived: z.boolean(),
 	updatedAt: z.number()
 });

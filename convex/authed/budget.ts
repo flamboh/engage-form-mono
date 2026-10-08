@@ -16,7 +16,7 @@ import {
 	summarizeBudget
 } from '../budget';
 import { todayInEugene } from '../lifecycle';
-import { optionLabel, splitsLabel } from '../funds';
+import { budgetOptions, optionLabel, splitsLabel } from '../funds';
 import { fund } from '../purchaseZod';
 import { ownerFromIdentity, requireOwnedDoc } from '../purchaseModel';
 import { authedQuery } from './helpers';
@@ -109,10 +109,10 @@ export const budgetSummary = authedQuery({
 		const purchaseYears = await yearsWithPurchases(ctx, owner, organization._id, current);
 		return {
 			fiscalYear: fiscalYear(year),
-			fiscalYears: availableFiscalYears(organization.budgetLines, current, purchaseYears).map(
+			fiscalYears: availableFiscalYears(organization, current, purchaseYears).map(
 				fiscalYear
 			),
-			...summarizeBudget(organization.budgetLines, year, requests)
+			...summarizeBudget(organization, year, requests)
 		};
 	}
 });
@@ -130,13 +130,22 @@ export const budgetLeft = authedQuery({
 			request.organizationSourceId,
 			owner
 		);
-		if (!hasAllocations(organization.budgetLines)) return null;
+		if (!hasAllocations(organization)) return null;
 		const year = requestFiscalYear(request);
 		const others = (
 			await yearStream(ctx, owner, organization._id, year).take(MAX_REQUESTS_PER_YEAR)
 		).filter((other) => other._id !== request._id);
-		const summary = summarizeBudget(organization.budgetLines, year, others);
-		return Object.fromEntries(summary.lines.map((line) => [line.name, line.remaining]));
+		const summary = summarizeBudget(organization, year, others);
+		const fundLeft = new Map(summary.funds.map((fund) => [fund.fund, fund.remaining]));
+		return Object.fromEntries(
+			budgetOptions(organization.budgetLines).map((option) => {
+				const line = summary.lines.find((item) => item.name === optionLabel(option));
+				const left = [line?.remaining ?? null, fundLeft.get(option.fund) ?? null].filter(
+					(value): value is number => value !== null
+				);
+				return [optionLabel(option), left.length === 0 ? null : Math.min(...left)];
+			})
+		);
 	}
 });
 

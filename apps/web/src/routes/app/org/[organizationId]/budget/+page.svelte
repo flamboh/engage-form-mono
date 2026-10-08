@@ -25,7 +25,7 @@
 	const organization = $derived(
 		savedQuery.data?.organizations.find((org) => org._id === organizationId)
 	);
-	const tracking = $derived(organization ? hasAllocations(organization.budgetLines) : undefined);
+	const tracking = $derived(organization ? hasAllocations(organization) : undefined);
 	const summaryQuery = useQuery(
 		api.authed.budget.budgetSummary,
 		() => (tracking ? { organizationId, fiscalYear } : 'skip'),
@@ -74,8 +74,8 @@
 			</p>
 		{:else if tracking === false}
 			<EmptyState
-				title="Add what each line was allocated to see what's left"
-				body="Budget lines without an allocation still work for requests. Once any line has one, this page shows what's spent, what's pending and what's left for the year."
+				title="Add your ASUO allocations to see what's left"
+				body="Enter what ASUO gave your Administrative and Programming funds this year. This page then shows what's spent, what's pending and what's left in each."
 			>
 				{#snippet action()}
 					<Button variant="primary" href={settingsHref}>Add allocations</Button>

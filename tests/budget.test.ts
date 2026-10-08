@@ -10,6 +10,7 @@ import {
 	fiscalYearOfDate,
 	requestDate,
 	summarizeBudget,
+	type BudgetRequest,
 	type BudgetLine
 } from '../convex/budget';
 import { csvFilename, ledgerCsv } from '../apps/web/src/lib/budget/csv';
@@ -33,6 +34,12 @@ const spend = (
 	status: Doc<'purchaseRequests'>['status'],
 	vendor = 'Safeway'
 ) => ({ budgetSplits: onLine(name), totalAmount, status, vendor });
+
+const summarize = (lines: BudgetLine[], year: number, requests: BudgetRequest[]) =>
+	summarizeBudget({ budgetLines: lines }, year, requests);
+
+const yearsFor = (lines: BudgetLine[], current: number, purchaseYears: number[]) =>
+	availableFiscalYears({ budgetLines: lines }, current, purchaseYears);
 
 describe('fiscal years', () => {
 	test('Jun 30 closes one year and Jul 1 opens the next', () => {
@@ -61,16 +68,14 @@ describe('fiscal years', () => {
 	});
 
 	test('year chips cover the current year, allocated years and years with purchases', () => {
-		expect(availableFiscalYears([line('Food', [[2024, 100]])], 2026, [2025])).toEqual([
-			2026, 2025, 2024
-		]);
-		expect(availableFiscalYears([], 2026, [])).toEqual([2026]);
+		expect(yearsFor([line('Food', [[2024, 100]])], 2026, [2025])).toEqual([2026, 2025, 2024]);
+		expect(yearsFor([], 2026, [])).toEqual([2026]);
 	});
 });
 
 describe('summarizeBudget', () => {
 	test('approved is spent and draft or ready is pending', () => {
-		const summary = summarizeBudget([line('Food', [[2026, 600]])], 2026, [
+		const summary = summarize([line('Food', [[2026, 600]])], 2026, [
 			spend('Food', 100.1, 'approved'),
 			spend('Food', 0.2, 'approved'),
 			spend('Food', 40, 'ready', 'Costco'),
@@ -99,7 +104,7 @@ describe('summarizeBudget', () => {
 	});
 
 	test('going over the allocation leaves a negative remainder', () => {
-		const summary = summarizeBudget([line('Prizes', [[2026, 150]])], 2026, [
+		const summary = summarize([line('Prizes', [[2026, 150]])], 2026, [
 			spend('Prizes', 120, 'approved'),
 			spend('Prizes', 74.97, 'draft', 'Amazon')
 		]);
@@ -107,8 +112,8 @@ describe('summarizeBudget', () => {
 		expect(summary.totals.remaining).toBe(-44.97);
 	});
 
-	test('lines without an allocation that year are untracked and left out of the totals', () => {
-		const summary = summarizeBudget(
+	test('a line without an allocation still counts against its fund', () => {
+		const summary = summarize(
 			[line('Food', [[2026, 600]]), line('Advertising', [[2025, 90]])],
 			2026,
 			[spend('Food', 50, 'approved'), spend('Advertising', 45, 'approved')]
@@ -118,12 +123,12 @@ describe('summarizeBudget', () => {
 			allocated: null,
 			remaining: null
 		});
-		expect(summary.totals).toEqual({ allocated: 600, spent: 50, pending: 0, remaining: 550 });
-		expect(summary.untracked).toEqual({ spent: 45, pending: 0 });
+		expect(summary.totals).toEqual({ allocated: 600, spent: 95, pending: 0, remaining: 505 });
+		expect(summary.untracked).toEqual({ spent: 0, pending: 0 });
 	});
 
-	test('a request on a renamed line keeps its old name as its own untracked line', () => {
-		const summary = summarizeBudget([line('Events', [[2026, 500]])], 2026, [
+	test('a request on a renamed line keeps its old name as its own line', () => {
+		const summary = summarize([line('Events', [[2026, 500]])], 2026, [
 			spend('Event Expenses', 30, 'approved'),
 			spend('Events', 20, 'draft')
 		]);
@@ -131,12 +136,11 @@ describe('summarizeBudget', () => {
 			['Events', 500],
 			['Event Expenses', null]
 		]);
-		expect(summary.untracked).toEqual({ spent: 30, pending: 0 });
-		expect(summary.totals.remaining).toBe(480);
+		expect(summary.totals.remaining).toBe(450);
 	});
 
 	test('a split request counts each part against its own line or fund', () => {
-		const summary = summarizeBudget([], 2026, [
+		const summary = summarize([], 2026, [
 			{
 				budgetSplits: [
 					{ fund: 'administrative', line: null, amount: 55 },
@@ -154,7 +158,7 @@ describe('summarizeBudget', () => {
 	});
 
 	test('funds add up their lines, and an overflow counts against each fund it came from', () => {
-		const summary = summarizeBudget(
+		const summary = summarize(
 			[
 				{
 					name: 'Yearly Kahoot! Subscription',
@@ -188,8 +192,33 @@ describe('summarizeBudget', () => {
 		]);
 	});
 
+	test('an ASUO fund allocation replaces the sum of its lines', () => {
+		const summary = summarizeBudget(
+			{
+				budgetLines: [line('Weekly Musical Discussion Events', [[2026, 1200]])],
+				fundAllocations: [
+					{ fund: 'programming', fiscalYear: 2026, amount: 3000 },
+					{ fund: 'administrative', fiscalYear: 2026, amount: 500 },
+					{ fund: 'programming', fiscalYear: 2025, amount: 9 }
+				]
+			},
+			2026,
+			[spend('Weekly Musical Discussion Events', 41.28, 'approved')]
+		);
+		expect(summary.funds).toEqual([
+			{ fund: 'administrative', allocated: 500, spent: 0, pending: 0, remaining: 500 },
+			{ fund: 'programming', allocated: 3000, spent: 41.28, pending: 0, remaining: 2958.72 }
+		]);
+		expect(summary.totals).toEqual({
+			allocated: 3500,
+			spent: 41.28,
+			pending: 0,
+			remaining: 3458.72
+		});
+	});
+
 	test('pending vendors are listed once and capped at three', () => {
-		const summary = summarizeBudget([line('Food', [[2026, 600]])], 2026, [
+		const summary = summarize([line('Food', [[2026, 600]])], 2026, [
 			spend('Food', 1, 'draft', 'Costco'),
 			spend('Food', 1, 'draft', 'Costco'),
 			spend('Food', 1, 'draft', 'Safeway'),
@@ -246,8 +275,8 @@ describe('budget queries', () => {
 			{ name: 'Prizes', allocated: 25, spent: 0, pending: 40, remaining: -15 },
 			{ name: 'Snacks', allocated: null, spent: 0, pending: 5, remaining: null }
 		]);
-		expect(summary.totals).toEqual({ allocated: 125, spent: 20, pending: 77, remaining: 28 });
-		expect(summary.untracked).toEqual({ spent: 0, pending: 5 });
+		expect(summary.totals).toEqual({ allocated: 125, spent: 20, pending: 82, remaining: 23 });
+		expect(summary.untracked).toEqual({ spent: 0, pending: 0 });
 		expect(summary.fiscalYears.map((year) => year.year)).toContain(2025);
 
 		const lastYear = await owner.query(api.authed.budget.budgetSummary, {
@@ -333,6 +362,7 @@ describe('budget queries', () => {
 			name: 'Album Listening Club',
 			indexNumber: 'OS353i',
 			fundLetter: 'I',
+			fundAllocations: [],
 			budgetLines: [
 				{
 					name: ' Food ',
@@ -364,6 +394,7 @@ describe('budget queries', () => {
 				name: 'Album Listening Club',
 				indexNumber: 'OS353i',
 				fundLetter: 'I',
+				fundAllocations: [],
 				budgetLines: [
 					{ name: 'Food', fund: 'programming', allocations: [{ fiscalYear: 2026, amount: -1 }] }
 				]

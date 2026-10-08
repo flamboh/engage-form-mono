@@ -86,18 +86,32 @@ function allocationFor(line: BudgetLine, year: number): number | null {
 	return line.allocations.find((allocation) => allocation.fiscalYear === year)?.amount ?? null;
 }
 
-export function hasAllocations(lines: BudgetLine[]) {
-	return lines.some((line) => line.allocations.length > 0);
+export type BudgetSource = Pick<Doc<'organizations'>, 'budgetLines' | 'fundAllocations'>;
+
+function fundAllocationFor(source: BudgetSource, fund: Fund, year: number): number | null {
+	return (
+		(source.fundAllocations ?? []).find(
+			(allocation) => allocation.fund === fund && allocation.fiscalYear === year
+		)?.amount ?? null
+	);
+}
+
+export function hasAllocations(source: BudgetSource) {
+	return (
+		(source.fundAllocations ?? []).length > 0 ||
+		source.budgetLines.some((line) => line.allocations.length > 0)
+	);
 }
 
 const cents = (value: number) => Math.round(value * 100);
 const dollars = (value: number) => value / 100;
 
 export function summarizeBudget(
-	lines: BudgetLine[],
+	source: BudgetSource,
 	year: number,
 	requests: BudgetRequest[]
 ): BudgetSummary {
+	const lines = source.budgetLines;
 	const rows = new Map<
 		string,
 		{
@@ -151,20 +165,9 @@ export function summarizeBudget(
 			}
 		}
 	}
-	const totals = { allocated: 0, spent: 0, pending: 0, remaining: 0 };
-	const untracked = { spent: 0, pending: 0 };
 	const summaries: BudgetLineSummary[] = [];
 	for (const [name, row] of rows) {
 		const remaining = row.allocated === null ? null : row.allocated - row.spent - row.pending;
-		if (row.allocated === null) {
-			untracked.spent += row.spent;
-			untracked.pending += row.pending;
-		} else {
-			totals.allocated += row.allocated;
-			totals.spent += row.spent;
-			totals.pending += row.pending;
-			totals.remaining += remaining ?? 0;
-		}
 		summaries.push({
 			name,
 			fund: row.fund,
@@ -177,9 +180,23 @@ export function summarizeBudget(
 			pendingVendors: row.pendingVendors.slice(0, PENDING_VENDORS)
 		});
 	}
+	const fundSummaries = summarizeFunds(source, year, summaries);
+	const totals = { allocated: 0, spent: 0, pending: 0, remaining: 0 };
+	const untracked = { spent: 0, pending: 0 };
+	for (const fund of fundSummaries) {
+		if (fund.allocated === null) {
+			untracked.spent += cents(fund.spent);
+			untracked.pending += cents(fund.pending);
+			continue;
+		}
+		totals.allocated += cents(fund.allocated);
+		totals.spent += cents(fund.spent);
+		totals.pending += cents(fund.pending);
+		totals.remaining += cents(fund.remaining ?? 0);
+	}
 	return {
 		lines: summaries,
-		funds: summarizeFunds(summaries),
+		funds: fundSummaries,
 		totals: {
 			allocated: dollars(totals.allocated),
 			spent: dollars(totals.spent),
@@ -191,7 +208,11 @@ export function summarizeBudget(
 	};
 }
 
-function summarizeFunds(lines: BudgetLineSummary[]): FundSummary[] {
+function summarizeFunds(
+	source: BudgetSource,
+	year: number,
+	lines: BudgetLineSummary[]
+): FundSummary[] {
 	return funds
 		.map((fund) => {
 			const inFund = lines.filter((line) => line.fund === fund);
@@ -199,7 +220,8 @@ function summarizeFunds(lines: BudgetLineSummary[]): FundSummary[] {
 			const sum = (values: number[]) =>
 				dollars(values.reduce((acc, value) => acc + cents(value), 0));
 			const allocated =
-				tracked.length === 0 ? null : sum(tracked.map((line) => line.allocated ?? 0));
+				fundAllocationFor(source, fund, year) ??
+				(tracked.length === 0 ? null : sum(tracked.map((line) => line.allocated ?? 0)));
 			const spent = sum(inFund.map((line) => line.spent));
 			const pending = sum(inFund.map((line) => line.pending));
 			return {
@@ -211,16 +233,20 @@ function summarizeFunds(lines: BudgetLineSummary[]): FundSummary[] {
 					allocated === null ? null : dollars(cents(allocated) - cents(spent) - cents(pending))
 			};
 		})
-		.filter((summary) => lines.some((line) => line.fund === summary.fund));
+		.filter(
+			(summary) =>
+				summary.allocated !== null || lines.some((line) => line.fund === summary.fund)
+		);
 }
 
 export function availableFiscalYears(
-	lines: BudgetLine[],
+	source: BudgetSource,
 	current: number,
 	purchaseYears: number[]
 ): number[] {
 	const years = new Set<number>([current, ...purchaseYears]);
-	for (const line of lines) {
+	for (const allocation of source.fundAllocations ?? []) years.add(allocation.fiscalYear);
+	for (const line of source.budgetLines) {
 		for (const allocation of line.allocations) years.add(allocation.fiscalYear);
 	}
 	return [...years].sort((a, b) => b - a);

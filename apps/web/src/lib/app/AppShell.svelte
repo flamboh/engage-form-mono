@@ -30,7 +30,7 @@
 		);
 	});
 	const homeHref = $derived(current ? `/app/org/${current._id}` : '/app');
-	const tracking = $derived(current ? hasAllocations(current.budgetLines) : false);
+	const tracking = $derived(current ? hasAllocations(current) : false);
 	const tabs = $derived(
 		current
 			? [

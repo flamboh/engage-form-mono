@@ -13,7 +13,11 @@
 	import { useConvexClient } from 'convex-svelte';
 
 	type Organization = Doc<'organizations'>;
-	type Patch = Partial<Pick<Organization, 'name' | 'indexNumber' | 'fundLetter' | 'budgetLines'>>;
+	type Patch = Partial<
+		Pick<Organization, 'name' | 'indexNumber' | 'fundLetter' | 'budgetLines'> & {
+			fundAllocations: NonNullable<Organization['fundAllocations']>;
+		}
+	>;
 
 	let {
 		organization,
@@ -34,11 +38,12 @@
 			name: organization.name,
 			indexNumber: organization.indexNumber,
 			fundLetter: organization.fundLetter,
-			budgetLines: organization.budgetLines
+			budgetLines: organization.budgetLines,
+			fundAllocations: organization.fundAllocations ?? []
 		}
 	);
 
-	const tracking = $derived(hasAllocations(current.budgetLines));
+	const tracking = $derived(hasAllocations(current));
 
 	async function save(patch: Patch) {
 		const next = { ...current, ...patch };
@@ -118,8 +123,9 @@
 
 	<BudgetLines
 		lines={current.budgetLines}
+		fundAllocations={current.fundAllocations}
 		budgetHref={tracking ? `/app/org/${organization._id}/budget` : null}
-		onsave={(budgetLines) => save({ budgetLines })}
+		onsave={(patch) => save(patch)}
 	/>
 
 	<OrganizationEvents {organization} />

@@ -24,6 +24,7 @@ import {
 	budgetLine,
 	budgetSplit,
 	fileKind,
+	fundAllocation,
 	fundLetter,
 	nullReturn,
 	savedData,
@@ -36,7 +37,8 @@ const createOrganizationArgs = {
 	name: z.string(),
 	indexNumber: z.string(),
 	fundLetter,
-	budgetLines: z.array(budgetLine)
+	budgetLines: z.array(budgetLine),
+	fundAllocations: z.array(fundAllocation)
 };
 
 const purchaserArgs = {
@@ -178,12 +180,14 @@ export const upsertOrganization = authedMutation({
 		requireText(args.name, 'Organization name missing.');
 		requireText(args.indexNumber, 'Index number missing.');
 		const budgetLines = normalizeBudgetLines(args.budgetLines);
+		const fundAllocations = normalizeFundAllocations(args.fundAllocations);
 		const fields = {
 			owner,
 			name: args.name,
 			indexNumber: args.indexNumber,
 			fundLetter: args.fundLetter,
 			budgetLines,
+			fundAllocations,
 			archived: false,
 			updatedAt: Date.now()
 		};
@@ -459,6 +463,22 @@ function emptyDraft(
 		approvedAt: null,
 		reviewerNote: null
 	};
+}
+
+function normalizeFundAllocations(allocations: z.infer<typeof fundAllocation>[]) {
+	const result = new Map<string, z.infer<typeof fundAllocation>>();
+	for (const allocation of allocations) {
+		if (!Number.isInteger(allocation.fiscalYear)) throw new Error('Fiscal year is invalid.');
+		if (!Number.isFinite(allocation.amount) || allocation.amount < 0) {
+			throw new Error('Allocations must be zero or more.');
+		}
+		result.set(`${allocation.fund}:${allocation.fiscalYear}`, {
+			fund: allocation.fund,
+			fiscalYear: allocation.fiscalYear,
+			amount: Math.round(allocation.amount * 100) / 100
+		});
+	}
+	return [...result.values()].sort((a, b) => a.fiscalYear - b.fiscalYear);
 }
 
 function normalizeBudgetLines(lines: z.infer<typeof budgetLine>[]) {

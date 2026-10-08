@@ -8,15 +8,21 @@
 	import { fundLabel, funds, type Fund } from '$convex/funds';
 
 	type BudgetLine = Doc<'organizations'>['budgetLines'][number];
+	type FundAllocation = NonNullable<Doc<'organizations'>['fundAllocations']>[number];
 
 	let {
 		lines,
+		fundAllocations,
 		budgetHref,
 		onsave
 	}: {
 		lines: BudgetLine[];
+		fundAllocations: FundAllocation[];
 		budgetHref: string | null;
-		onsave: (lines: BudgetLine[]) => Promise<string | null>;
+		onsave: (patch: {
+			budgetLines?: BudgetLine[];
+			fundAllocations?: FundAllocation[];
+		}) => Promise<string | null>;
 	} = $props();
 
 	const currentYear = currentFiscalYear(Date.now());
@@ -31,37 +37,62 @@
 			...new Set([
 				currentYear - 1,
 				currentYear,
-				...lines.flatMap((line) => line.allocations.map((item) => item.fiscalYear))
+				...lines.flatMap((line) => line.allocations.map((item) => item.fiscalYear)),
+				...fundAllocations.map((item) => item.fiscalYear)
 			])
 		].sort((a, b) => a - b)
 	);
-	function amountFor(line: BudgetLine) {
-		const amount = line.allocations.find((item) => item.fiscalYear === year)?.amount;
+	function shownAmount(amount: number | undefined) {
 		return amount === undefined
 			? ''
 			: amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 	}
 
-	async function save(next: BudgetLine[]) {
-		error = (await onsave(next)) ?? '';
+	function amountFor(line: BudgetLine) {
+		return shownAmount(line.allocations.find((item) => item.fiscalYear === year)?.amount);
 	}
 
-	async function setAllocation(line: BudgetLine, input: HTMLInputElement) {
+	function fundAmountFor(fund: Fund) {
+		return shownAmount(
+			fundAllocations.find((item) => item.fund === fund && item.fiscalYear === year)?.amount
+		);
+	}
+
+	async function save(next: BudgetLine[]) {
+		error = (await onsave({ budgetLines: next })) ?? '';
+	}
+
+	function readAmount(input: HTMLInputElement, previous: string) {
 		const raw = input.value.replace(/[$,\s]/g, '');
 		const amount = raw === '' ? null : Number(raw);
 		if (amount !== null && (!Number.isFinite(amount) || amount < 0)) {
 			error = 'Enter an amount like 1500 or 1,500.00.';
-			input.value = amountFor(line);
-			return;
+			input.value = previous;
+			return undefined;
 		}
+		input.value = amount === null ? '' : shownAmount(amount);
+		return amount;
+	}
+
+	async function setFundAllocation(fund: Fund, input: HTMLInputElement) {
+		const amount = readAmount(input, fundAmountFor(fund));
+		if (amount === undefined) return;
+		const next = [
+			...fundAllocations.filter((item) => !(item.fund === fund && item.fiscalYear === year)),
+			...(amount === null
+				? []
+				: [{ fund, fiscalYear: year, amount: Math.round(amount * 100) / 100 }])
+		];
+		error = (await onsave({ fundAllocations: next })) ?? '';
+	}
+
+	async function setAllocation(line: BudgetLine, input: HTMLInputElement) {
+		const amount = readAmount(input, amountFor(line));
+		if (amount === undefined) return;
 		const allocations = [
 			...line.allocations.filter((item) => item.fiscalYear !== year),
 			...(amount === null ? [] : [{ fiscalYear: year, amount: Math.round(amount * 100) / 100 }])
 		].sort((a, b) => a.fiscalYear - b.fiscalYear);
-		input.value =
-			amount === null
-				? ''
-				: amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 		await save(lines.map((item) => (item.name === line.name ? { ...item, allocations } : item)));
 	}
 
@@ -87,15 +118,7 @@
 </script>
 
 <div class="flex flex-col">
-	<SectionHeader title="Your budget lines" level={3}>
-		{#snippet action()}
-			<Button variant="quiet" size="sm" onclick={() => (adding = !adding)}>Add line</Button>
-		{/snippet}
-	</SectionHeader>
-	<p class="hint top">
-		Optional, for your own tracking. Engage only sees how much comes from Administrative and
-		Programming.
-	</p>
+	<SectionHeader title="Budget" level={3} />
 	<div class="years" role="group" aria-label="Fiscal year">
 		<span>Allocated in</span>
 		{#each years as option (option)}
@@ -104,6 +127,47 @@
 			</Chip>
 		{/each}
 	</div>
+	<table>
+		<thead>
+			<tr>
+				<th scope="col">ASUO fund</th>
+				<th scope="col" class="num">Allocated {fiscalYearLabel(year)}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each funds as fund (fund)}
+				<tr>
+					<td>{fundLabel[fund]}</td>
+					<td class="num">
+						{#key year}
+							<input
+								inputmode="decimal"
+								placeholder="Not tracked"
+								aria-label={`${fundLabel[fund]} allocated in ${fiscalYearLabel(year)}`}
+								value={fundAmountFor(fund)}
+								onchange={(event) => setFundAllocation(fund, event.currentTarget)}
+								onkeydown={(event) => {
+									if (event.key === 'Enter') event.currentTarget.blur();
+								}}
+							/>
+						{/key}
+					</td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+
+	<div class="lines-header">
+		<SectionHeader title="Your budget lines" level={3}>
+			{#snippet action()}
+				<Button variant="quiet" size="sm" onclick={() => (adding = !adding)}>Add line</Button>
+			{/snippet}
+		</SectionHeader>
+	</div>
+	<p class="hint top">
+		Optional, for your own tracking within a fund. Engage only sees how much comes from
+		Administrative and Programming.
+	</p>
 	<table>
 		<thead>
 			<tr>
@@ -184,7 +248,7 @@
 	{/if}
 	{#if error}<div class="pt-3"><InlineError message={error} /></div>{/if}
 	<p class="hint">
-		Add allocations and a Budget tab shows what’s spent and left.
+		Add allocations and a Budget tab shows what’s spent and left in each fund.
 		{#if budgetHref}<a href={budgetHref}>Open Budget</a>{/if}
 	</p>
 </div>
@@ -280,6 +344,10 @@
 		padding: 12px 0 0;
 		font-size: 13.5px;
 		color: var(--quiet);
+	}
+
+	.lines-header {
+		padding-top: 22px;
 	}
 
 	.hint.top {
