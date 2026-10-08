@@ -39,7 +39,6 @@ import type * as extraction_textract from "../extraction/textract.js";
 import type * as fileSigning from "../fileSigning.js";
 import type * as files from "../files.js";
 import type * as funds from "../funds.js";
-import type * as fundsMigration from "../fundsMigration.js";
 import type * as http from "../http.js";
 import type * as lifecycle from "../lifecycle.js";
 import type * as purchaseCategories from "../purchaseCategories.js";
@@ -87,7 +86,6 @@ declare const fullApi: ApiFromModules<{
   fileSigning: typeof fileSigning;
   files: typeof files;
   funds: typeof funds;
-  fundsMigration: typeof fundsMigration;
   http: typeof http;
   lifecycle: typeof lifecycle;
   purchaseCategories: typeof purchaseCategories;
