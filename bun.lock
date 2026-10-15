@@ -33,7 +33,7 @@
     },
     "apps/extension": {
       "name": "extension",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@engage-form/domain": "workspace:*",
         "@engage-form/fill-engine": "workspace:*",

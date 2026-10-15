@@ -22,7 +22,7 @@ export default defineConfig({
 
 		return {
 			name: 'Engage Form',
-			version: '0.0.1',
+			version: '0.0.2',
 			description: 'Fill Engage purchase request forms from prepared purchase requests.',
 			key: env.CRX_PUBLIC_KEY?.trim() || undefined,
 			action: {

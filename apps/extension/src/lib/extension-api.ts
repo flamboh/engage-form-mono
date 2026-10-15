@@ -1,4 +1,4 @@
-import type { PurchaseRequest } from '@engage-form/domain';
+import { fillProtocolHeader, fillProtocolVersion, type PurchaseRequest } from '@engage-form/domain';
 import type { ReadyPurchaseRequest } from './messages';
 import type { PendingFill } from './pending-fill';
 
@@ -18,7 +18,7 @@ export class ExtensionRequestError extends Error {
 	}
 }
 
-type Fetch = typeof fetch;
+type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 
 export function createExtensionApi(siteUrl: string, fetcher: Fetch = fetch) {
 	async function call<T>(
@@ -31,6 +31,7 @@ export function createExtensionApi(siteUrl: string, fetcher: Fetch = fetch) {
 			method,
 			headers: {
 				Authorization: `Bearer ${token}`,
+				[fillProtocolHeader]: String(fillProtocolVersion),
 				...(body === undefined ? {} : { 'Content-Type': 'application/json' })
 			},
 			body: body === undefined ? undefined : JSON.stringify(body),
