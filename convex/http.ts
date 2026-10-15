@@ -2,6 +2,11 @@ import { httpRouter } from 'convex/server';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { httpAction, type ActionCtx } from './_generated/server';
+import {
+	fillProtocolHeader,
+	isCurrentFillProtocol,
+	outdatedExtensionMessage
+} from '../packages/domain/src/protocol';
 import { bearerToken, extensionOrigin, hashExtensionToken } from './extensionTokens';
 
 type ExtensionAuth = { owner: string; tokenHash: string };
@@ -62,6 +67,9 @@ function extensionRoute(method: 'GET' | 'POST', path: string, handler: Extension
 		path,
 		method,
 		handler: httpAction(async (ctx, request) => {
+			if (!isCurrentFillProtocol(request.headers.get(fillProtocolHeader))) {
+				return json(request, 426, { error: outdatedExtensionMessage });
+			}
 			const token = bearerToken(request.headers.get('Authorization'));
 			const tokenHash = token === null ? null : await hashExtensionToken(token);
 			const session =
@@ -107,7 +115,7 @@ function cors(request: Request): Record<string, string> {
 	return {
 		'Access-Control-Allow-Origin': extensionOrigin,
 		'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-		'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+		'Access-Control-Allow-Headers': `Authorization, Content-Type, ${fillProtocolHeader}`,
 		'Access-Control-Max-Age': '600',
 		Vary: 'Origin'
 	};

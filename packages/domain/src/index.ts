@@ -1,3 +1,5 @@
+export * from './protocol';
+
 export type FundLetter = 'I' | 'E' | 'G' | 'N' | 'U' | 'D' | 'T';
 
 export type DocumentKind =
