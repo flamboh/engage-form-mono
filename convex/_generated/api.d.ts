@@ -47,6 +47,7 @@ import type * as purchaseReadiness from "../purchaseReadiness.js";
 import type * as purchaseZod from "../purchaseZod.js";
 import type * as requestView from "../requestView.js";
 import type * as seed from "../seed.js";
+import type * as uploadLimit from "../uploadLimit.js";
 
 import type {
   ApiFromModules,
@@ -94,6 +95,7 @@ declare const fullApi: ApiFromModules<{
   purchaseZod: typeof purchaseZod;
   requestView: typeof requestView;
   seed: typeof seed;
+  uploadLimit: typeof uploadLimit;
 }>;
 
 /**
