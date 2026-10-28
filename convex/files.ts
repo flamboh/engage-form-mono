@@ -8,10 +8,10 @@ import {
 } from './_generated/server';
 import { internal } from './_generated/api';
 import { ownerKeyPrefix, ownsKey, signedFileUrl, uploadContentType } from './fileSigning';
+import { maxUploadBytes } from './uploadLimit';
 
 const minute = 60 * 1000;
 const hour = 60 * minute;
-export const maxUploadSize = 15 * 1024 * 1024;
 const uploadTicketTtl = 10 * minute;
 const downloadTimeoutMs = 20_000;
 
@@ -23,7 +23,7 @@ function filesConfig() {
 }
 
 export async function issueUploadTicket(owner: string, contentType: string, size: number) {
-	if (size > maxUploadSize) throw new Error('File is larger than 15 MB.');
+	if (size > maxUploadBytes) throw new Error('Engage only accepts files under 4 MB.');
 	const normalizedContentType = uploadContentType(contentType);
 	const { baseUrl, secret } = filesConfig();
 	const r2Key = `${await ownerKeyPrefix(owner)}/${crypto.randomUUID()}`;
@@ -32,7 +32,7 @@ export async function issueUploadTicket(owner: string, contentType: string, size
 		key: r2Key,
 		expiresAt: Date.now() + uploadTicketTtl,
 		contentType: normalizedContentType,
-		maxSize: maxUploadSize
+		maxSize: maxUploadBytes
 	});
 	return { uploadUrl, r2Key };
 }

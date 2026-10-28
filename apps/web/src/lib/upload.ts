@@ -1,6 +1,7 @@
 import { api } from '$convex/_generated/api';
 import type { Id } from '$convex/_generated/dataModel';
 import { convexMutation, type ClerkSession } from '$lib/convex-http';
+import { prepareForUpload } from '$lib/imageConvert';
 
 type Kind =
 	| 'receipt'
@@ -46,6 +47,6 @@ export async function uploadFile(
 	kind: Kind,
 	file: File
 ): Promise<Id<'files'>> {
-	const stored = await putFile(session, file);
+	const stored = await putFile(session, await prepareForUpload(file));
 	return await convexMutation(session, api.authed.purchaseBuilder.saveFile, { kind, ...stored });
 }

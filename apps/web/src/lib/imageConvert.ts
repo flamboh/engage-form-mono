@@ -1,5 +1,6 @@
+import { maxUploadBytes as maxBytes } from '../../../../convex/uploadLimit';
+
 const maxSide = 2000;
-const maxBytes = 10 * 1024 * 1024 - 64 * 1024;
 const keepBytes = 2 * 1024 * 1024;
 
 const extensionTypes: Record<string, string> = {
@@ -38,8 +39,10 @@ export function previewable(type: string) {
 export async function prepareForUpload(file: File): Promise<File> {
 	const type = fileType(file);
 	if (type === 'application/pdf') {
-		if (file.size > 15 * 1024 * 1024) {
-			throw new UploadProblem(`${file.name} is over 15 MB. Try a smaller PDF.`);
+		if (file.size > maxBytes) {
+			throw new UploadProblem(
+				`${file.name} is over 4 MB, which Engage won’t accept. Try a smaller PDF.`
+			);
 		}
 		return withType(file, type);
 	}
